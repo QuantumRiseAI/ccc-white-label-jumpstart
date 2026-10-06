@@ -1,0 +1,135 @@
+# P&L Flux: Reference
+
+Pairs with [`PROJECT_INSTRUCTIONS.md`](PROJECT_INSTRUCTIONS.md). What each check tests, how
+each account group moves, and how an entry is shaped. The scripts apply all of it; use this
+file to explain a result, not to reproduce one.
+
+## What Each Check Tests
+
+| Check | Shows on | What it tests |
+|---|---|---|
+| `F1.VARIANCE` | Actual vs. Actual | Each P&L account against the prior month, from $2,500. The prior year rides along for context. |
+| `F2.BUDGET` | Actual vs. Budget | Each account the June plan covers, against plan, from $2,500 |
+| `F5.MODEL_TIE` | Forecast vs. Actual | The closed months of the forecast cut after the month closed, against the ledger. A difference is an entry staged in one and not the other. |
+| `F3.ACCRUAL_RECEIPT` | Accrual Proposals | Goods received in Coupa and not invoiced, $5,000 or more per supplier and account |
+| `F6.ACCRUAL_PATTERN` | Accrual Proposals | A vendor that bills every month and billed nothing this month, at its three-month average |
+| `F9.PREPAID` | Prepaids and Capital | Bills for one good or service of $10,000 or more that name a service term, or sit on a term account the vendor does not bill most months |
+| `F10.CAPITALIZE` | Prepaids and Capital | Bills of $2,500 or more on an account the asset policy names for review, or on repairs and maintenance, that do not name a service term |
+| `F7.REVENUE_IN_EXPENSE` | Reclassifications | A customer document posted to an expense account |
+| `F8.VENDOR_DROPPED` | Reclassifications | A journal with no vendor where the same account, department and amount carried one before, including prepaid releases |
+
+The threshold that decides what needs commentary or a decision is the reviewer's, $10,000 by
+default, in dollars.
+
+## How Each Account Group Moves
+
+| Account group | What drives it | In commentary |
+|---|---|---|
+| `6100000` Employee Expenses | Headcount, bonus cycle, benefits | Without the payroll register, headcount does not explain a salary move. Say the driver is not attributed. |
+| `6200000` Consulting | `Flagship Labs LLC`, about $9.1M net | Related party. Keep Flagship apart from other consulting. |
+| `6300000` Legal & Professional | `K&L Gates LLP` corporate, IP legal apart | Milestone driven. Check for unbilled legal against `2204000`. |
+| `6400000` Lab Expenses | Fisher Scientific, New England BioLabs, Life Technologies | Explain by vendor and order cycle, not one line. |
+| `6500000` External Research | Sequencing, synthesis, in vivo, in vitro, CMC | Moves in steps with milestones and batches. A drop is often a missing invoice. Check accruals first. |
+| `6600000` Facilities | Rent, CAM, parking | Largely fixed. Explain any move. |
+| `6700000` Travel & Entertainment | Conferences, travel, meals | Follows the conference calendar. |
+| `6800000` Administrative | Office supplies, software, insurance | Many small lines. Comment in aggregate. |
+| `6900000` FSP Operating Charges | Flagship shared-platform allocation | A move means the allocation changed, not Serif's activity. Related party. |
+| `7100000` Depreciation | Fixed asset schedule | Moves only with additions and disposals. Flag any other move. |
+| `7301000` Stock Compensation | Grant schedule | Rarely adjusted. Flag any move. |
+| `8202000` Interest Expense - Cash | Debt schedule | Tie to principal and rate, not operations. |
+| `8231000`, `8232000` FX | Realized and unrealized FX | Non-operating. Report apart from operating commentary. |
+
+## Journal Entry Patterns
+
+Accrual, reversing on the first day of the next month:
+
+```
+Dr [expense account] / [department]    [amount]
+  Cr [accrual account]                 [amount]
+```
+
+| Expense | Accrual account |
+|---|---|
+| Lab supplies and external research | `2206000 Accrued Lab Supplies and External Research` |
+| Payroll, benefits and bonus | `2201000 Accrued Payroll Benefits and Bonus` |
+| Consulting | `2202000 Accrued Consulting` |
+| Facilities | `2203000 Accrued Facility Costs` |
+| Legal | `2204000 Accrued Legal Fees` |
+| FSP charges | `2206500 Accrued FSP Charges` |
+| Anything else | `2207000 Accrued Other` |
+
+Prepaid, when the service runs past the period end, then amortized straight-line over the
+term to the account and department where the spend was budgeted:
+
+```
+Dr [prepaid account]                   [amount]
+  Cr [expense account] / [department]  [amount]
+```
+
+| Expense account | Prepaid account |
+|---|---|
+| `6601000` Rent | `1305000 Prepaid Rent` |
+| `6891000` Package Insurance | `1310000 Prepaid Insurance` |
+| `6416000`, `6816000` software | `1320000 Prepaid Software` |
+| Any other | `1315000 Prepaid Other` |
+
+Capital, when the item lasts more than a year, placed in service at the invoice date:
+
+```
+Dr [asset account]                     [amount]
+  Cr [expense account] / [department]  [amount]
+```
+
+| Expense account | Asset account |
+|---|---|
+| `6415000` Lab Non-Capital Equipment, `6435000` Lab Equipment Repairs & Maintenance | `1510000 Lab Equipment - New` |
+| `6815000` Office Non-Cap Equipment/Furniture | `1505000 Capital in Process` |
+| `6416000`, `6816000` software | `1530000 Computers & Software` |
+
+Customer document in expense:
+
+```
+Dr [expense account] / [department]    [amount]
+  Cr 4001003 Revenue - Cost Reimbursement  [amount]
+```
+
+Department recode, one pair per posted line, with no P&L effect:
+
+```
+Dr [account] / [correct department]    [amount]
+  Cr [account] / [posted department]   [amount]
+```
+
+## Load Summary
+
+Print this before anything else:
+
+```
+P&L FLUX, DATA LOAD
+Period: [Mon YYYY] | Prior month: [Mon YYYY] | Same month last year: [Mon YYYY]
+LOADED:    [file]  [N] rows             (one row per file)
+TIE-OUT:   Dr [X] / Cr [Y] / net [Z]    [PASS or FAIL]
+NOT RUN:   [check]  needs [feed]         (one row per check)
+```
+
+A failed tie-out stops the run. Report the difference and produce nothing else.
+
+## When Something Is Off
+
+| What you see | What to do |
+|---|---|
+| Debits do not equal credits | Stop. Report the difference. No findings. |
+| A prior value is zero | Give the dollar change. The percent is not meaningful. |
+| A template is header-only | Expected. Name the checks it turns off and continue. |
+| A template has rows under the wrong headers | Stop for that feed. Report the mismatch. Do not guess a mapping. |
+| An expense fell and a regular vendor billed nothing | Not a saving until the accrual question is answered. |
+| A Coupa PO line has no quantity | It counts as zero, so the accrual total is a floor. Say so. |
+| `Currency Revaluation` lines | Report under FX, not in operating commentary. |
+
+## Limits
+
+* Every Serif policy is a draft and unapproved.
+* Receipt accruals are pro-rated from the PO line total; 279 PO lines in 2026 carry no
+  quantity. Billing-pattern accruals are estimates that the budget owner confirms.
+* No Coupa invoice data, so a receipt cannot be matched to a later bill.
+* The plan does not cover payroll or depreciation.

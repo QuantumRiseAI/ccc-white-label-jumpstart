@@ -1,0 +1,934 @@
+#!/usr/bin/env python3
+"""Read Serif's system exports exactly as the systems produce them.
+
+    netsuite GL    the Custom General Ledger saved search, exported as .xls
+                   (SpreadsheetML). One export or several; each month is read from
+                   the one export that holds it.
+    coupa          the PO line export with all available columns, as a .csv
+    forecast       the rolling forecast workbook, as an .xlsx
+    balance sheet  the NetSuite Balance Sheet report, monthly columns, exported as .xls
+                   (SpreadsheetML)
+
+Nothing is sliced, summarized or reshaped on disk. The engines and the schedules
+call these readers and derive what they need in memory, so every figure traces to
+a file a system produced.
+
+Stdlib only. Python 3.9+.
+"""
+
+from __future__ import annotations
+
+import csv
+import datetime as dt
+import os
+import re
+import zipfile
+from collections import defaultdict
+from xml.etree import ElementTree as ET
+
+# Where the consoles' links open. NETSUITE_ACCOUNT is the account ID in the
+# NetSuite address bar (1234567 in 1234567.app.netsuite.com); left blank, no
+# NetSuite links are drawn.
+COUPA_HOST = "aflagshipcompany.coupahost.com"
+NETSUITE_ACCOUNT = "5602907"
+
+MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def period_key(period: str) -> tuple[int, int]:
+    """'Aug 2026' -> (2026, 8), so periods sort as dates."""
+    try:
+        mon, year = period.split()
+        return int(year), MONTH_NAMES.index(mon[:3]) + 1
+    except (ValueError, AttributeError):
+        return (0, 0)
+
+
+def shift(period: str, months: int) -> str:
+    """shift('Aug 2026', -1) -> 'Jul 2026'; shift('Aug 2026', -12) -> 'Aug 2025'."""
+    year, month = period_key(period)
+    if not year:
+        raise SystemExit(f"Not a period: {period!r}. Write it as 'Sep 2026'.")
+    index = year * 12 + (month - 1) + months
+    return f"{MONTH_NAMES[index % 12]} {index // 12}"
+
+
+def slug(period: str) -> str:
+    return period.lower().replace(" ", "")
+
+
+# ── NetSuite Custom General Ledger ──────────────────────────────────────────
+#
+# Rows 0-5 are report headers; row 6 is the column header; data starts at row 7.
+# The export carries TWO columns named "ProjectID: Name" and the second holds the
+# values, so columns are read by position, never by header name. Amounts arrive as
+# separate Debit and Credit strings; `amount` is Debit - Credit.
+#
+# Columns after Memo are read by header name. The saved search can add
+# "Internal ID" (the NetSuite record a line belongs to), the bill's Coupa
+# Transaction URL (custbody_coupa_transaction_url) and the line's Coupa PO number
+# (custcol_coupa_po_num, eg FL087030260-1). A Coupa invoice address in any cell is
+# carried as the line's link.
+
+SS = "{urn:schemas-microsoft-com:office:spreadsheet}"
+GL_HEADER_ROW = 6
+GL_COLS = {
+    "account_path": 0, "txn_type": 1, "date": 2, "document_number": 3, "name": 4,
+    "debit": 5, "credit": 6, "balance": 7, "account_name": 8, "period": 9,
+    "department": 10, "program": 11, "project_unused": 12, "project": 13,
+    "subsidiary": 14, "description": 15, "memo": 16,
+}
+
+
+def _float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def split_account(path: str) -> tuple[str, str]:
+    """'6000000 - Operating Expenses:6410000 - Lab Supplies' -> ('6410000', 'Lab Supplies')."""
+    leaf = path.split(":")[-1]
+    match = re.match(r"\s*(\d+)\s*-\s*(.*)", leaf)
+    return (match.group(1), match.group(2).strip()) if match else ("", leaf.strip())
+
+
+def _gl_rows(path: str, header=None):
+    """Yield each data row's cell values, streaming, so a large export fits in memory.
+    The column header row is copied into `header` when one is passed."""
+    index = 0
+    try:
+        for _, elem in ET.iterparse(path, events=("end",)):
+            if elem.tag != SS + "Row":
+                continue
+            values = []
+            for cell in elem.findall(SS + "Cell"):
+                data = cell.find(SS + "Data")
+                values.append("".join(data.itertext()).strip() if data is not None else "")
+            if index == GL_HEADER_ROW and (not values or values[0] != "Account"):
+                raise SystemExit(
+                    f"{os.path.basename(path)}: row {GL_HEADER_ROW} is {values[:3]}, not the "
+                    "Custom General Ledger header. Export the saved search again as .xls, "
+                    "unchanged.")
+            if index == GL_HEADER_ROW and header is not None:
+                header[:] = values
+            if index > GL_HEADER_ROW and len(values) >= len(GL_COLS):
+                yield values
+            index += 1
+            elem.clear()
+    except ET.ParseError as error:
+        raise SystemExit(f"{os.path.basename(path)} is not a NetSuite .xls export: {error}")
+
+
+COUPA_INVOICE = "https://" + COUPA_HOST + "/invoices/"
+
+
+def _extra_cols(header):
+    """-> (Internal ID column, Coupa PO column), or None for one the export lacks."""
+    def find(test):
+        return next((i for i, h in enumerate(header) if i >= len(GL_COLS) and test(h.strip().lower())), None)
+    return (find(lambda h: h == "internal id"),
+            find(lambda h: "coupa" in h and re.search(r"\bpo\b", h) is not None))
+
+
+def _gl_line(values, internal_id_col=None, po_col=None):
+    get = lambda key: values[GL_COLS[key]]
+    code, leaf = split_account(get("account_path"))
+    debit, credit = _float(get("debit")), _float(get("credit"))
+    return {
+        "period": get("period"), "date": get("date")[:10], "txn_type": get("txn_type"),
+        "document_number": get("document_number"), "vendor_or_name": get("name"),
+        "account_path": get("account_path"), "account_code": code, "account_leaf": leaf,
+        "amount": round(debit - credit, 2), "debit": debit, "credit": credit,
+        "department": get("department"), "project": get("project"),
+        "program": get("program"), "subsidiary": get("subsidiary"),
+        "description": get("description"), "memo": get("memo"),
+        "internal_id": (values[internal_id_col].strip()
+                        if internal_id_col is not None and internal_id_col < len(values) else ""),
+        "coupa_url": next((v.strip() for v in values if v.strip().startswith(COUPA_INVOICE)), ""),
+        # 'FL087030260-1' is PO FL087030260, line 1; 'No PO' is none.
+        "coupa_po": (re.match(r"(FL\d{9})", values[po_col].strip()).group(1)
+                     if po_col is not None and po_col < len(values)
+                     and re.match(r"FL\d{9}", values[po_col].strip()) else ""),
+    }
+
+
+def read_gl(paths) -> tuple[dict, list[dict]]:
+    """-> ({period: [line, ...]}, [{path, periods, rows}, ...]).
+
+    A month held by two exports is refused rather than read twice or picked
+    between: the two may differ, and a silent choice would change the findings.
+    """
+    by_period: dict[str, list[dict]] = {}
+    owner: dict[str, str] = {}
+    files = []
+    for path in paths:
+        if not os.path.exists(path):
+            raise SystemExit(f"Not found: {path}")
+        mine = defaultdict(list)
+        header: list = []
+        cols = None
+        for values in _gl_rows(path, header):
+            if cols is None:
+                cols = _extra_cols(header)
+            line = _gl_line(values, *cols)
+            if line["period"]:
+                mine[line["period"]].append(line)
+        for period, lines in mine.items():
+            if period in owner:
+                raise SystemExit(
+                    f"{period} is in two NetSuite exports: {os.path.basename(owner[period])} "
+                    f"and {os.path.basename(path)}. Pass exports that do not overlap.")
+            owner[period] = path
+            by_period[period] = lines
+        files.append({"path": path, "periods": sorted(mine, key=period_key),
+                      "rows": sum(len(v) for v in mine.values())})
+    return by_period, files
+
+
+def activity(lines) -> list[dict]:
+    """Net movement by account and department for one period's lines.
+
+    Not a trial balance: for P&L accounts it is the period's expense or income,
+    which is what a flux reads; for balance sheet accounts it is the movement.
+    """
+    totals = defaultdict(float)
+    for line in lines:
+        totals[(line["account_code"], line["account_leaf"], line["account_path"],
+                line["department"])] += line["amount"]
+    return [{"period": lines[0]["period"] if lines else "", "account_code": code,
+             "account_leaf": leaf, "account_path": path, "department": dept,
+             "period_activity": round(total, 2)}
+            for (code, leaf, path, dept), total in sorted(totals.items())]
+
+
+# ── Coupa PO line export ────────────────────────────────────────────────────
+#
+# Traps in the raw export:
+#   * `Department` is empty on every row. The department code is the third segment
+#     of the packed `Account` string, 97-<gl account>-<dept>-<seg3>-<seg4>.
+#   * `Period` reads 'None' on every row. The period comes from `Order Date`.
+#   * Amounts carry thousands separators ("2,772.80").
+#   * `Received`, `Active Invoiced` and `Approved Invoiced` are QUANTITIES. The
+#     received-not-invoiced value pro-rates `Line Total`; Quantity x Price is
+#     unreliable on bulk-price lines.
+#
+# Two populations that must not be confused:
+#   is_open_commitment           ordered, not yet fully received. NOT an accrual.
+#   received_not_invoiced_value  received, not yet invoiced. The accrual population.
+
+def _num(value):
+    text = (value or "").replace(",", "").strip()
+    if not text:
+        return 0.0
+    try:
+        return float(text)
+    except ValueError:
+        return 0.0
+
+
+def _coupa_date(value):
+    """'9/10/2026' -> ('2026-09-10', 'Sep 2026'), or ('', '')."""
+    match = re.match(r"\s*(\d{1,2})/(\d{1,2})/(\d{4})", value or "")
+    if not match:
+        return "", ""
+    month, day, year = (int(g) for g in match.groups())
+    if not 1 <= month <= 12:
+        return "", ""
+    return f"{year:04d}-{month:02d}-{day:02d}", f"{MONTH_NAMES[month - 1]} {year}"
+
+
+def _coupa_line(row):
+    order_date, period = _coupa_date(row.get("Order Date (Header)", ""))
+    account_raw = (row.get("Account") or "").strip()
+    parts = account_raw.split("-")
+    seg = lambda i: parts[i].strip() if len(parts) > i else ""
+    qty, received = _num(row.get("Qty")), _num(row.get("Received"))
+    approved_invoiced = _num(row.get("Approved Invoiced"))
+    line_total = _num(row.get("Line Total"))
+    line_status = (row.get("Line Status") or "").strip()
+    order_status = (row.get("Order Status (Header)") or "").strip()
+    # A cancelled or soft-closed header is not an open commitment even if the line
+    # never got a receipt.
+    is_open = 1 if (line_status in ("created", "partially_received")
+                    and order_status == "Issued") else 0
+    open_qty = max(received - approved_invoiced, 0.0)
+    open_value = round(line_total * min(open_qty, qty) / qty, 2) if qty > 0 and open_qty > 0 else 0.0
+    return {
+        "period": period, "order_date": order_date,
+        "po_number": (row.get("PO Number (Header)") or "").strip(),
+        # Coupa's own record ID, the one its PO addresses use.
+        "po_id": (row.get("PO ID") or "").strip(),
+        "line": (row.get("Line") or "").strip(),
+        # The id inside 'Name (Name|496|Labs)' is a site id, not the supplier id.
+        "supplier": (row.get("Supplier") or "").strip().split(" (")[0].strip(),
+        "supplier_id": (row.get("Supplier id") or "").strip(),
+        "order_status": order_status, "line_status": line_status,
+        "item_name": (row.get("Item") or "").strip(),
+        "line_total": line_total, "currency": (row.get("Currency") or "").strip(),
+        "gl_account_code": seg(1), "coupa_dept_code": seg(2),
+        "coupa_seg3": seg(3), "coupa_seg4": seg(4), "account_raw": account_raw,
+        "qty": qty, "received": received, "price": _num(row.get("Price")),
+        "commodity": (row.get("Commodity") or "").strip(),
+        "uom": (row.get("UOM") or "").strip(),
+        "line_owner": (row.get("Line Owner") or "").strip(),
+        "created_by": (row.get("Created By") or "").strip(),
+        "requested_by": (row.get("Requested By (Header)") or "").strip(),
+        "need_by": _coupa_date(row.get("Need By", ""))[0],
+        "is_open_commitment": is_open,
+        "approved_invoiced": approved_invoiced,
+        "active_invoiced": _num(row.get("Active Invoiced")),
+        "received_not_invoiced_qty": open_qty,
+        "received_not_invoiced_value": open_value,
+    }
+
+
+def read_coupa(path) -> list[dict]:
+    """Every PO line in the export, with the period taken from its order date."""
+    if not os.path.exists(path):
+        raise SystemExit(f"Not found: {path}")
+    with open(path, encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if "PO Number (Header)" not in (reader.fieldnames or []):
+            raise SystemExit(
+                f"{os.path.basename(path)} is not the Coupa PO line export: it has no "
+                "'PO Number (Header)' column. Export it from Coupa with all available columns.")
+        return [_coupa_line(row) for row in reader]
+
+
+# ── Rolling forecast workbook ───────────────────────────────────────────────
+#
+# The workbook carries four tabs built on one grid: `EXT$_R&D`, `EXT$_G&A`, `LAB`
+# and `OH`. Each holds the grid twice side by side: the CURRENT cut in columns
+# 0-44 and the PRIOR cut in columns 51-95. The current cut's closed months are the
+# posted actuals, so it reconciles the model to the ledger; the prior cut predates
+# the month and is the plan.
+
+NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+
+# Excel's serial-date origin. 1899-12-30 rather than 12-31 absorbs the
+# deliberate 1900 leap-year bug, so month-ends land on the right day.
+EXCEL_EPOCH = dt.date(1899, 12, 30)
+
+# Any number will convert to a date, so a header scan with no plausibility window
+# reads money as dates: a cell holding 1,389,370 yields a date in the year 5704.
+# Only serials inside this window are treated as month headers.
+SERIAL_MIN = int((dt.date(1990, 1, 1) - EXCEL_EPOCH).days)
+SERIAL_MAX = int((dt.date(2100, 1, 1) - EXCEL_EPOCH).days)
+
+MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+# The line-item build tabs. All four share one grid. Only the two `EXT$_` tabs
+# were named in the request; LAB and OH are the same shape and carry lab supplies
+# and overhead, which together are most of R&D spend, so excluding them would
+# report a budget of zero on accounts that are in fact budgeted.
+DETAIL_SHEETS = ("EXT$_R&D", "EXT$_G&A", "LAB", "OH")
+
+# Row 19 is the detail header, detail begins at row 20. Rows above it are a
+# summary block that aggregates the detail, and including them would double count.
+HEADER_ROW = 19
+LABEL_FIELDS = ("num", "dept", "acct", "proj", "vendor", "po", "note1", "note2", "desc")
+MONTHS_PER_BLOCK = 36
+
+
+class Block:
+    """One horizontal copy of the detail grid.
+
+    `first_label` is the column of its `#` cell and `first_month` the column of
+    its first month, so the nine label fields run from `first_label` and the
+    months run from `first_month` for MONTHS_PER_BLOCK columns.
+    """
+
+    def __init__(self, key: str, first_label: int, first_month: int, trust_header: bool):
+        self.key = key
+        self.first_label = first_label
+        self.first_month = first_month
+        # Whether this block's own header row can be believed. See BLOCKS below.
+        self.trust_header = trust_header
+
+    def col(self, field: str) -> int:
+        return self.first_label + LABEL_FIELDS.index(field)
+
+
+# The current block's header is correct on all four tabs and is the only one that
+# can be read directly.
+#
+# THE PRIOR BLOCK'S HEADER IS STALE AND MUST NOT BE READ. On `EXT$_R&D` it is
+# correct, but on `EXT$_G&A`, `LAB` and `OH` it carries only 24 dates, running Jan
+# 2024 to Dec 2025, which is a leftover from an older cut of the template. Reading
+# it literally would misdate every prior-vintage number by twelve months, and the
+# twelve unlabelled columns beyond it hold $24,589,211.80 of real values that
+# would be dropped.
+#
+# The months are therefore taken POSITIONALLY from the current block, so column
+# `first_month + k` carries the same period in both. That is verifiable rather
+# than assumed: 2025 is closed and actualized in both vintages, so entity-aligned
+# rows must agree on 2025 months, and the positional reading matches 100% of cells
+# across all four tabs where the year-shifted reading matches as little as 69%.
+# The workbook's own delta block also computes positionally.
+BLOCKS = (
+    Block("current", first_label=0, first_month=9, trust_header=True),
+    Block("prior", first_label=51, first_month=60, trust_header=False),
+)
+
+BUDGET_FIELDS = ["fiscal_year", "period", "account_code", "account_leaf",
+                 "department", "budget_amount", "budget_version",
+                 "approved_by", "approved_date"]
+
+LINE_FIELDS = ["fiscal_year", "period", "account_code", "account_leaf",
+               "department", "project", "vendor", "po_number", "description",
+               "note_1", "note_2", "amount", "source_tab", "line_ref",
+               "budget_version", "vintage_block", "account_source"]
+
+UNMAPPED_FIELDS = ["forecast_account", "reason", "source_tabs", "vintage_blocks",
+                   "departments", "forecast_lines", "total_all_periods",
+                   "gl_account_code", "gl_account_leaf"]
+
+# Accounts outside the expense ranges. The build tabs are expense planning, so a
+# revenue line here is unexpected and its sign convention cannot be checked
+# against the ledger, which carries no revenue rows on these accounts. Carried
+# through but called out rather than silently mixed into an expense budget.
+EXPENSE_PREFIXES = ("6", "7", "8")
+
+
+def _period_key(label: str) -> tuple[int, int]:
+    """Chronological ordering for 'Aug 2026' style labels, which sort alphabetically."""
+    month, _, year = label.partition(" ")
+    return (int(year or 0), MONTHS.index(month) if month in MONTHS else 0)
+
+
+# ── Reading the workbook ────────────────────────────────────────────────────
+
+def _col_index(ref: str) -> int:
+    """'BC12' -> 54. Column letters are base-26 with no zero digit."""
+    letters = re.match(r"([A-Z]+)", ref).group(1)
+    n = 0
+    for ch in letters:
+        n = n * 26 + (ord(ch) - 64)
+    return n - 1
+
+
+def _shared_strings(zf: zipfile.ZipFile) -> list[str]:
+    if "xl/sharedStrings.xml" not in zf.namelist():
+        return []
+    root = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+    return ["".join(t.text or "" for t in si.iter(NS + "t"))
+            for si in root.findall(NS + "si")]
+
+
+def _sheet_map(zf: zipfile.ZipFile) -> dict[str, str]:
+    """Sheet display name -> its part name inside the archive."""
+    rels = zf.read("xl/_rels/workbook.xml.rels").decode("utf-8")
+    targets = dict(re.findall(r'Id="(rId\d+)"[^>]*Target="([^"]*)"', rels))
+    book = zf.read("xl/workbook.xml").decode("utf-8")
+    out = {}
+    for m in re.finditer(r'<sheet[^>]*?name="([^"]*)"[^>]*?r:id="(rId\d+)"', book):
+        name = (m.group(1).replace("&amp;", "&").replace("&lt;", "<")
+                .replace("&gt;", ">").replace("&quot;", '"').replace("&apos;", "'"))
+        target = targets.get(m.group(2), "")
+        if target:
+            out[name] = "xl/" + target.lstrip("/")
+    return out
+
+
+def _read_grid(zf: zipfile.ZipFile, part: str, strings: list[str]) -> dict[int, dict[int, str]]:
+    """{row_number: {col_index: cell_text}}, cached values only.
+
+    Formula cells are read through their cached `<v>`, which is what Excel last
+    computed. A file saved with formulas but no cached results would read as empty
+    here rather than wrong, and the account tie-out would catch that immediately.
+    """
+    root = ET.fromstring(zf.read(part))
+    grid: dict[int, dict[int, str]] = {}
+    for row in root.iter(NS + "row"):
+        cells: dict[int, str] = {}
+        for c in row.findall(NS + "c"):
+            ref = c.get("r")
+            if not ref:
+                continue
+            kind = c.get("t")
+            if kind == "inlineStr":
+                text = "".join(t.text or "" for t in c.iter(NS + "t"))
+            else:
+                v = c.find(NS + "v")
+                if v is None or v.text is None:
+                    continue
+                text = strings[int(v.text)] if kind == "s" else v.text
+            text = text.strip()
+            if text:
+                cells[_col_index(ref)] = text
+        grid[int(row.get("r"))] = cells
+    return grid
+
+
+def _serial_to_period(serial: str) -> tuple[str, int] | None:
+    """Excel serial -> ('Aug 2026', 2026), or None if it is not a plausible date."""
+    try:
+        value = int(float(serial))
+    except (TypeError, ValueError):
+        return None
+    if not SERIAL_MIN <= value <= SERIAL_MAX:
+        return None
+    date = EXCEL_EPOCH + dt.timedelta(days=value)
+    return f"{MONTHS[date.month - 1]} {date.year}", date.year
+
+
+def _number(text: str) -> float | None:
+    try:
+        return float(text.replace(",", "").replace("$", ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def _norm(text: str) -> str:
+    """Normalized account-name key.
+
+    Dashes are folded because the prior vintage spells three G&A accounts with an
+    en dash where the current vintage uses an ASCII hyphen ('FSP Charges – PBU'
+    against 'FSP Charges - Origination'). Without this, $13.87M of prior-vintage
+    spend matches nothing and is silently stranded.
+    """
+    text = (text or "").replace("–", "-").replace("—", "-")
+    text = re.sub(r"\s*-\s*", " - ", text)
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+# ── Account mapping ─────────────────────────────────────────────────────────
+
+def load_coa(zf, sheets, strings) -> dict[str, tuple[str, str]]:
+    """Account name -> (code, name) as recorded on the workbook's COA tab."""
+    part = sheets.get("COA")
+    if not part:
+        return {}
+    lookup: dict[str, tuple[str, str]] = {}
+    for cells in _read_grid(zf, part, strings).values():
+        name, code = cells.get(1, ""), cells.get(2, "")
+        if name and re.fullmatch(r"\d{7}", code):
+            lookup.setdefault(_norm(name), (code, name))
+    return lookup
+
+
+def load_gl_accounts(lines) -> dict[str, tuple[str, str]]:
+    """Account name -> (code, name) as the ledger currently uses them.
+
+    A name carrying more than one code in the ledger is left out, because a
+    forecast line naming it cannot be assigned to one code without guessing.
+    """
+    seen: dict[str, set[tuple[str, str]]] = {}
+    for row in lines:
+        code = (row.get("account_code") or "").strip()
+        leaf = (row.get("account_leaf") or "").strip()
+        if code and leaf:
+            seen.setdefault(_norm(leaf), set()).add((code, leaf))
+    return {name: sorted(pairs)[0] for name, pairs in seen.items() if len(pairs) == 1}
+
+
+def load_account_map(gl_lines, coa: dict[str, tuple[str, str]]):
+    """name -> (code, name, source), preferring the ledger over the workbook.
+
+    THE WORKBOOK'S COA TAB IS BEHIND THE LEDGER. Of the 65 account names that
+    appear in both, 21 carry a different code on the COA tab. Whole ranges have
+    been renumbered:
+
+        Rent or Lease of Buildings          COA 6501000 -> GL 6601000
+        Building Operating Costs & CAM      COA 6509000 -> GL 6609000
+        Sequencing Costs                    COA 6441000 -> GL 6501000
+        Other External Research costs       COA 6446000 -> GL 6509000
+        Travel                              COA 6610000 -> GL 6702000
+        Depreciation - Lab Equipment        COA 8010000 -> GL 7110000
+
+    The old rent code is the new sequencing code, so mapping through the COA tab
+    would compare the rent forecast against sequencing actuals and report a large
+    variance on both, which is worse than reporting nothing.
+
+    The ledger therefore wins wherever it knows a name. The COA tab fills gaps,
+    but ONLY where its code is not already occupied by a different ledger account:
+    'Moving Expenses' is absent from the GL and the COA tab assigns it 6508000,
+    which the ledger uses for Partnered Research, so accepting that fallback would
+    post moving costs to Partnered Research and give one code two names. Those are
+    refused and reported as unmapped instead.
+    """
+    gl = load_gl_accounts(gl_lines) if gl_lines else {}
+    mapping = {name: (code, leaf, "gl") for name, (code, leaf) in gl.items()}
+    occupied = {code: leaf for code, leaf in gl.values()}
+
+    conflicts, collisions = [], []
+    for name, (code, leaf) in coa.items():
+        if name in mapping:
+            if mapping[name][0] != code:
+                conflicts.append((leaf, code, mapping[name][0]))
+            continue
+        if code in occupied:
+            collisions.append((leaf, code, occupied[code]))
+            continue
+        mapping[name] = (code, leaf, "coa")
+    return mapping, conflicts, collisions
+
+
+# ── Extraction ──────────────────────────────────────────────────────────────
+
+def _months_for(header: dict[int, str], block: Block, reference: list[tuple[str, int]] | None):
+    """Period labels for each of a block's month columns.
+
+    The current block reads its own header. Every other block takes the reference
+    block's periods by position, because its header cannot be trusted.
+    """
+    if block.trust_header:
+        periods = []
+        idx = block.first_month
+        while True:
+            parsed = _serial_to_period(header.get(idx, ""))
+            if not parsed:
+                break
+            periods.append(parsed)
+            idx += 1
+        return periods
+    return list(reference or [])
+
+
+def extract(path: str, vintage_label: str, prior_label: str, gl_lines):
+    """Read every detail tab and block into long-format line rows."""
+    zf = zipfile.ZipFile(path)
+    strings = _shared_strings(zf)
+    sheets = _sheet_map(zf)
+    coa = load_coa(zf, sheets, strings)
+    accounts, conflicts, collisions = load_account_map(gl_lines, coa)
+    if not accounts:
+        raise SystemExit(
+            "No account mapping is available: pass the NetSuite GL export, "
+            "or supply a workbook whose COA tab is readable.")
+
+    labels = {"current": vintage_label, "prior": prior_label}
+    rows: list[dict] = []
+    notes: list[str] = []
+    unmapped: dict[tuple, dict] = {}
+
+    def drop(acct: str, reason: str, tab: str, block: Block, dept: str, total: float):
+        bucket = unmapped.setdefault((_norm(acct), reason), {
+            "forecast_account": acct or "(blank)", "reason": reason,
+            "tabs": set(), "blocks": set(), "departments": set(),
+            "lines": 0, "total_all_periods": 0.0})
+        bucket["tabs"].add(tab)
+        bucket["blocks"].add(block.key)
+        if dept:
+            bucket["departments"].add(dept)
+        bucket["lines"] += 1
+        bucket["total_all_periods"] += total
+
+    for tab in DETAIL_SHEETS:
+        part = sheets.get(tab)
+        if not part:
+            notes.append(f"Tab {tab!r} is not in this workbook and was skipped.")
+            continue
+        grid = _read_grid(zf, part, strings)
+        header = grid.get(HEADER_ROW, {})
+        reference: list[tuple[str, int]] | None = None
+
+        for block in BLOCKS:
+            if header.get(block.col("dept"), "").upper() != "DEPT":
+                notes.append(
+                    f"{tab}/{block.key}: column {block.col('dept')} of row {HEADER_ROW} "
+                    "is not DEPT, so the layout has changed. Skipped rather than "
+                    "read at the wrong offsets.")
+                continue
+
+            periods = _months_for(header, block, reference)
+            if block.trust_header:
+                if len(periods) != MONTHS_PER_BLOCK:
+                    notes.append(
+                        f"{tab}/{block.key}: found {len(periods)} month columns, "
+                        f"expected {MONTHS_PER_BLOCK}. Skipped, and every later block "
+                        "on this tab with it, because they are read by position.")
+                    break
+                reference = periods
+            if not periods:
+                notes.append(f"{tab}/{block.key}: no periods available. Skipped.")
+                continue
+
+            source = "own header" if block.trust_header else "position"
+            notes.append(f"{tab}/{block.key}: {len(periods)} months "
+                         f"({periods[0][0]} to {periods[-1][0]}) read by {source}, "
+                         f"columns {block.first_month}-{block.first_month + len(periods) - 1}.")
+
+            for rnum in sorted(r for r in grid if r > HEADER_ROW):
+                cells = grid[rnum]
+                dept = cells.get(block.col("dept"), "")
+                acct = cells.get(block.col("acct"), "")
+                amounts = {}
+                for offset, (period, year) in enumerate(periods):
+                    value = _number(cells.get(block.first_month + offset, ""))
+                    # Zero is a real forecast value but adds ~90% volume for no
+                    # signal; an account with no row for a period reads as zero.
+                    if value:
+                        amounts[offset] = (period, year, value)
+                if not amounts:
+                    continue
+
+                total = sum(abs(v) for _, _, v in amounts.values())
+                # A row carrying money but missing a dimension cannot be placed.
+                # It is reported rather than skipped: a line that vanishes with no
+                # trace is the failure this whole pipeline exists to prevent.
+                if not acct:
+                    drop(acct, "blank account on a row carrying values",
+                         tab, block, dept, total)
+                    continue
+                if not dept:
+                    drop(acct, "blank department on a row carrying values",
+                         tab, block, dept, total)
+                    continue
+
+                mapped = accounts.get(_norm(acct))
+                if not mapped:
+                    drop(acct, "no matching ledger or COA account",
+                         tab, block, dept, total)
+                    continue
+                code, leaf, src = mapped
+
+                for period, year, value in amounts.values():
+                    rows.append({
+                        "fiscal_year": year, "period": period,
+                        "account_code": code, "account_leaf": leaf,
+                        "department": dept,
+                        "project": cells.get(block.col("proj"), ""),
+                        "vendor": cells.get(block.col("vendor"), ""),
+                        "po_number": cells.get(block.col("po"), ""),
+                        "description": cells.get(block.col("desc"), ""),
+                        "note_1": cells.get(block.col("note1"), ""),
+                        "note_2": cells.get(block.col("note2"), ""),
+                        "amount": round(value, 2),
+                        "source_tab": tab,
+                        "line_ref": f"{tab}!{rnum}",
+                        "budget_version": labels[block.key],
+                        "vintage_block": block.key,
+                        "account_source": src,
+                    })
+
+    unmapped_rows = []
+    for bucket in sorted(unmapped.values(), key=lambda b: -b["total_all_periods"]):
+        unmapped_rows.append({
+            "forecast_account": bucket["forecast_account"],
+            "reason": bucket["reason"],
+            "source_tabs": "; ".join(sorted(bucket["tabs"])),
+            "vintage_blocks": "; ".join(sorted(bucket["blocks"])),
+            "departments": "; ".join(sorted(bucket["departments"])),
+            "forecast_lines": bucket["lines"],
+            "total_all_periods": round(bucket["total_all_periods"], 2),
+            "gl_account_code": "", "gl_account_leaf": "",
+        })
+    return rows, unmapped_rows, notes, conflicts, collisions
+
+
+def aggregate(lines: list[dict]) -> list[dict]:
+    """Roll line items up to the account / department / period feed."""
+    totals: dict[tuple, dict] = {}
+    for line in lines:
+        key = (line["fiscal_year"], line["period"], line["account_code"],
+               line["department"], line["budget_version"])
+        bucket = totals.setdefault(key, {
+            "fiscal_year": line["fiscal_year"], "period": line["period"],
+            "account_code": line["account_code"], "account_leaf": line["account_leaf"],
+            "department": line["department"], "budget_amount": 0.0,
+            "budget_version": line["budget_version"],
+            # The workbook records no approval for these numbers. Leaving these
+            # empty is the honest reading; filling them would assert a control
+            # that does not exist.
+            "approved_by": "", "approved_date": "",
+        })
+        bucket["budget_amount"] += line["amount"]
+
+    out = []
+    for bucket in totals.values():
+        bucket["budget_amount"] = round(bucket["budget_amount"], 2)
+        out.append(bucket)
+    out.sort(key=lambda r: (_period_key(r["period"]), r["account_code"], r["department"]))
+    return out
+
+
+def read_forecast(path, gl_lines, prior_label="prior"):
+    """-> (vintage, {"current": [line, ...], "prior": [line, ...]}).
+
+    The vintage is read from the file name, as Serif names it:
+    serif_rolling_forecast_2026-08.xlsx is the 2026-08 cut. Account names are
+    mapped to codes through the ledger lines supplied.
+    """
+    if not os.path.exists(path):
+        raise SystemExit(f"Not found: {path}")
+    found = re.search(r"(20\d\d)[-_]?(\d\d)", os.path.basename(path))
+    vintage = f"{found.group(1)}-{found.group(2)}" if found else "current"
+    try:
+        lines, _, _, _, _ = extract(path, vintage, prior_label, gl_lines)
+    except zipfile.BadZipFile:
+        raise SystemExit(f"{os.path.basename(path)} is not an .xlsx workbook.")
+    if not lines:
+        raise SystemExit(f"{os.path.basename(path)}: no forecast lines found. "
+                         "The workbook layout has changed.")
+    blocks = {"current": [], "prior": []}
+    for line in lines:
+        blocks[line["vintage_block"]].append(line)
+    return vintage, blocks
+
+
+# ── Links ───────────────────────────────────────────────────────────────────
+#
+# The NetSuite link IDs file is the result of one SuiteQL query, saved as the
+# connector returns it (netsuite_link_ids_<period>.csv; the query is in
+# HOW-TO-RUN). It carries each posting line's internal ID, the bill's Coupa
+# invoice address and the line's Coupa PO. It is read for links only: no figure
+# or finding comes from it, and a file whose totals do not tie to the GL month is
+# set aside.
+
+LINK_ID_COLS = ("internal_id", "document_number", "period", "debit", "credit",
+                "coupa_transaction_url", "coupa_po_num")
+
+
+# ── NetSuite balance sheet report ───────────────────────────────────────────
+#
+# The Balance Sheet report with one column per month, exported as .xls. It is
+# SpreadsheetML: title rows, then a "Financial Row" header naming the months, a
+# row of "Amount" labels, then the report's rows. A heading row has no figures; a
+# subtotal row starts "Total"; an account row is "<code> - <name>". Blank cells are
+# zero balances. The report is read as NetSuite wrote it, for the months asked.
+
+_SS = "{urn:schemas-microsoft-com:office:spreadsheet}"
+
+
+def read_balance_sheet(path, months) -> list[dict]:
+    """-> [{name, code, depth, kind, values: {month: amount}}] in report order.
+
+    `kind` is head, account or total. `depth` is the row's level under its
+    headings, for laying the report out as NetSuite does."""
+    if not os.path.exists(path):
+        raise SystemExit(f"Not found: {path}")
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError:
+        raise SystemExit(f"{os.path.basename(path)} is not a NetSuite .xls export (SpreadsheetML). "
+                         "Export the Balance Sheet report again as .xls.")
+    sheet = root.find(_SS + "Worksheet")
+    table = sheet.find(_SS + "Table") if sheet is not None else None
+    if table is None:
+        raise SystemExit(f"{os.path.basename(path)} holds no worksheet table.")
+    grid = []
+    for row in table.findall(_SS + "Row"):
+        cells = []
+        for cell in row.findall(_SS + "Cell"):
+            data = cell.find(_SS + "Data")
+            cells.append(data.text if data is not None and data.text is not None else "")
+        grid.append(cells)
+    head = next((i for i, c in enumerate(grid) if c and (c[0] or "").strip() == "Financial Row"), None)
+    if head is None:
+        raise SystemExit(f"{os.path.basename(path)}: no 'Financial Row' header. Export the "
+                         "NetSuite Balance Sheet report with one column per month.")
+    col = {(m or "").strip(): i for i, m in enumerate(grid[head]) if i}
+    missing = [m for m in months if m and m not in col]
+    if missing:
+        raise SystemExit(f"{os.path.basename(path)} has no column for " + ", ".join(missing)
+                         + ". Export the Balance Sheet report through the period.")
+    out, depth = [], 0
+    for cells in grid[head + 2:]:
+        name = (cells[0] if cells else "").replace("\xa0", " ").strip()
+        if not name:
+            continue
+        values = {}
+        for m in months:
+            if not m:
+                continue
+            i = col[m]
+            text = cells[i] if i < len(cells) else ""
+            values[m] = round(float(text), 2) if text not in ("", None) else None
+        is_total = name.startswith("Total")
+        if is_total:
+            depth = max(depth - 1, 0)
+        kind = "total" if is_total else ("head" if all(v is None for v in values.values()) else "account")
+        match = re.match(r"^(?:Total - )?(\d{7}) - (.+)$", name)
+        out.append({"name": name, "code": match.group(1) if match else "", "depth": depth, "kind": kind,
+                    "values": {m: (v if v is not None else 0.0) for m, v in values.items()}})
+        if kind == "head":
+            depth += 1
+    return out
+
+
+def read_link_ids(paths) -> list[dict]:
+    rows = []
+    for path in paths or []:
+        if not os.path.exists(path):
+            raise SystemExit(f"Not found: {path}")
+        with open(path, encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            missing = [c for c in LINK_ID_COLS if c not in (reader.fieldnames or [])]
+            if missing:
+                raise SystemExit(f"{os.path.basename(path)} is not the NetSuite link IDs query "
+                                 f"result: it has no {', '.join(missing)} column. Run the query "
+                                 "in HOW-TO-RUN again.")
+            for row in reader:
+                po = re.match(r"(FL\d{9})", (row.get("coupa_po_num") or "").strip())
+                url = (row.get("coupa_transaction_url") or "").strip()
+                rows.append({
+                    "document_number": (row.get("document_number") or "").strip(),
+                    "internal_id": (row.get("internal_id") or "").strip(),
+                    "period": (row.get("period") or "").strip(),
+                    "debit": _num(row.get("debit")), "credit": _num(row.get("credit")),
+                    "coupa_url": url if url.startswith(COUPA_INVOICE) else "",
+                    "coupa_po": po.group(1) if po else "",
+                })
+    return rows
+
+
+def link_ids_tie(id_rows, gl_by_period) -> list[str]:
+    """Periods where the link IDs file and the GL export disagree on total debits."""
+    totals = defaultdict(float)
+    for row in id_rows:
+        totals[row["period"]] += row["debit"]
+    return [p for p, t in sorted(totals.items())
+            if round(t, 2) != round(sum(l["debit"] for l in gl_by_period.get(p, [])), 2)]
+
+
+def po_id(po_number, coupa_ids):
+    """Coupa's record ID for a PO number. The export's PO ID is used when the PO
+    is in it; otherwise the ID is the number after FL087, the rule every one of the
+    3,664 POs in the 2026 export follows."""
+    if po_number in coupa_ids:
+        return coupa_ids[po_number]
+    match = re.fullmatch(r"FL087(\d{6})", po_number)
+    return str(int(match.group(1))) if match else ""
+
+
+def links(gl_lines, coupa_rows, po_numbers=(), id_rows=()) -> dict:
+    """What the consoles need to open a document in NetSuite or Coupa.
+
+    Only IDs the exports carry are used. Every document number in `gl_lines` is
+    listed, so the consoles link a number only when the ledger holds it. A number
+    that belongs to two NetSuite records, two Coupa invoices or two POs gets no link
+    of that kind, so a link never opens the wrong one.
+    """
+    ns, coupa, po = defaultdict(set), defaultdict(set), defaultdict(set)
+    seen = {(l.get("document_number") or "").strip() for l in gl_lines} - {""}
+    for line in list(gl_lines) + list(id_rows):
+        doc = (line.get("document_number") or "").strip()
+        if not doc:
+            continue
+        if line.get("internal_id"):
+            ns[doc].add(line["internal_id"])
+        if line.get("coupa_url"):
+            coupa[doc].add(line["coupa_url"])
+        if line.get("coupa_po"):
+            po[doc].add(line["coupa_po"])
+    docs = {}
+    for doc in sorted(seen):
+        entry = {}
+        if len(ns.get(doc, ())) == 1:
+            entry["ns"] = next(iter(ns[doc]))
+        if len(coupa.get(doc, ())) == 1:
+            entry["coupa"] = next(iter(coupa[doc]))
+        if len(po.get(doc, ())) == 1:
+            entry["po"] = next(iter(po[doc]))
+        docs[doc] = entry
+    coupa_ids = {r.get("po_number", ""): r.get("po_id", "") for r in coupa_rows
+                 if r.get("po_number") and r.get("po_id")}
+    wanted = set(po_numbers) | {e["po"] for e in docs.values() if "po" in e}
+    po_ids = {p: po_id(p, coupa_ids) for p in sorted(wanted) if po_id(p, coupa_ids)}
+    return {"netsuite_account": NETSUITE_ACCOUNT, "coupa_host": COUPA_HOST,
+            "docs": docs, "po_ids": po_ids}

@@ -1,0 +1,1 @@
+period,pay_date,pay_period_start,pay_period_end,batch_id,employee_id,gross_pay,employer_taxes,employer_benefits,total_employer_cost,gl_department,gl_account_code,cost_center

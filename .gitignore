@@ -1,0 +1,36 @@
+# The repo holds scripts, instructions, skills and header-only templates.
+# Serif's data and everything built from it stay in OneDrive.
+
+# Raw data inputs: Serif's exports as each system wrote them, and extracts of them.
+*/monthly-inputs/
+data/real/
+data/forecast-vintages/
+data/pending/budget_fy2026_by_account_dept_month.csv
+data/pending/forecast_lines_*.csv
+data/pending/unmapped_forecast_accounts.csv
+
+# Built outputs: the runs and consoles carry the ledger, employee names and pay.
+*/out/
+updated-ui/runs/
+run.json
+status/
+
+# Reference material: Serif's documents, reviewer exports, another client's dashboard.
+references/*
+!references/README.md
+
+# Office and export formats never belong in the repo.
+*.xls
+*.xlsx
+*.xlsm
+*.pptx
+*.docx
+*.pdf
+*.eml
+
+# System and Python files
+.DS_Store
+desktop.ini
+__pycache__/
+*.pyc
+~$*
