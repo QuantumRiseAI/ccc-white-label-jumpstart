@@ -3,7 +3,7 @@
 Two Claude Project agents adapted from the CrossCountry CrossCore AI Jumpstart to run on Serif
 Biomedicines' actual NetSuite ledger instead of the synthetic dataset.
 
-* Built: 2026-09-16 by Quantum Rise, last updated 2026-09-18
+* Built: 2026-09-16 by Quantum Rise, last updated 2026-10-06 (Console 2.0.0)
 * Runs every month. Reference period: Aug 2026
 * Status: runnable today on real GL and forecast data. Budget variance is live as of UC2 engine
   0.3.0, using the June forecast vintage extracted from the rolling forecast workbook
@@ -26,47 +26,76 @@ same item gets investigated twice. Coding Review first means fewer reclassificat
 ## Layout
 
 ```
-serif-data-jumpstarts/
-├── README.md                  you are here
-├── DATA-MANIFEST.md           every file, its origin, and what is still missing
-├── tools/                   cut the month's files; not uploaded to the Projects
-│   ├── netsuite_gl_to_csv.py  slices the 58 MB GL export into per-period CSVs
-│   ├── coupa_po_to_csv.py     slices the Coupa PO export, parsing its packed coding string
-│   ├── forecast_to_csv.py     extracts a rolling forecast vintage into line and plan CSVs
-│   ├── rebuild_views.sh       copies the shared scripts to gl-coding-review, rebuilds both consoles
-│   ├── compare_runs.py        compares two run.json files field by field
-│   └── test_*.js              console tests: shared mode, record save and load, run log
-├── data/                      shared source of truth
-│   ├── real/                  original Serif exports, renamed
-│   │   └── derived/           per-period CSVs produced by the tool
-│   └── pending/               header-only templates for data Serif still owes
-├── gl-coding-review/          one Claude Project
-│   ├── upload-to-project/     CONFIGURE ONCE: everything that goes in the Project, flat
-│   ├── monthly-inputs/        EVERY MONTH: the period's data, dropped into a chat
-│   │   └── aug2026/
-│   └── out/                   where the run artifact and the console land
-├── pl-flux/                   same shape
-└── updated-ui/                both consoles laid out as Chris's August reports; see its README
-    ├── upload-to-project/     one Claude Project for both: scripts, reference files, instructions
-    ├── build_runs.sh, build_pages.py
-    ├── runs/<period>/         the runs it reads (names and pay kept)
-    └── out/<period>/          the two consoles
+serif-jumpstarts/
+├── README.md
+├── CHANGELOG.md               every console, engine and views version
+├── Makefile                   make package | make build PERIOD=aug2026 | make test
+├── src/                       the scripts, one copy each: engines, views, readers, console
+├── projects/                  what is particular to each Claude Project
+│   ├── gl-coding-review/      its instructions, how-to, skill and vendor baseline
+│   ├── pl-flux/               its instructions, how-to, skill and status
+│   └── shared/                docs both Projects carry: Serif context, data rules, NetSuite
+├── templates/                 header-only feed templates the engines read when present
+├── consoles/                  the current console for each Project; earlier versions are in Git history
+├── design-system/             Serif's tokens, open fonts and brand references
+├── docs/                      the data manifest, internal notes, and spec/ (Chris's August reports)
+├── tests/                     test_console.js, the console tests
+├── tools/                     build.sh, package.py, compare_runs.py, bundle_engine.py, cost-model/
+├── inputs/<period>/           Serif's exports for a close, as each system wrote them (not in Git)
+└── out/                       build output: dist/ (the Project folders) and <period>/ (not in Git)
 ```
 
-The split is the point. `upload-to-project/` is configured once and does not change month to
-month. `monthly-inputs/<period>/` holds Serif's exports for a close, exactly as each system
-writes them. Neither engine reads a sliced or derived file.
+Each file lives once. `tools/package.py` assembles each Project's upload folder, flat, in
+`out/dist/<project>/` (and a `.zip`): the scripts from `src/`, the Project's docs, the shared
+docs and its templates. The build runs from those folders, so what is tested is what is
+uploaded. `inputs/<period>/` holds a close's exports exactly as each system writes them;
+neither engine reads a sliced or derived file.
+
+### The Console
+
+Console 2.0.0 is laid out as Chris's August reports, in Serif's design: the GL review as
+Overview, Review, Transparency and Documentation; the flux pack as Executive Overview,
+Analysis and Close Workflow. `build_pages.py` builds it from the run, in each Project. Each
+proposed Journal Entry is filled in and editable, every vendor card shows its last three
+months, and the NetSuite CSV takes the entries as edited. Published as a claude.ai Artifact,
+the console is shared by everyone with access. The decision record, the run log and Claude's
+drafts work as they did in 1.8.
+
+`consoles/` holds one file per Project, `serif-gl-coding-review.html` and `serif-pl-flux.html`,
+and each console version is a commit to them, tagged `console-v<version>`: v1.8.3 to v1.8.8,
+then v2.0.0. To see or diff a past version, use the tag:
+
+```sh
+git tag -l 'console-v*'
+git show console-v1.8.8:consoles/serif-pl-flux.html > serif-pl-flux-v1.8.8.html
+```
+
+The 1.8 generator, `build_report.py`, and its tests are in the history before 2.0.0 (the
+repo's first commit). The month a console shows is only the input data it was built from (Aug
+2026 for all of these).
+
+### Working in the Repo
+
+Python 3.9 or newer, standard library only. The tests need Node and Playwright.
+
+```sh
+make package                  # out/dist/gl-coding-review/ and out/dist/pl-flux/, with .zip
+make build PERIOD=aug2026     # both Projects' commands on inputs/aug2026/, from out/dist/
+make test                     # the console tests, on consoles/
+```
+
+`make build` writes `out/<period>/<project>/run.json` and the month's console, and copies the
+console to `consoles/`. The console version is `VERSION` in `src/build_pages.py`. Mint a new one
+only when it is agreed: add it to `CHANGELOG.md`, commit the rebuilt consoles, and tag the
+commit `console-v<version>`.
 
 ### In Git
 
-The repo is private and holds only the scripts, instructions, skills, tests and the header-only
-templates. `.gitignore` leaves out Serif's data and everything built from it, all of which stays
-in OneDrive: `monthly-inputs/`, `data/real/`, `data/forecast-vintages/`, the forecast and budget
-extracts in `data/pending/`, every `out/` folder and `updated-ui/runs/` (the runs and consoles
-carry the ledger, names and pay), `status/`, and everything in `references/` except its README.
-Office and export formats (`.xls`, `.xlsx`, `.pptx`, `.docx`, `.pdf`, `.eml`) are ignored
-everywhere. To rebuild a month from a clone, put its exports back in `monthly-inputs/<period>/`
-and in `data/real/`, then rerun the build.
+The repo is private. `.gitignore` leaves out Serif's data: `inputs/`, `out/` (the runs and
+local builds), the local `data/` and `status/` folders, and everything in `references/` but
+its README. Chris's two August reports are kept in `docs/spec/`. The consoles in `consoles/`
+are committed, every version: they carry the ledger, names and pay, for the accounting team. To rebuild a
+month from a clone, put its exports in `inputs/<period>/` and run `make build`.
 
 ## Setup
 
@@ -75,17 +104,17 @@ instructions, different reference material and different run orders.
 
 Configure once:
 
-1. Create a Claude Project named `Serif Biomedicines, GL Coding Review` or
+1. Run `make package`.
+2. Create a Claude Project named `Serif Biomedicines, GL Coding Review` or
    `Serif Biomedicines, P&L Flux`.
-2. Paste that folder's `upload-to-project/PROJECT_INSTRUCTIONS.md` into the Project Instructions
+3. Paste `PROJECT_INSTRUCTIONS.md` from `out/dist/<project>/` into the Project Instructions
    field. It is instructions, not an upload.
-3. Upload every other file in `upload-to-project/`.
+4. Upload every other file in `out/dist/<project>/`.
 
 Then each month:
 
-4. Put Serif's exports for the month in `monthly-inputs/<period>/`, as each system wrote
+5. Start a fresh chat in the Project and attach the month's exports, as each system wrote
    them. Each `HOW-TO-RUN.md` lists them under Each Month.
-5. Start a fresh chat and attach them, or add them to the Project.
 6. Prompt: `Run the GL coding review for Sep 2026.` or `Run the P&L flux for Sep 2026.`
 
 Two things to know about Project uploads. They are **flat**, so the scripts are invoked by bare
@@ -140,11 +169,11 @@ Real and working now:
 * Serif's real chart of accounts, department list, and how its top vendors are actually coded
 * Serif's draft accounting policies as the threshold source
 
-Not yet available, with placeholders in `data/pending/`:
+Not yet available, with placeholders in `templates/`:
 
 * Payroll register (access request in flight). This is now the largest remaining gap: it
   blocks payroll tie-out. The UKG roster arrived 2026-09-24 and runs the
-  requisitioner-versus-coding department check, as the requester flag on Vendors
+  requisitioner-versus-coding department check, as the requester flag
 * Vendor master, fixed asset register, prepaid schedule, accruals log
 * Coupa invoice-level data, without which there is no three-way match
 * The 2025 and Open tabs of the Coupa pull; only calendar 2026 arrived
@@ -159,19 +188,19 @@ Nothing is fabricated to fill a gap.
 
 ## Caveats Worth Carrying Into the Readout
 
-* All policies in the `reference/` folders are DRAFT and unapproved. Every threshold in both agents
+* All policies in `references/` are DRAFT and unapproved. Every threshold in both agents
   rests on unapproved documents.
 * The vendor coding baseline is descriptive. It records what Serif does, which is not necessarily
   what Serif should do. It is evidence, not policy.
 * The Treasury policy found in the Serif policy folder is CrossCountry Consulting's own policy, not
-  Serif's. It is excluded from both agents. See [`DATA-MANIFEST.md`](DATA-MANIFEST.md).
+  Serif's. It is excluded from both agents. See [`docs/DATA-MANIFEST.md`](docs/DATA-MANIFEST.md).
 * Accrual estimates are pattern-derived and need controller confirmation before anything posts.
 * IRC §174 output is preliminary and needs tax counsel sign-off.
 
 ## Related
 
-* [`DATA-MANIFEST.md`](DATA-MANIFEST.md), file origins, name mapping, and the full gap list
-* [`../SERIF_REAL_DATA_GAPS.md`](../SERIF_REAL_DATA_GAPS.md), the earlier gap analysis prepared for
+* [`docs/DATA-MANIFEST.md`](docs/DATA-MANIFEST.md), file origins, name mapping, and the full gap list
+* [`docs/SERIF_REAL_DATA_GAPS.md`](docs/SERIF_REAL_DATA_GAPS.md), the earlier gap analysis prepared for
   the latest client confirmation, now superseded by the manifest.
-* [`../synthetic-jumpstarts/`](../synthetic-jumpstarts/), the original CCC mock package, kept for
-  reference
+* `synthetic-jumpstarts/`, the original CCC mock package, kept beside this folder in OneDrive
+  for reference
