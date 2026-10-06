@@ -1,0 +1,7 @@
+# Text files are stored with LF line endings, whatever the editor wrote.
+* text=auto
+*.woff2 binary
+*.png binary
+# Built consoles and Chris's reports are kept byte for byte.
+consoles/** -text
+docs/spec/** -text
