@@ -34,6 +34,70 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Console 2.0.0: 2026-10-06
+
+The updated UI replaces the 1.8 console in both jumpstarts. It is laid out as Chris's August
+reports, in Serif's design, and built by `build_pages.py` in each Project from that Project's
+own run. Engine and ruleset versions are unchanged, and the runs are identical to the ones the
+updated UI v1 read.
+
+- **Pages:**
+  - GL Coding Review: Overview; Review (CapEx Flags, Prepaid Flags, Dept & Entity);
+    Transparency (Reviewed & Cleared, New This Period); Documentation (Audit Log, SOX
+    Documentation, Export);
+  - P&L Flux: Executive Overview; Analysis (Actual vs. Actual, MoM and YoY; Actual vs. Budget;
+    By Department; Payroll Analytics); Close Workflow (Balance Sheet Flux, Adjustments, SOX &
+    GAAP).
+- **Carried over from 1.8.8:**
+  - shared mode, as a claude.ai Artifact with the db, user and downloads capabilities:
+    - every decision, note, entry edit, checklist mark, sign-off and audit log entry is its
+      own document, written only when it changes;
+    - a write reads the document again first, so a change made by someone else in the
+      meantime stands and the reviewer is told;
+    - who decided is kept as a user id and named on screen;
+    - Viewers read only, and only Editors sign off (sign-off has its own `signoff/` root for
+      the access rule);
+    - a rerun registers as a new run, and **Bring in the earlier run's decisions** carries the
+      earlier run's work across;
+  - the decision record, saved and loaded from Settings, asking on the page before it loads;
+  - the run log, the icon beside Settings: the exports, what each check found, the estimated
+    cost of a run, the inputs and the build record;
+  - Claude's drafts (`--drafts`), each beside its item with **Use this**:
+    - commentary on Actual vs. Actual;
+    - adjustment notes with a recommendation;
+    - vendor notes on every card of the vendor;
+    - drafted Journal Entries, on Adjustments (flux) and Dept & Entity (coding).
+
+    A draft that does not match the run is left out and listed.
+- **Item ids** are built from what the item is (vendor, accounts, description), so a decision
+  matches the same item in a later run. Records from 1.8 do not load into 2.0.0.
+- **The coding console reads only the coding run.** Its CapEx and Prepaid screens come from the
+  flux engine's prepaid and capital rules, which `serif_views.py` already runs over the month
+  for the vendor rows.
+- **Not carried over from 1.8:**
+  - the Follow up and Fixed in NetSuite outcomes, and line-level reclass;
+  - the Questions, decision log and proposed-entries CSVs, and the work paper;
+  - recording the NetSuite upload, and the Finish the close button;
+  - the posting lag and tax findings, which are counted on the run log only.
+- **Names and pay** are kept (`serif_views.py --keep-names`), for the accounting team.
+- **Repo layout:** each file lives once.
+  - `src/` holds the scripts, `projects/` what is particular to each Claude Project (with
+    `projects/shared/` for the docs both carry), and `templates/` the feed templates.
+  - `tools/package.py` (`make package`) assembles each Project's flat upload folder and zip in
+    `out/dist/`. `tools/build.sh` (`make build`) runs both Projects' commands from those folders
+    on `inputs/<period>/`, so what is tested is what is uploaded. `tests/test_console.js`
+    (`make test`) tests the consoles, standalone and in shared mode.
+  - `consoles/` holds the current console for each Project. Each version is a commit to it,
+    tagged `console-v<version>`, from v1.8.3 on.
+  - `serif_design.py` carries the design tokens, logo, fonts and the run log's cards.
+    `build_report.py` and its tests are retired; they stay in Git history before 2.0.0.
+  - The design system is in `design-system/`; the data manifest, internal notes and Chris's
+    two August reports (`docs/spec/`) are in `docs/`.
+  - The `gl-coding-review/`, `pl-flux/` and `updated-ui/` folders are gone: their upload
+    folders are generated, and each close's exports go in one `inputs/<period>/`.
+
+---
+
 ## Updated UI v1, Chris's 1 Oct comments: 2026-10-06
 
 `updated-ui/build_pages.py`. The figures are unchanged; the runs are not rebuilt.

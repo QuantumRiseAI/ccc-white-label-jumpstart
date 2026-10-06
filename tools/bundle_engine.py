@@ -145,7 +145,7 @@ def _summarize(result, path):
           f"Low {s.get('by_severity', {}).get('low', 0)}")
     print(f"AMOUNT AT RISK  ${s.get('amount_at_risk', 0):,.2f}")
     print(f"\\nWrote {path}")
-    print("Next: python3 build_report.py " + path)
+    print("Next: python3 serif_views.py " + path + ", then build_pages.py")
 
 
 if __name__ == "__main__":

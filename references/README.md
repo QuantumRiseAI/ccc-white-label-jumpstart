@@ -1,6 +1,7 @@
 # References: Source Documents
 
-**None of this is uploaded to a Claude Project.** It is the provenance layer.
+**None of this is uploaded to a Claude Project, and only this README is in Git.** It is the
+provenance layer, kept in OneDrive.
 
 The operative rules from these documents are synthesized into
 `serif-policy-rules.md`, which *is* uploaded, about 2,000 tokens instead of ~18,000 of
@@ -38,8 +39,9 @@ only: nothing here is an engine input.
   with the reviewer's questions in yellow beside the lines they concern. The questions
   drove the Vendors page, the three-month trend, and flux rules F6 to F10; see
   `../CHANGELOG.md`. It carries the full ledger, so it is client-confidential.
-* `chris-gl-review-aug2026.html` and `chris-pl-flux-aug2026-v4.html`: Chris's own Aug 2026
-  GL coding review and P&L flux reports, received 2026-09-30. They are a source of ideas
+* `chris-gl-review-aug2026.html` and `chris-pl-flux-aug2026-v4.html`, now in `docs/spec/`:
+  Chris's own Aug 2026 GL coding review and P&L flux reports, received 2026-09-30, and the
+  layout Console 2.0.0 follows. They are a source of ideas
   only. Their figures are unverified and some are wrong, so take no figure, rule or entry
   from them. The ideas drawn from them are listed in Impulsive AIJ-93.
 * A manual close review in three tabs, saved from Excel as CSV (Windows-1252, not UTF-8),

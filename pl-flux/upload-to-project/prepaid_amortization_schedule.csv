@@ -1,1 +1,0 @@
-prepaid_id,vendor_name,invoice_number,description,gl_prepaid_account_code,gl_expense_account_code,department,total_prepaid_amount,service_start_date,service_end_date,term_months,monthly_amortization,amortized_to_date,remaining_balance,status
