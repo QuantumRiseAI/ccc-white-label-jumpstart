@@ -274,7 +274,7 @@ CLOSING = {
         "than with engineering. The first is where the jumpstarts run once they leave the "
         "Projects, which Flagship IT is weighing against its data separation work. The second "
         "is whether the ledger arrives through the NetSuite connector Serif already has: it "
-        "removes most of the monthly uploads and is the base for checking entries against "
+        "removes the monthly NetSuite uploads and is the base for checking entries against "
         "NetSuite and reversing reclasses on every dimension.",
         "With those settled, the follow-up tracker and the shared review are one piece of work: "
         "both need state that outlives a single close and more than one person working it, "
