@@ -53,6 +53,22 @@ reports. Engines and ruleset are unchanged; everything is computed from the GL e
   over three months. Aug 2026: $430,605.
 - **Trailing averages** (Actual vs. Actual, MoM): each account's 3- and 6-month averages.
 
+Both consoles:
+
+- **Reviewed & Cleared** (GL) says what was checked: each vendor lists the checks it passed and
+  the ones that could not apply, and why. The Review and Routine tags are gone from it: nothing
+  there was flagged, and $2,500 or more is a plain label. Account group headers are neutral.
+- **A confirmed vendor folds** to its name; clicking the name opens and closes it.
+- **Every account number shows its name**: in line tables, engine text, payroll labels, plan-only
+  accounts and the Export page. Accounts the chart lacks take their name from the GL export or
+  the Balance Sheet. `tests/audit_account_names.js`, run by `make test`, checks every page.
+- **Navigation**: the open section is an outlined group, section titles carry a chevron and
+  more space, and the bar is marked up for screen readers (expanded sections, the current
+  page, each section's pages as a group).
+- **Tabs** are folder tabs, the current one open into its panel, and are announced as tabs.
+- **Tables** fit the card: headers wrap, so no table scrolls sideways at 1280px or wider.
+  `tests/audit_table_width.js` checks it.
+
 Not built, because the data does not support them: department-level bonus (the roster's
 departments), the accrual roll-forward (the accruals log is not supplied), small amounts
 capitalized below a threshold (Serif's asset policy sets none), reading prepaid terms from line

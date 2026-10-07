@@ -127,6 +127,30 @@ ytd = sum(l["amount"] for p, ls in by_period.items() if p.endswith(PERIOD[-4:]) 
 gl_6x = sum(l["amount"] for l in gl_now if l["account_code"][:1] == "6")
 pl_lines_now = sum(1 for l in gl_now if PNL(l["account_code"]))
 DEPTS = sorted({l["department"] for ls in by_period.values() for l in ls if l.get("department")})
+for _ls in by_period.values():
+    for _l in _ls:
+        if not ACC.get(_l["account_code"]) and _l.get("account_leaf"):
+            ACC[_l["account_code"]] = _l["account_leaf"]
+for _r in ((PLR.get("views") or {}).get("balance_sheet") or {}).get("rows") or []:
+    _m = re.match(r"(?:Total - )?(\d{7}) - (.+)", _r.get("name") or "")
+    if _m and not ACC.get(_m.group(1)):
+        ACC[_m.group(1)] = _m.group(2).strip()
+
+
+def named(text):
+    """Escaped text with each account number followed by its name, where it is not already."""
+    def put(m):
+        code, name = m.group(1), acct_name(m.group(1))
+        if not name:
+            return code
+        after = m.string[m.end():m.end() + len(name) + 8].lstrip(" -&ndash;").lower()
+        return code if after.startswith(e(name).lower()[:12]) else code + " " + e(name)
+    return re.sub(r"(?<![\d#])\b([1-8]\d{6})\b(?!\d)", put, text)
+
+
+en = lambda s: named(e(s))
+# A flux row's name: the engine's leaf, or the chart's name where the leaf is only the number.
+leaf_of = lambda r: (r.get("account_leaf") if r.get("account_leaf") not in (None, "", r.get("account_code")) else acct_name(r["account_code"])) or ""
 acct_month = defaultdict(lambda: defaultdict(float))    # P&L account -> period -> net
 for _p, _ls in by_period.items():
     for _l in _ls:
@@ -256,10 +280,13 @@ a.xl{font-size:var(--text--2);color:var(--color-fg-secondary);text-decoration:un
 .top .logo{width:52px;height:auto;color:#fff;display:block}
 .top .brand b{font-weight:500;color:#fff;white-space:nowrap}
 .top .brand span{color:var(--color-warm-gray);white-space:nowrap}
-.top nav{display:flex;align-items:center;gap:var(--spacing-3xs);flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.top nav{display:flex;align-items:center;gap:var(--spacing-xs);flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
 .top nav::-webkit-scrollbar{display:none}
 .tg{display:flex;align-items:center;flex:none;border-radius:var(--radius-pill);transition:background-color .25s}
-.tg.open{background-color:rgba(255,255,255,.08)}
+.tg.open{background-color:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28);padding-right:.2em}
+.tb.sec::after{content:"";width:.38em;height:.38em;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+  transform:rotate(-45deg);margin-left:.1em;opacity:.8;transition:transform .2s}
+.tg.open > .tb.sec::after{transform:rotate(45deg);margin-bottom:.2em}
 .tb{height:2.4em;display:inline-flex;align-items:center;gap:.45em;padding:0 .7em;border:0;border-radius:var(--radius-pill);
   background:none;color:var(--color-warm-gray);cursor:pointer;white-space:nowrap}
 .tb:hover{color:#fff;background-color:rgba(255,255,255,.06)}
@@ -299,19 +326,27 @@ main{max-width:96rem;margin:0 auto;padding:var(--spacing-md) var(--spacing-md-lg
   display:flex;align-items:center;gap:var(--spacing-xs)}
 .card .ch .r{margin-left:auto}
 .pad{padding:var(--spacing-sm) var(--spacing-sm-md)}
-.tabs{display:flex;gap:var(--spacing-3xs);padding:0 var(--spacing-sm);border-bottom:1px solid var(--color-hairline);overflow-x:auto}
-.tabs button{border:0;background:none;padding:.8em .8em .7em;cursor:pointer;color:var(--color-fg-secondary);border-bottom:2px solid transparent;white-space:nowrap}
+.tabs{display:flex;align-items:flex-end;gap:4px;padding:.7em var(--spacing-sm) 0;overflow-x:auto;scrollbar-width:none;
+  background:linear-gradient(to top,var(--color-warm-gray) 1px,var(--color-bg-primary) 1px)}
+.tabs::-webkit-scrollbar{display:none}
+/* Folder tabs: each tab is its own shape, the current one opens into the panel below. */
+.tabs button{flex:none;height:2.5em;padding:0 1.05em;cursor:pointer;white-space:nowrap;font-size:var(--text--1);color:var(--color-fg-secondary);
+  background-color:rgba(255,255,255,.5);border:1px solid var(--color-hairline);border-bottom:0;border-radius:var(--radius-sm) var(--radius-sm) 0 0;
+  transition:background-color .15s,color .15s}
+.tabs button:hover{background-color:var(--color-stark);color:var(--color-fg-primary)}
 .tabs button:focus{outline:none}
 .tabs button:focus-visible{outline:2px solid var(--color-vivid);outline-offset:-2px}
-.tabs button.on{color:var(--color-fg-primary);font-weight:600;border-bottom-color:var(--color-red-text)}
+.tabs button.on{background-color:var(--color-stark);color:var(--color-fg-primary);font-weight:600;border-color:var(--color-warm-gray);
+  box-shadow:0 1px 0 0 var(--color-stark)}
 .sumline{padding:.7em var(--spacing-sm-md);font-size:var(--text--1);color:var(--color-fg-secondary);border-bottom:1px solid var(--color-hairline);display:flex;gap:var(--spacing-sm);flex-wrap:wrap}
 .sumline b{color:var(--color-fg-primary);font-variant-numeric:tabular-nums}
 .tw{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-size:var(--text--1)}
 th{font-size:var(--text--2);text-transform:uppercase;letter-spacing:.04em;color:var(--color-fg-secondary);font-weight:600;text-align:left;
-  padding:.7em .8em;border-bottom:1px solid var(--color-hairline);white-space:nowrap;background-color:var(--color-stark)}
+  padding:.7em .8em;border-bottom:1px solid var(--color-hairline);background-color:var(--color-stark);vertical-align:bottom}
 td{padding:.65em .8em;border-bottom:1px solid var(--color-hairline);vertical-align:top}
-td.n2,th.n2{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.n2,th.n2{text-align:right;font-variant-numeric:tabular-nums}
+td.n2{white-space:nowrap}
 td.n2 small{display:block;color:var(--color-fg-secondary);font-size:var(--text--2)}
 .mono{font-family:var(--font-mono);font-size:.9em}
 .code{display:block;font-family:var(--font-mono);font-size:var(--text--2);color:var(--color-fg-secondary)}
@@ -347,6 +382,12 @@ input.f{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);pa
 .item{background-color:var(--color-stark);border-radius:var(--radius-sm);margin-bottom:var(--spacing-xs);border-left:3px solid var(--color-warm-gray)}
 .item.hi{border-left-color:var(--color-red-text)}
 .item.done{border-left-color:var(--color-dark-gray)}
+.item.folded > .ib{display:none}
+.item.folded > .ih{border-bottom:0}
+.item.foldable > .ih{cursor:pointer}
+.item.foldable > .ih::after{content:"";width:.5em;height:.5em;border-right:1.5px solid var(--color-fg-secondary);border-bottom:1.5px solid var(--color-fg-secondary);
+  transform:rotate(45deg);margin:0 .2em .2em .4em;transition:transform .2s}
+.item.foldable:not(.folded) > .ih::after{transform:rotate(-135deg);margin-bottom:-.2em}
 .item .ih{display:flex;align-items:center;gap:var(--spacing-xs);padding:.8em var(--spacing-sm);border-bottom:1px solid var(--color-hairline);flex-wrap:wrap}
 .item .ih b{font-weight:600}
 .item .ib{padding:var(--spacing-xs) var(--spacing-sm) var(--spacing-sm)}
@@ -383,12 +424,19 @@ input.f{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);pa
 details.lines{margin:0 0 .8em}
 details.lines summary{cursor:pointer;font-size:var(--text--1);color:var(--color-fg-secondary);padding:.2em 0}
 details.lines table{font-size:var(--text--2)}
+details.lines td small{display:block;color:var(--color-fg-secondary)}
 .acts{display:flex;gap:var(--spacing-2xs);flex-wrap:wrap;align-items:center}
 .acts textarea{flex:1 1 20rem}
 .bar{height:.5em;background-color:var(--color-bg-primary);border-radius:var(--radius-pill);overflow:hidden;margin:.6em 0}
 .bar > i{display:block;height:100%;background-color:var(--color-dark-gray);border-radius:var(--radius-pill)}
 .chips{display:flex;gap:var(--spacing-2xs);flex-wrap:wrap;font-size:var(--text--1)}
 .chips span{border:1px solid var(--color-hairline);border-radius:var(--radius-pill);padding:.25em .8em}
+.checks{display:flex;flex-wrap:wrap;align-items:baseline;gap:.35em var(--spacing-sm);font-size:var(--text--1);margin:0 0 .8em;padding:.55em .8em;
+  border-radius:var(--radius-xs);background-color:var(--color-bg-primary)}
+.checks .l{font-size:var(--text--2);text-transform:uppercase;letter-spacing:.04em;color:var(--color-fg-secondary);margin-right:.2em}
+.checks .ok{color:var(--color-fg-primary)}
+.checks .na{color:var(--color-fg-secondary)}
+.tag.plain{display:none}
 .legend{display:flex;gap:var(--spacing-xs);flex-wrap:wrap;align-items:center;font-size:var(--text--1);color:var(--color-fg-secondary);margin-bottom:var(--spacing-xs)}
 .grphead{display:flex;align-items:center;gap:var(--spacing-xs);margin:var(--spacing-sm) 0 var(--spacing-2xs);font-size:var(--text--1)}
 .wfx{position:relative;padding:var(--spacing-md) var(--spacing-sm-md) 0 calc(var(--spacing-sm-md) + 4.5em)}
@@ -513,8 +561,8 @@ def shell(title, product, sections, pages, data, js):
             nav.append('<div class="tg"><button class="tb pg" data-p="%s">%s<span class="n" data-c="%s"></span></button></div>' % (pid, e(label), pid))
         else:
             sub = "".join('<button class="tb pg" data-p="%s">%s<span class="n" data-c="%s"></span></button>' % (pid, e(label), pid) for pid, label in items)
-            nav.append('<div class="tg" data-s="%d"><button class="tb sec" data-s="%d">%s<span class="n" data-cs="%d"></span></button>'
-                       '<div class="sub shut" data-s="%d">%s</div></div>' % (si, si, e(stitle), si, si, sub))
+            nav.append('<div class="tg" data-s="%d"><button class="tb sec" data-s="%d" aria-expanded="false" aria-controls="sub%d">%s<span class="n" data-cs="%d"></span></button>'
+                       '<div class="sub shut" data-s="%d" id="sub%d" role="group" aria-label="%s">%s</div></div>' % (si, si, si, e(stitle), si, si, si, e(stitle), sub))
     return ("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
             "<title>" + e(title) + "</title><style>" + CSS + "</style></head><body>"
             '<header class="top"><div class="brand">' + DS.LOGO + "<b>" + e(product) + "</b><span>" + e(PERIOD) + "</span></div>"
@@ -548,6 +596,10 @@ if (Array.isArray(S.log)){ const o = {}; S.log.forEach((l, i) => { o[String(l.at
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money = v => v == null ? '–' : (v < 0 ? '($' : '$') + Math.abs(Math.round(v)).toLocaleString('en-US') + (v < 0 ? ')' : '');
 const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+/* Escaped text with each account number followed by its name, where it is not already. */
+const named = t => esc(t).replace(/\b([1-8]\d{6})\b(?!\d)/g, (c, code, at, all) => { const n = DATA.acct[code];
+  if (!n) return c; const after = all.slice(at + c.length, at + c.length + n.length + 8).replace(/^[\s\-–]+/, '').toLowerCase();
+  return after.startsWith(esc(n).toLowerCase().slice(0, 12)) ? c : c + ' ' + esc(n); });
 function toast(msg, ms){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, ms || 2600); }
 
 /* ---------- shared mode ----------
@@ -795,9 +847,10 @@ function ask(title, sub, lines, okLabel){
 /* navigation: a section's pages open beside its title */
 function show(pid){
   $$('.page').forEach(p => p.hidden = p.id !== 'p-' + pid);
-  $$('.tb.pg').forEach(b => b.classList.toggle('cur', b.dataset.p === pid));
+  $$('.tb.pg').forEach(b => { const on = b.dataset.p === pid; b.classList.toggle('cur', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   $$('.tg[data-s]').forEach(g => { const on = !!g.querySelector('.tb.pg.cur');
-    g.classList.toggle('open', on); g.querySelector('.sub').classList.toggle('shut', !on); });
+    g.classList.toggle('open', on); g.querySelector('.sub').classList.toggle('shut', !on);
+    g.querySelector('.tb.sec').setAttribute('aria-expanded', on ? 'true' : 'false'); });
   window.scrollTo(0, 0); refresh();
 }
 document.addEventListener('click', ev => {
@@ -806,7 +859,7 @@ document.addEventListener('click', ev => {
   const p = ev.target.closest('.tb.pg'); if (p){ show(p.dataset.p); return; }
   const t = ev.target.closest('.tabs button');
   if (t){ const box = t.closest('[data-tabbox]');
-    box.querySelectorAll(':scope > .tabs button').forEach(b => b.classList.toggle('on', b === t));
+    box.querySelectorAll(':scope > .tabs button').forEach(b => { b.classList.toggle('on', b === t); b.setAttribute('aria-selected', b === t ? 'true' : 'false'); });
     box.querySelectorAll(':scope > [data-pane]').forEach(x => x.hidden = x.dataset.pane !== t.dataset.tab); return; }
   const d = ev.target.closest('[data-d]');
   if (d){ decide(d.dataset.d, d.dataset.v, d.dataset.label); return; }
@@ -836,6 +889,10 @@ document.addEventListener('input', ev => {
   if (t.dataset.jef){ editJE(t); return; }
   if (t.id === 'thr'){ const v = Number(String(t.value).replace(/[^0-9.]/g, '')); if (isFinite(v) && v > 0){ S.thr = v; save(); refresh(); } }
 });
+/* tabs are announced as tabs, the selected one marked */
+$$('.tabs').forEach(tl => { tl.setAttribute('role', 'tablist');
+  tl.querySelectorAll('button').forEach(b => { b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', b.classList.contains('on') ? 'true' : 'false'); }); });
+$$('[data-tabbox] > [data-pane]').forEach(x => x.setAttribute('role', 'tabpanel'));
 /* tooltips */
 const tip = $('#tip');
 document.addEventListener('mousemove', ev => { const t = ev.target.closest('[data-tip]');
@@ -857,6 +914,10 @@ const decided = id => !!S.dec[id] && (['modify', 'recode'].indexOf(S.dec[id].v) 
 function paintItems(){
   $$('[data-item]').forEach(el => { const id = el.dataset.item, d = S.dec[id];
     el.classList.toggle('done', !!d);
+    const fold = !!d && d.v === 'confirm';
+    if (!fold) el.classList.remove('unfold');
+    el.classList.toggle('folded', fold && !el.classList.contains('unfold'));
+    el.classList.toggle('foldable', fold);
     const st = el.querySelector('.stp'); if (st){ st.textContent = d ? LABEL[d.v] + ((['modify','recode'].indexOf(d.v) > -1 && !(S.notes[id]||'').trim()) ? ', add a note' : '')
       + (d.by_uid ? ' · ' + Shared.name(d.by_uid) : '') : 'Pending';
       st.className = 'stp' + (d ? (d.v === 'reject' || d.v === 'none' ? ' rej' : ' done') : ''); }
@@ -951,6 +1012,8 @@ function checklist(){
   host.innerHTML = rows.join('');
 }
 document.addEventListener('click', ev => { const r = ev.target.closest('tr[data-go]'); if (r) show(r.dataset.go); });
+document.addEventListener('click', ev => { const h = ev.target.closest('.item.foldable > .ih'); if (!h || ev.target.closest('a,button')) return;
+  const el = h.parentElement; el.classList.toggle('unfold', el.classList.contains('folded')); paintItems(); });
 /* a line at or over the threshold is marked for review */
 function marks(){
   const thr = S.thr || DATA.thr;
@@ -1084,7 +1147,7 @@ def flux():
                     used_com.add(r["account_code"])
                 out.append('<tr data-var="%s"><td><span class="code">%s</span>%s</td><td class="n2">%s</td><td class="n2">%s</td>'
                            '<td class="n2">%s</td><td class="n2">%s</td>%s<td><div class="cm">%s</div>%s<textarea class="c" rows="1" data-note="%s" placeholder="Commentary"></textarea></td></tr>'
-                           % (round(v, 2), e(r["account_code"]), e(r["account_leaf"]), money(r["actual"]), money(r.get(base)), fav(v), fav(v, pct(v, r.get(base))) if r.get(base) else "&ndash;",
+                           % (round(v, 2), e(r["account_code"]), e(leaf_of(r)), money(r["actual"]), money(r.get(base)), fav(v), fav(v, pct(v, r.get(base))) if r.get(base) else "&ndash;",
                               avgs, line if round(v) else "No change.", draft("com:" + key, dn, key) if dn else "", key))
         head = ("<thead><tr><th>Account</th><th class=\"n2\">" + e(PERIOD) + "</th><th class=\"n2\">" + e(label) + "</th><th class=\"n2\">$ Var</th>"
                 "<th class=\"n2\">% Var</th>" + ('<th class="n2">3-mo avg</th><th class="n2">6-mo avg</th>' if kind == "mom" else "")
@@ -1115,13 +1178,13 @@ def flux():
             if r.get("budget") is None:
                 out.append('<tr data-var="0" data-mark="dot"><td><span class="code">%s</span>%s</td><td class="n2">%s</td><td class="n2">&ndash;</td><td class="n2">&ndash;</td><td class="n2">&ndash;</td>'
                            '<td><div class="cm">No plan line for this account.</div><textarea class="c" rows="1" data-note="avb:%s" placeholder="Commentary"></textarea></td></tr>'
-                           % (e(r["account_code"]), e(r["account_leaf"]), money(r["actual"]), e(r["account_code"])))
+                           % (e(r["account_code"]), e(leaf_of(r)), money(r["actual"]), e(r["account_code"])))
                 continue
             v = (r["budget"] or 0) - (r["actual"] or 0)
             line = money(abs(v)) + (" under plan" if v > 0 else " over plan") + (" (" + format(abs(100 * v / r["budget"]), ".1f") + "%)." if r["budget"] else ".")
             out.append('<tr data-var="%s"><td><span class="code">%s</span>%s</td><td class="n2">%s</td><td class="n2">%s</td><td class="n2">%s</td><td class="n2">%s</td>'
                        '<td><div class="cm">%s</div><textarea class="c" rows="1" data-note="avb:%s" placeholder="Commentary"></textarea></td></tr>'
-                       % (round(v, 2), e(r["account_code"]), e(r["account_leaf"]), money(r["actual"]), money(r["budget"]), fav(v), fav(v, pct(v, r["budget"])) if r["budget"] else "&ndash;",
+                       % (round(v, 2), e(r["account_code"]), e(leaf_of(r)), money(r["actual"]), money(r["budget"]), fav(v), fav(v, pct(v, r["budget"])) if r["budget"] else "&ndash;",
                           line if round(v) else "On plan.", e(r["account_code"])))
     pages.append(page("avb", hero("Actual vs. Budget, " + PERIOD, "Plan: the " + e(PLR["views"]["tables"][[t["id"] for t in PLR["views"]["tables"]].index("dept_plan")].get("vintage") or "2026-06") + " vintage of the rolling forecast", [
         (MON + " Actual OpEx", short(act_p), "Accounts with a plan line"),
@@ -1221,16 +1284,16 @@ def flux():
         taxbars = "".join('<div class="row"><span>%s</span><span>%s</span></div><div class="bar"><i style="width:%.1f%%"></i></div>' % (lab, money(v), 100 * v / mx)
                           for lab, v in (("Social Security (6.2%, cap $176,100)", ss), ("Medicare (1.45%, uncapped)", med), ("MA SUI (~3%, first $15K)", sui)))
         ptabs.append('<button%s data-tab="pd%d">%s</button>' % (' class="on"' if not ptabs else "", k, e(r["department"])))
-        ppanes.append('<div data-pane="pd%d"%s><div class="pad split"><div><h3 style="margin:0 0 .8em">%s, Payroll Analytics</h3><div class="stats">'
+        ppanes.append(('<div data-pane="pd%d"%s><div class="pad split"><div><h3 style="margin:0 0 .8em">%s, Payroll Analytics</h3><div class="stats">'
                       '<div><div class="l">Headcount (roster)</div><div class="x">%d</div></div><div><div class="l">Avg annual salary</div><div class="x">%s</div></div>'
                       '<div><div class="l">Median salary</div><div class="x">%s</div></div><div><div class="l">Theoretical monthly salary</div><div class="x">%s</div></div>'
-                      '<div><div class="l">GL salary %s (6101000)</div><div class="x">%s</div></div><div><div class="l">Salary variance</div><div class="x">%s</div></div>'
-                      '<div><div class="l">GL bonus %s (6102000)</div><div class="x">%s</div></div><div><div class="l">GL benefits %s (6104000)</div><div class="x">%s</div></div>'
+                      '<div><div class="l">GL 6101000 ' + e(acct_name("6101000")) + ', %s</div><div class="x">%s</div></div><div><div class="l">Salary variance</div><div class="x">%s</div></div>'
+                      '<div><div class="l">GL 6102000 ' + e(acct_name("6102000")) + ', %s</div><div class="x">%s</div></div><div><div class="l">GL 6104000 ' + e(acct_name("6104000")) + ', %s</div><div class="x">%s</div></div>'
                       '<div><div class="l">Avg bonus target</div><div class="x">%.1f%%</div></div></div><h4 style="margin:.4em 0">Payroll Tax Breakdown</h4><div class="tax">%s'
-                      '<div class="row"><b>Total theoretical payroll tax</b><b>%s (%.1f%% of wages)</b></div><div class="row"><span>GL payroll tax (6103000 %s actual)</span><span>%s</span></div>'
+                      '<div class="row"><b>Total theoretical payroll tax</b><b>%s (%.1f%% of wages)</b></div><div class="row"><span>GL 6103000 ' + e(acct_name("6103000")) + ', %s actual</span><span>%s</span></div>'
                       '<div class="row"><span>Variance (GL vs. theoretical)</span><span>%s</span></div><div class="row"><span>Est. annual bonus pool (at target)</span><span>%s</span></div></div></div>'
                       '<div><h3 style="margin:0 0 .8em">Roster, %s</h3><div class="tw"><table><thead><tr><th>Name</th><th>Title</th><th>Type</th><th class="n2">Annual salary</th><th class="n2">Bonus %%</th></tr></thead>'
-                      '<tbody>%s</tbody></table></div></div></div></div>'
+                      '<tbody>%s</tbody></table></div></div></div></div>')
                       % (k, "" if len(ptabs) == 1 else " hidden", e(r["department"]), len(r["people"]), short(statistics.mean(sal)), short(statistics.median(sal)), money(mon), MON, money(r.get("salaries")),
                          fav(-((r.get("salaries") or 0) - mon), money((r.get("salaries") or 0) - mon)), MON, money(r.get("bonus")), MON, money(r.get("benefits")), avgb, taxbars, money(tax), 100 * tax / mon,
                          MON, money(glt), fav(-(glt - tax), ("+" if glt > tax else "") + money(glt - tax)), money(bon), e(r["department"]), roster))
@@ -1239,11 +1302,11 @@ def flux():
     # are not the ledger's, so it is not compared department by department.
     gl_bon = sum(r.get("bonus") or 0 for r in (pay.get("rows") or []))
     bdiff = gl_bon - tot["bon"] / 12
-    bonus_card = ('<div class="card"><div class="ch">Bonus Accrual, All Departments</div><div class="tw"><table><thead><tr><th>Check</th><th class="n2">GL 6102000 %s</th>'
+    bonus_card = (('<div class="card"><div class="ch">Bonus Accrual, All Departments</div><div class="tw"><table><thead><tr><th>Check</th><th class="n2">GL 6102000 ' + e(acct_name("6102000")) + ', %s</th>'
                   '<th class="n2">Pool at target &divide; 12</th><th class="n2">Difference</th><th style="width:40%%">Commentary</th></tr></thead><tbody>'
                   '<tr data-var="%s"><td>Bonus accrued this month</td><td class="n2">%s</td><td class="n2">%s</td><td class="n2">%s</td><td><div class="cm">Total only: the roster&rsquo;s '
                   'departments differ from the ledger&rsquo;s. Payroll tax on the bonus needs the payroll register.</div><textarea class="c" rows="1" data-note="bonus:total" placeholder="Commentary">'
-                  '</textarea></td></tr></tbody></table></div></div>'
+                  '</textarea></td></tr></tbody></table></div></div>')
                   % (MON, round(abs(bdiff), 2), money(gl_bon), money(tot["bon"] / 12), fav(-bdiff, ("+" if bdiff > 0 else "") + money(bdiff))))
     comp.append('<tr class="tot"><td>Total</td><td class="n2">%d</td><td class="n2">&ndash;</td><td class="n2">%s</td><td class="n2">&ndash;</td><td class="n2">&ndash;</td><td class="n2">&ndash;</td>'
                 '<td class="n2">%s</td><td class="n2">%.1f%%</td><td class="n2">%s</td><td class="n2">&ndash;</td><td class="n2">&ndash;</td><td class="n2">%s</td></tr>'
@@ -1253,7 +1316,7 @@ def flux():
         ("Avg Payroll Tax Rate", "%.1f%%" % (100 * tot["tax"] / (tot["mon"] or 1)), "SS 6.2% + Med 1.45% + SUI ~3%"), ("Est. Annual Bonus Pool", short(tot["bon"]), "At target % per roster")])
         + '<div class="card"><div class="ch">Compensation Summary, All Departments (Monthly, Regular Employees)</div><div class="tw"><table><thead><tr><th>Department</th><th class="n2">HC</th>'
           '<th class="n2">Avg Salary</th><th class="n2">Monthly Salary</th><th class="n2">SS (6.2%)</th><th class="n2">Medicare (1.45%)</th><th class="n2">SUI (~3%)</th><th class="n2">Total Tax</th>'
-          '<th class="n2">PT % Wages</th><th class="n2">GL 6103000 ' + MON + '</th><th class="n2">GL vs. Theoretical</th><th class="n2">Avg Bonus %</th><th class="n2">Est. Bonus Pool</th></tr></thead><tbody>'
+          '<th class="n2">PT % Wages</th><th class="n2">GL 6103000 ' + e(acct_name("6103000")) + ', ' + MON + '</th><th class="n2">GL vs. Theoretical</th><th class="n2">Avg Bonus %</th><th class="n2">Est. Bonus Pool</th></tr></thead><tbody>'
         + "".join(comp) + '</tbody></table></div></div>' + bonus_card + '<div class="card" data-tabbox><div class="ch">Department Detail, Payroll Breakdown &amp; Roster</div><div class="tabs">' + "".join(ptabs) + "</div>" + "".join(ppanes) + "</div>"))
 
     # ----- Balance Sheet Flux
@@ -1349,11 +1412,11 @@ def flux():
                        '<div class="why">%s%s</div><div class="pol">%s</div>%s'
                        '<div class="acts"><button class="pill" data-d="%s" data-v="approve" data-label="%s">Approve</button><button class="pill" data-d="%s" data-v="reject" data-label="%s">Reject</button>'
                        '<button class="pill" data-d="%s" data-v="modify" data-label="%s">Modify</button><textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
-                       % (" hi" if hi else "", aid, round(x["debits"], 2), e(x.get("kind") or ""), e(x["memo"]), "", e(acct["account"]), e(acct_name(acct["account"])), money(x["debits"], True),
+                       % (" hi" if hi else "", aid, round(x["debits"], 2), e(x.get("kind") or ""), en(x["memo"]), "", e(acct["account"]), e(acct_name(acct["account"])), money(x["debits"], True),
                           fav(imp, ("&#9660; Favorable " if imp > 0 else "&#9650; Unfavorable " if imp < 0 else "No P&amp;L impact") + (money(abs(imp), True) if round(imp) else "")),
                           e(", ".join(vend) or "&ndash;"), e(", ".join("%s %s %s" % (l["account"], acct_name(l["account"]), money((l.get("debit") or 0) - (l.get("credit") or 0), True).replace("&ndash;", "-")) for l in bsl)) or "&ndash;",
                           e(", ".join(sorted({l.get("department") for l in x["lines"] if l.get("department")})) or "&ndash;"),
-                          e(f.get("recommendation") or x.get("support") or x["memo"]), (" " + " ".join(doc_links(d) for d in docs)) if docs else "", e(f.get("policy_basis") or ""), je_editor(aid, je[aid]["lines"]) + dhtml,
+                          en(f.get("recommendation") or x.get("support") or x["memo"]), (" " + " ".join(doc_links(d) for d in docs)) if docs else "", en(f.get("policy_basis") or ""), je_editor(aid, je[aid]["lines"]) + dhtml,
                           aid, e(x["memo"]), aid, e(x["memo"]), aid, e(x["memo"]), aid))
     for r in revs:
         rid = sid("REV", r["account"], r.get("department"))
@@ -1365,7 +1428,7 @@ def flux():
                        '<div class="acts"><button class="pill" data-d="%s" data-v="ack" data-label="%s">Acknowledge &amp; Flag</button><button class="pill" data-d="%s" data-v="none" data-label="%s">No Action</button>'
                        '<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
                        % (rid, round(abs(v), 2), e(r["account"] + " " + acct_name(r["account"]) + ((" / " + r["department"]) if r.get("department") else "")), e(r["account"]), e(acct_name(r["account"])), (" / " + e(r["department"])) if r.get("department") else "",
-                          "Ledger %s, forecast %s, difference %s" % (money(r.get("ledger")), money(r.get("model")), money(v)), e(f.get("recommendation") or f.get("title") or ""), rid, "Forecast revision " + e(r["account"]), rid, "Forecast revision " + e(r["account"]), rid))
+                          "Ledger %s, forecast %s, difference %s" % (money(r.get("ledger")), money(r.get("model")), money(v)), en(f.get("recommendation") or f.get("title") or ""), rid, "Forecast revision " + e(r["account"]), rid, "Forecast revision " + e(r["account"]), rid))
     # Billed twice after a gap: two or more bills this month, none last month, billed in
     # at least two of the four months before, and this month at least 1.5 times the usual
     # month and at or over the threshold. It may be a missed accrual coming back.
@@ -1530,8 +1593,8 @@ def coding():
                if (not account or i["account"] == account) and (not docs or i["document"] in docs)]
         if not its:
             return ""
-        rows = "".join('<tr><td class="mono">%s</td><td>%s %s%s</td><td>%s</td><td class="mono">%s</td><td>%s</td><td class="n2">%s</td></tr>'
-                       % (e(i["date"]), e(i["type"]), e(i["document"]), doc_links(i["document"]), e(i["text"]), e(i["account"]), e(i.get("department") or ""), money(i["amount"], True))
+        rows = "".join('<tr><td class="mono">%s</td><td>%s %s%s</td><td>%s</td><td><span class="mono">%s</span><small>%s</small></td><td>%s</td><td class="n2">%s</td></tr>'
+                       % (e(i["date"]), e(i["type"]), e(i["document"]), doc_links(i["document"]), e(i["text"]), e(i["account"]), e(acct_name(i["account"])), e(i.get("department") or ""), money(i["amount"], True))
                        for i in sorted(its, key=lambda i: -abs(i["amount"])))
         more = (((r or {}).get("detail") or {}).get("count") or len(its)) - len(its) if not account and not docs else 0
         return ('<details class="lines"><summary>Lines (%d)</summary><div class="tw"><table><thead><tr><th>Date</th><th>Document</th><th>Description</th><th>Account</th><th>Department</th>'
@@ -1588,7 +1651,7 @@ def coding():
                        "lines": je_lines([{"account": r["to_account"], "department": r["department"], "debit": r["amount"]}, {"account": r["from_account"], "department": r["department"], "credit": r["amount"]}])}
             items.append(("capex" if prefix == "C" else "prepaid", iid, typ, r["vendor"], r.get("what") or "", r["amount"], r["from_account"], r["to_account"]))
             bucket.append(card(iid, r["vendor"], r["amount"], True, coding_(r["from_account"], r["department"]), '<span class="arrow">&rarr;</span> ' + coding_(r["to_account"], r["department"]),
-                               doc, '<div><div class="l">Department</div><div class="x">' + e(r["department"]) + "</div></div>", e(r["why"]) + (" " + e(r["do"]) if r["do"] else ""), "",
+                               doc, '<div><div class="l">Department</div><div class="x">' + e(r["department"]) + "</div></div>", en(r["why"]) + (" " + en(r["do"]) if r["do"] else ""), "",
                                FLAG_ACTS, lines_html(r["vendor"], r["from_account"]), je_editor(iid, je[iid]["lines"]) + history(r["vendor"])))
 
     # The other direction: bills posted to prepaid or fixed-asset accounts this month
@@ -1644,11 +1707,11 @@ def coding():
                 doc = next((i for r in vrows if r["vendor"] == vname for i in (r.get("detail") or {}).get("items") or [] if i["document"] in docs), doc)
         else:
             ev = f.get("evidence") or {}
-            cur, rec, doc = e(ev.get("observed") or ""), '<span class="arrow">&rarr;</span> ' + e(ev.get("expected") or ""), line_doc(vname)
+            cur, rec, doc = en(ev.get("observed") or ""), '<span class="arrow">&rarr;</span> ' + en(ev.get("expected") or ""), line_doc(vname)
         typ = "Department" if f["rule_id"].startswith("T1") else "Account vs. Coupa"
         items.append(("dept", iid, typ, vname, (doc or {}).get("text") or "", f.get("amount_at_risk") or 0, "", ""))
         dcards.append(card(iid, vname, f.get("amount_at_risk") or 0, (f.get("amount_at_risk") or 0) >= thr, cur, rec, doc,
-                           '<div><div class="l">Type</div><div class="x">' + e(typ) + "</div></div>", e(f.get("recommendation") or ""), "", FLAG_ACTS,
+                           '<div><div class="l">Type</div><div class="x">' + e(typ) + "</div></div>", en(f.get("recommendation") or ""), "", FLAG_ACTS,
                            lines_html(vname, docs=set(d for l in (x or {}).get("lines", []) for d in (l.get("documents") or [])) or None),
                            (je_editor(iid, je[iid]["lines"]) if iid in je else "") + history(vname)))
 
@@ -1657,7 +1720,7 @@ def coding():
         c = max(r.get("by_coding") or [{"account": "", "department": "", "current": 0}], key=lambda x: abs(x.get("current") or 0))
         return c.get("department") or "Non-Specific", c["account"], c.get("current") or r["amount"]
 
-    def vcard(iid, r, tag, why, actions):
+    def vcard(iid, r, tag, why, actions, checks=False):
         dept, a, camt = coding_of(r)
         dv = (RAW_DRAFTS.get("vendors") or {}).get(r["vendor"]) or {}
         dh = ""
@@ -1673,9 +1736,9 @@ def coding():
         return ('<div class="item" data-item="%s" data-amt="%s"><div class="ih"><b>%s</b><span class="stp">Pending</span><span class="mono">%s</span><span class="tag%s">%s</span></div>'
                 '<div class="ib"><div class="kv"><div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Document / item</div><div class="x">%s%s</div></div>'
                 '<div><div class="l">%s</div><div class="x">%s</div></div></div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
-                % (iid, round(r["amount"] or 0, 2), e(r["vendor"]), money(r["amount"], True), " hi" if tag == "Review" else "", tag, cur,
+                % (iid, round(r["amount"] or 0, 2), e(r["vendor"]), money(r["amount"], True), " hi" if tag == "Review" else (" plain" if not tag else ""), tag, cur,
                    (e(doc["type"] + " " + doc["document"]) + "<small>" + e(doc["text"]) + "</small>") if doc else "&ndash;", doc_links(doc["document"]) if doc else "",
-                   "Lines this month", str(((r.get("detail") or {}).get("count") or 0)), ('<div class="why">' + why + "</div>") if why else "",
+                   "Lines this month", str(((r.get("detail") or {}).get("count") or 0)), (why if checks else '<div class="why">' + why + "</div>") if why else "",
                    dh + history(r["vendor"]), je_editor(iid, je[iid]["lines"], "recode"), lines_html(r["vendor"]), acts(iid, r["vendor"], actions), iid))
 
     def by_dept(rs, make):
@@ -1688,19 +1751,35 @@ def coding():
             n = sum(len(v) for v in accts.values())
             out.append('<h4 class="dh">%s<span class="note">%s &middot; %s</span></h4>' % (e(d), count(n, "vendor"), money(sum(r["amount"] for v in accts.values() for r in v), True)))
             for a, vs in sorted(accts.items(), key=lambda kv: -sum(r["amount"] for r in kv[1])):
-                out.append('<div class="grphead"><span class="tag hi">%s %s</span>%s &middot; %s</div>' % (e(a), e(acct_name(a)), count(len(vs), "vendor"), money(sum(r["amount"] for r in vs), True)))
+                out.append('<div class="grphead"><span class="tag">%s %s</span>%s &middot; %s</div>' % (e(a), e(acct_name(a)), count(len(vs), "vendor"), money(sum(r["amount"] for r in vs), True)))
                 out.extend(make(r) for r in sorted(vs, key=lambda r: -r["amount"]))
         return out
 
     clear = [r for r in vrows if not r.get("flags") and round(r.get("amount") or 0)]
+    P2 = SS.shift(PERIOD, -2)
+
+    def passed(r):
+        """What was checked on a vendor no check flagged, and what each found. A check
+        with nothing to compare against says so, and is not counted as passed."""
+        cur = {(c["account"], c.get("department")) for c in (r.get("by_coding") or []) if round(c.get("current") or 0)}
+        hist = {(c["account"], c.get("department")) for c in (r.get("by_coding") or []) if round(c.get("prior") or 0) or round(c.get("prior2") or 0)}
+        coupa = any((LINKS.get(str(i["document"])) or {}).get("coupa") for i in ((r.get("detail") or {}).get("items") or []))
+        out = [("ok", "Coded as in %s and %s" % (P2[:3], PRIOR[:3])) if hist and cur <= hist else
+               ("ok", "Department is the vendor's usual") if hist else ("na", "No bills in %s or %s to compare" % (P2[:3], PRIOR[:3])),
+               ("ok", "Account matches its Coupa PO") if coupa else ("na", "No Coupa PO to compare"),
+               ("ok", "Not a prepaid or capital purchase"),
+               ("ok", "Coded as planned") if r.get("planned") else ("na", "No plan line for this vendor")]
+        return ('<div class="checks"><span class="l">Checks</span>' + "".join(
+            '<span class="%s">%s%s</span>' % (k, "&#10003; " if k == "ok" else "&ndash; ", e(t)) for k, t in out) + "</div>")
+
     def clear_card(r):
-        return vcard(sid("R", r["vendor"]), r, "Review" if r["amount"] >= thr else "Routine", "", (("confirm", "Confirm, No Recode"), ("recode", "Recode This Line")))
+        return vcard(sid("R", r["vendor"]), r, "$2,500 or more" if r["amount"] >= thr else "", passed(r), (("confirm", "Confirm, No Recode"), ("recode", "Recode This Line")), checks=True)
     ccards = by_dept(clear, clear_card)
     news = sorted([r for r in vrows if any(f.get("id") == "new" for f in r.get("flags") or []) and round(r.get("amount") or 0)], key=lambda r: -r["amount"])
     def new_card(r):
         fl = next(f for f in r["flags"] if f.get("id") == "new")
         return vcard(sid("N", r["vendor"]), r, "Review" if r["amount"] >= thr else "Routine",
-                     "<b>Assessment:</b> " + e(fl.get("why") or "") + ((" <b>Action:</b> " + e(fl.get("do"))) if fl.get("do") else ""),
+                     "<b>Assessment:</b> " + en(fl.get("why") or "") + ((" <b>Action:</b> " + en(fl.get("do"))) if fl.get("do") else ""),
                      (("confirm", "Confirm Vendor &amp; Coding"), ("recode", "Recode This Line")))
     ncards = by_dept(news, new_card)
 
@@ -1730,8 +1809,8 @@ def coding():
     pages.append(page("capex", "<h3>CapEx Flags</h3>" + two_way("Capital", cap_cards, cap_booked, "capex", "Fixed Assets")))
     pages.append(page("prepaid", "<h3>Prepaid Flags</h3>" + two_way("Prepaid", pre_cards, pre_booked, "prepaid", "Prepaid")))
     pages.append(page("dept", '<h3>Dept &amp; Entity Flags <span class="note">%d items &middot; %s total</span></h3>' % (len(dcards), money(sum(i[5] for i in items if i[0] == "dept"), True)) + "".join(dcards)))
-    pages.append(page("clear", '<h3>Reviewed &amp; Cleared <span class="note">%d vendors &middot; %s</span></h3><div class="legend"><span class="tag">Routine</span>Correctly coded, confirm and close'
-                      '<span class="tag hi">Review</span>$2,500 or more, confirm the coding</div>' % (len(clear), money(sum(r["amount"] for r in clear), True)) + "".join(ccards)))
+    pages.append(page("clear", '<h3>Reviewed &amp; Cleared <span class="note">%d vendors &middot; %s</span></h3><div class="legend">No check flagged these vendors. '
+                      'Confirm each one, or recode it if the coding is wrong. Start with those at $2,500 or more.</div>' % (len(clear), money(sum(r["amount"] for r in clear), True)) + "".join(ccards)))
     pages.append(page("new", '<h3>New This Period <span class="note">%d vendors &middot; first appearance in the ledger</span></h3><div class="legend">'
                       '<span class="tag hi">Review</span>$2,500 or more<span class="tag">Routine</span>Under $2,500</div>' % len(news) + "".join(ncards)))
     pages.append(page("audit", '<h3>Audit Log</h3><div class="card"><div class="tw"><table><thead><tr><th>Timestamp</th><th>Item</th><th>Decision</th><th>By</th><th>Detail</th></tr></thead>'
@@ -1775,7 +1854,7 @@ function refresh(){
     '</td><td>' + esc(LABEL[l.v] || 'Cleared') + '</td><td>' + esc(l.by_uid ? Shared.name(l.by_uid) : '') + '</td><td>' + esc(l.note || '') + '</td></tr>').join('') : '<tr><td colspan="5" class="note">No decisions recorded yet.</td></tr>';
   const ex = $('[data-exportrows]'); if (ex){ const r = [];
     Object.keys(DATA.je).forEach(id => { if (!jeLive(id)) return; const j = jeOf(id), ok = jeReady(id);
-      j.lines.forEach((l, i) => r.push('<tr><td>' + (i ? '' : esc(j.memo)) + '</td><td class="mono">' + esc(l.account) + '</td><td>' + esc(l.department || '') + '</td><td class="n2">' + (Number(l.debit) ? money(l.debit) : '') +
+      j.lines.forEach((l, i) => r.push('<tr><td>' + (i ? '' : named(j.memo)) + '</td><td><span class="mono">' + esc(l.account) + '</span><small>' + esc(DATA.acct[(l.account || '').trim()] || '') + '</small></td><td>' + esc(l.department || '') + '</td><td class="n2">' + (Number(l.debit) ? money(l.debit) : '') +
         '</td><td class="n2">' + (Number(l.credit) ? money(l.credit) : '') + '</td><td>' + (i ? '' : ok ? 'Ready' : '<span class="unf">' + (jeBal(j) ? 'Out of balance' : jeNoop(j) ? 'No change' : !decided(id) ? 'Add a note' : 'Missing account') + '</span>') + '</td></tr>')); });
     ex.innerHTML = r.length ? r.join('') : '<tr><td colspan="6" class="note">No approved entries yet.</td></tr>'; }
 }

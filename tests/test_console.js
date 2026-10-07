@@ -92,6 +92,19 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     const [dl] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
     let csvText = ''; if (dl){ const f = await dl.path(); csvText = fs.readFileSync(f, 'utf8'); }
     ok(/Finance/.test(csvText) && /Department per budget owner/.test(csvText), k + ': the CSV carries the edit and the note');
+    if (k === 'gl'){
+      const r = await p.evaluate(() => document.querySelector('#p-clear [data-item]').dataset.item);
+      await p.evaluate(() => show('clear'));
+      await p.click('[data-item="' + r + '"] [data-v="confirm"]');
+      ok(await p.locator('[data-item="' + r + '"] > .ib').isHidden(), 'gl: a confirmed vendor card folds to its name');
+      await p.click('[data-item="' + r + '"] > .ih b');
+      ok(await p.locator('[data-item="' + r + '"] > .ib').isVisible(), 'gl: clicking the name opens it');
+      await p.click('[data-item="' + r + '"] > .ih b');
+      ok(await p.locator('[data-item="' + r + '"] > .ib').isHidden(), 'gl: clicking again folds it');
+      await p.click('[data-item="' + r + '"] > .ih b');
+      await p.click('[data-item="' + r + '"] [data-v="confirm"]');
+      ok(await p.locator('[data-item="' + r + '"] > .ib').isVisible() && !(await p.evaluate(r => !!S.dec[r], r)), 'gl: undoing the confirm leaves it open');
+    }
     if (k === 'pl'){
       ok(await p.locator('#p-ava [data-pane="mom"] th', {hasText: '3-mo avg'}).count() === 1, 'pl: MoM carries trailing averages');
       ok(await p.locator('#p-dept .ch', {hasText: 'Credits in Expense Accounts'}).count() === 1 && await p.locator('[data-note^="cr:"]').count() > 0, 'pl: credits in expense accounts listed');

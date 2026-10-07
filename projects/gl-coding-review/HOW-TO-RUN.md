@@ -298,8 +298,8 @@ left on it. Run log and Settings are the icons at the right.
 
 Every flag and vendor is a card: its current coding (and the recommended one, on a flag), the
 document with its NetSuite and Coupa links, the vendor's last three months by account and
-department with the line descriptions, and its lines. An item at or over the threshold is
-marked Review.
+department with the line descriptions, and its lines. Every account number shows its name. An
+item at or over the threshold is marked Review.
 
 ### CapEx and Prepaid, Both Directions
 
@@ -315,7 +315,14 @@ from the vendor's usual expense account and department.
   department or amount marks it **Modified**, which needs a note. The entry shows whether it
   balances; **Reset** brings back the proposal.
 * **A vendor** on Reviewed & Cleared or New This Period is **confirmed**, or **recoded**: the
-  Journal Entry opens, filled in with its coding, to edit, with a note.
+  Journal Entry opens, filled in with its coding, to edit, with a note. A confirmed vendor
+  folds to its name; click the name to open it again.
+
+Reviewed & Cleared holds the vendors no check flagged. Each card says which checks it passed:
+coded as in the two months before, account matching its Coupa PO, not a prepaid or capital
+purchase, and coded as planned. A check with nothing to compare against says so (no bills in
+the two months before, no Coupa PO, no plan line) rather than passing. Confirm each vendor, or
+recode it if the coding is wrong, starting with those at $2,500 or more.
 
 A draft from Claude sits on its card with **Use this**, which copies the note and sets the
 recommended decision. Only the current month gets an entry.
