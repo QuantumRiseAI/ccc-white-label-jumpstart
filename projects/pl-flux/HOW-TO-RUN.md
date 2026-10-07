@@ -137,7 +137,7 @@ decision record each time you ask for a rerun, a summary or an email.
 | `Run the P&L flux for Sep 2026.` | The first run of the close: lists the exports, runs the scripts, drafts, publishes the console |
 | `Run it again. Reviewed as of 28 Sep.` | Runs on the newest exports and says what is new since that review |
 | `Draft the commentary.` | Commentary for the accounts named, or every account still needing it, built into the console |
-| `Draft the leadership summary.` | A draft for the controller, in the chat, from the commentary you have explained |
+| `Redraft the executive summary.` | Rewrites the executive summary on the Executive Overview from the commentary you have explained |
 | `Draft the follow-up email.` | One email per department from the questions in your notes, such as accrual confirmations, for you to send |
 | `Build the NetSuite import.` | Puts every entry you want on Journal Entries, then checks the **NetSuite import, CSV** you export. A person imports it. |
 | `Draft the forecast revisions.` | The changes to the rolling forecast a finding calls for, with who approves them |
@@ -315,7 +315,8 @@ The bar holds three section titles; clicking one opens its pages beside it, each
 left on it. Run log and Settings are the icons at the right.
 
 * **Executive Overview**: total operating expense, net loss, cash and headcount, the cards,
-  the net loss bridge from the prior month (hover a bar for its figures), and the close
+  the net loss bridge from the prior month (hover a bar for its figures), the executive
+  summary Claude drafts (**Use this**, then edit it in place), and the close
   checklist: each page, what is open on it and what that is worth. A line of the checklist
   opens its page.
 * **Analysis**: Actual vs. Actual (MoM, with a YoY tab), Actual vs. Budget, By Department
