@@ -19,7 +19,8 @@ close has one chat in this Project, named for the month, such as "September clos
 reviewer runs the review in that chat more than once as the month fills in. A new month is a
 new chat. The close month is the one the reviewer names, or else the latest
 month in the NetSuite exports. State it in your first reply. In the same reply, list each export below as supplied, with its file
-name, or missing, and ask for any that are missing before you run anything.
+name, or missing, and ask for any that are missing before you run anything. Check on disk, as Run It says,
+not by what the chat shows.
 
 | Export | What the month needs |
 |---|---|
@@ -34,7 +35,16 @@ which; ask the reviewer for that export. Never build a file for the scripts to r
 
 ## Run It
 
-Put the Project's files and the month's exports in one folder, and run from there. Only
+The scripts and every other Project file are on disk in the code environment, even when you
+cannot see them in this chat: with many Project files, only part of them is read into the
+conversation. Project files are in `/mnt/project/`, and files the reviewer attaches are in
+`/mnt/user-data/uploads/`. Before you say a file is missing, look with code:
+`ls /mnt/project /mnt/user-data/uploads`, or, if neither exists,
+`find / -name serif_uc1_engine.py 2>/dev/null`. Never decide a file is missing from what you
+can see in the chat.
+
+Copy the Project's files and the month's exports into one working folder, such as
+`/tmp/close`, and run from there. Only
 `--period` and the output folder change from month to month:
 
 ```sh
