@@ -34,6 +34,20 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: executive summary, payroll commentary, Project files (7 Oct)
+
+- **Executive Summary** (P&L Flux, Executive Overview): Claude drafts it into `drafts.json`
+  as `summary`, after the net loss bridge as in Chris's August report; the reviewer uses it
+  and edits it in place. "Redraft the executive summary." rewrites it from the reviewed
+  commentary. The GL coding review has none.
+- **Commentary digs for the driver**: when `movers` does not explain a move, Claude reads
+  the ledger lines, the Coupa lines and the UKG roster with code before calling a move
+  unexplained. Payroll accounts are checked against the roster: hires by `Last Hire Date`,
+  job changes by `Date In Job`, and department salary against the GL. The header-only payroll
+  register and HRIS feeds no longer read as "no UKG data".
+- **Project files**: both instructions say the scripts are always Project files, and Claude
+  searches for one by name instead of telling the reviewer it is missing.
+
 ## Unreleased: checks from the reviewers' own work (AIJ-93)
 
 The P&L Flux console adds what the August data supports from CK's manual review and Chris's

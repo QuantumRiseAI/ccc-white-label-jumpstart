@@ -417,6 +417,9 @@ input.f{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);pa
 .draft{display:flex;gap:var(--spacing-2xs);align-items:baseline;flex-wrap:wrap;background-color:var(--color-bg-primary);border-radius:var(--radius-xs);
   padding:.5em .7em;margin:0 0 .6em;font-size:var(--text--1);line-height:1.45}
 .draft .dt{flex:1 1 16rem}
+.esum{padding:var(--spacing-sm) var(--spacing-sm-md);display:grid;gap:var(--spacing-xs)}
+.esum .dt{white-space:pre-line;line-height:1.5}
+.esum textarea.c{font-size:var(--text-0);line-height:1.5}
 .draft .lk{margin-left:0}
 .lk{margin-left:auto;border:0;background:none;padding:0;font-size:var(--text--2);color:var(--color-fg-secondary);text-decoration:underline;cursor:pointer}
 .dh{font-size:var(--text-1);font-weight:500;margin:var(--spacing-md) 0 var(--spacing-3xs);display:flex;align-items:baseline;gap:var(--spacing-xs)}
@@ -1118,10 +1121,14 @@ def flux():
              tile("Cash &amp; Equiv. (" + MON + " BS)", short(cash_now),
                   " &middot; ".join(e(r["name"].split(" - ", 1)[-1].replace("Serif - ", "")) + ": " + short(r["values"][PERIOD]) for r in banks)),
              tile("Flags to Review", '<span data-cm></span>', '<span data-cmn></span>')]
+    # The executive summary for the controller: Claude's draft, used and edited by the reviewer.
+    sd = txt(RAW_DRAFTS.get("summary"))
+    exec_summary = ('<div class="card"><div class="ch">Executive Summary</div><div class="esum">' + (draft("sum:exec", sd, "exec:summary") if sd else "")
+                    + '<textarea class="c" rows="8" data-note="exec:summary" placeholder="Executive summary for the controller"></textarea></div></div>')
     pages.append(page("ov", hero("P&L Flux Analysis, " + PERIOD, "", tiles) + '<div class="grid">' + "".join(cards) + "</div>"
                       + '<div class="card"><div class="ch">Net Loss Bridge, ' + e(PRIOR) + ' to ' + e(PERIOD) + '</div>' + wf
                       + '<div class="wflegend"><span><i style="background:var(--color-dark-gray)"></i>Net loss</span><span><i style="background:var(--color-red-text)"></i>Raises the loss</span>'
-                        '<span><i style="background:var(--color-mid-gray)"></i>Lowers the loss</span></div></div>' + CHECKLIST))
+                        '<span><i style="background:var(--color-mid-gray)"></i>Lowers the loss</span></div></div>' + exec_summary + CHECKLIST))
 
     # ----- Actual vs. Actual
     def var_table(kind):

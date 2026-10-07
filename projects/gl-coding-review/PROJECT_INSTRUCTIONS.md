@@ -34,6 +34,11 @@ which; ask the reviewer for that export. Never build a file for the scripts to r
 
 ## Run It
 
+The scripts are Project files: `serif_uc1_engine.py`, `serif_views.py`, `build_pages.py` and
+their helpers, listed under Files. They are always in this Project. Never tell the reviewer a
+script is missing; if you cannot find one, search the Project's files for it by name, and
+say what you searched if it still does not turn up.
+
 Put the Project's files and the month's exports in one folder, and run from there. Only
 `--period` and the output folder change from month to month:
 
