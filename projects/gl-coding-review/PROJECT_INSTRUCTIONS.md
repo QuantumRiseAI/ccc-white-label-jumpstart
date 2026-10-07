@@ -179,9 +179,12 @@ section opens its pages beside its title.
     fixed-asset or prepaid accounts, to confirm or recode to expense;
   * **Dept & Entity**: department and account recodes, each with its proposed Journal Entry,
     and any Journal Entry you drafted.
-* **Transparency**: **Reviewed & Cleared**, the vendors with no flag, and **New This Period**,
-  the vendors first seen this month. Both are grouped by department, then account; each vendor
-  is confirmed, or recoded with a filled-in Journal Entry and a note.
+* **Transparency**: **Reviewed & Cleared**, the vendors no check flagged, and **New This
+  Period**, the vendors first seen this month. Both are grouped by department, then account;
+  each vendor is confirmed, or recoded with a filled-in Journal Entry and a note. A vendor on
+  Reviewed & Cleared shows which checks it passed (coded as in the two months before, account
+  matching its Coupa PO, not prepaid or capital, coded as planned), and which could not apply
+  and why. A confirmed vendor folds to its name; its name opens it again.
 * **Documentation**: the **Audit Log** (who decided what and when), **SOX Documentation**
   (sources, the GL tie-out, the policies applied and the sign-off), and **Export**, the
   NetSuite CSV.
@@ -455,6 +458,70 @@ they are not attached.
    connector you may look the entries up by External ID to see that they are there; say that
    it was read from NetSuite, and when. Ask the reviewer to save the decision record again for
    the close file.
+
+**List the follow-ups.** "List the follow-ups." "Give me the follow-up checklist."
+
+1. Ask for the latest decision record if it is not attached.
+2. With code, take every item still waiting on someone: each note that asks someone
+   something.
+3. Write a checklist, one row per item, in the order of the console's pages: an ID (CR1,
+   CR2 and on), the review and close month, the page, the vendor or account, the amount,
+   what is needed and from whom, the owner, the due date, the status (Open) and notes. Leave
+   the owner and due date blank unless the note names them.
+4. Give it in the chat, and as a spreadsheet if the reviewer asks. The IDs hold for this list
+   only: the console does not store them, and they do not carry to the next close.
+5. Never settle an item.
+
+**Check the posted entries.** "Check the posted entries." "Did the entries post as
+approved?" After the import, when the reviewer wants to know that NetSuite holds what was
+approved.
+
+1. Ask for the decision record and the NetSuite CSV that was imported, if they are not
+   attached. Ask for the posted entries: an export of the month's posted Journal Entries, or,
+   with the NetSuite connector, read them by External ID. Say which, and when it was read.
+2. With code, match each entry in the CSV to its posted entry by External ID. Compare the
+   date and posting period, the subsidiary, each line's account, department, debit and
+   credit, and the memo. Check that each posted entry balances, and that its amount
+   agrees to the item it came from in the run.
+3. Report each entry as Matches, Differences found (with each difference) or Not found. List
+   any posted entry for the month that carries a review memo but no External ID from the CSV.
+4. Change nothing. Never post, edit or reverse an entry. The reviewer decides what to do
+   with a difference.
+
+**Find the support for a change.** "What is the support for Journal Entry 1234?" "Why was
+this bill recoded?"
+
+1. Ask for the decision records of the closes in question, if they are not attached.
+2. With code, find the document number or External ID in the records and the runs: the
+   item and its page, the decision, the note, the entry as approved, and who decided it and
+   when, from `log`, where the record holds it.
+3. Name what raised it: the check, and the line or variance behind it.
+4. If no record holds it, say so: no support in the records attached. Never infer a reason.
+5. With the NetSuite connector you may read the document as NetSuite holds it now. Say that
+   it was read from NetSuite, and when.
+
+**Find what keeps recurring.** "What came up again this month?" "What do we correct every
+month?"
+
+1. Ask for the decision records of earlier closes, if they are not attached. Read them; never
+   load them into this month's console.
+2. With code, match items across months by vendor, account and check. List each one decided
+   in two or more consecutive months: the months, the total corrected, the decisions, and a
+   fix at the source, such as the vendor's default coding, a standard allocation entry, the PO
+   or contract setup, or a duplicate vendor record.
+3. Label it **Ad hoc, not a finding**. Fixing the source is the reviewer's call; never settle
+   an item.
+
+**Check a bill against its contract.** "Check this invoice against the SOW."
+
+1. Ask for the contract, SOW or amendment, if it is not attached. Take only the terms that
+   matter: start and end dates, billing frequency, rate or fee, proration and true-up,
+   termination and renewal.
+2. With code, find the bill's lines in the run or the exports.
+3. Report where they differ: an amount that does not agree, a partial month with no
+   proration, billing after the end date, an amendment not reflected. Show the arithmetic.
+4. Label it **Ad hoc, not a finding**. If it bears on an item, name the item; the reviewer
+   decides it.
 
 **Something the console does not show.** "Show me ...", "Cut this by ...". See below.
 

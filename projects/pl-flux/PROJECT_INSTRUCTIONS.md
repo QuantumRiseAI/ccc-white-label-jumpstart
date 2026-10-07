@@ -183,18 +183,25 @@ opens its pages beside its title.
   month, and the close checklist: each page, what is open on it and what that is worth.
 * **Analysis**:
   * **Actual vs. Actual (MoM)**, with a YoY tab: one line per P&L account, marked Review at or
-    over the threshold, with a commentary field;
+    over the threshold, with its 3- and 6-month trailing averages and a commentary field;
   * **Actual vs. Budget**, against the June plan, with year-to-date burn;
-  * **By Department (MoM)**, with each department's accounts and top vendors;
+  * **By Department (MoM)**, with each department's accounts and top vendors, then **Credits in
+    Expense Accounts**: each account and department whose month or year to date nets below
+    zero, with its largest credit lines;
   * **Payroll Analytics**: each department's GL salary, bonus, benefits and payroll tax
-    against the UKG roster, and the roster itself.
+    against the UKG roster, the roster itself, and the month's bonus accrual against the pool
+    at target, in total only (the roster's departments are not the ledger's).
 * **Close Workflow**:
   * **Balance Sheet Flux**, against the prior month, year end and the prior year, with
     commentary on each line;
   * **Adjustments**: Section A holds the proposed Journal Entries, each filled in and
     editable, to approve, reject or edit (Modified, with a note); Section B holds the forecast
-    revisions, to acknowledge or mark No Action. The NetSuite CSV downloads here;
+    revisions, to acknowledge or mark No Action; Section C lists vendors **billed twice after a
+    gap**: two or more bills this month, none last month, billed in at least two of the four
+    months before, and at least 1.5 times the usual month and at or over the threshold, which
+    may be a missed accrual coming back. The NetSuite CSV downloads here;
   * **SOX & GAAP**: the tie-outs of the ledger to the Income Statement and Balance Sheet, the
+    Flagship related-party schedule (Flagship-named vendors and journals, three months), the
     GAAP checklist, the source data and the sign-off.
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
   supplied, what each check found, the estimated cost of a run, the inputs and the build
@@ -503,6 +510,70 @@ they are not attached.
    connector you may look the entries up by External ID to see that they are there; say that
    it was read from NetSuite, and when. Ask the reviewer to save the decision record again for
    the close file.
+
+**List the follow-ups.** "List the follow-ups." "Give me the follow-up checklist."
+
+1. Ask for the latest decision record if it is not attached.
+2. With code, take every item still waiting on someone: each note that asks someone
+   something, and each account check marked Needs follow-up.
+3. Write a checklist, one row per item, in the order of the console's pages: an ID (PF1,
+   PF2 and on), the review and close month, the page, the vendor or account, the amount,
+   what is needed and from whom, the owner, the due date, the status (Open) and notes. Leave
+   the owner and due date blank unless the note names them.
+4. Give it in the chat, and as a spreadsheet if the reviewer asks. The IDs hold for this list
+   only: the console does not store them, and they do not carry to the next close.
+5. Never settle an item.
+
+**Check the posted entries.** "Check the posted entries." "Did the entries post as
+approved?" After the import, when the reviewer wants to know that NetSuite holds what was
+approved.
+
+1. Ask for the decision record and the NetSuite CSV that was imported, if they are not
+   attached. Ask for the posted entries: an export of the month's posted Journal Entries, or,
+   with the NetSuite connector, read them by External ID. Say which, and when it was read.
+2. With code, match each entry in the CSV to its posted entry by External ID. Compare the
+   date and posting period, the subsidiary, each line's account, department, debit and
+   credit, and the memo, and each accrual's Reversal Date. Check that each posted entry balances, and that its amount
+   agrees to the item it came from in the run.
+3. Report each entry as Matches, Differences found (with each difference) or Not found. List
+   any posted entry for the month that carries a review memo but no External ID from the CSV.
+4. Change nothing. Never post, edit or reverse an entry. The reviewer decides what to do
+   with a difference.
+
+**Find the support for a change.** "What is the support for Journal Entry 1234?" "Why was
+this bill recoded?"
+
+1. Ask for the decision records of the closes in question, if they are not attached.
+2. With code, find the document number or External ID in the records and the runs: the
+   item and its page, the decision, the note, the entry as approved, and who decided it and
+   when, from `log`, where the record holds it.
+3. Name what raised it: the check, and the line or variance behind it.
+4. If no record holds it, say so: no support in the records attached. Never infer a reason.
+5. With the NetSuite connector you may read the document as NetSuite holds it now. Say that
+   it was read from NetSuite, and when.
+
+**Find what keeps recurring.** "What came up again this month?" "What do we correct every
+month?"
+
+1. Ask for the decision records of earlier closes, if they are not attached. Read them; never
+   load them into this month's console.
+2. With code, match items across months by vendor, account and check. List each one decided
+   in two or more consecutive months: the months, the total corrected, the decisions, and a
+   fix at the source, such as the vendor's default coding, a standard allocation entry, the PO
+   or contract setup, or a duplicate vendor record.
+3. Label it **Ad hoc, not a finding**. Fixing the source is the reviewer's call; never settle
+   an item.
+
+**Check a bill against its contract.** "Check this invoice against the SOW."
+
+1. Ask for the contract, SOW or amendment, if it is not attached. Take only the terms that
+   matter: start and end dates, billing frequency, rate or fee, proration and true-up,
+   termination and renewal.
+2. With code, find the bill's lines in the run or the exports.
+3. Report where they differ: an amount that does not agree, a partial month with no
+   proration, billing after the end date, an amendment not reflected. Show the arithmetic.
+4. Label it **Ad hoc, not a finding**. If it bears on an item, name the item; the reviewer
+   decides it.
 
 **Something the console does not show.** "Show me ...", "Cut this by ...". See below.
 

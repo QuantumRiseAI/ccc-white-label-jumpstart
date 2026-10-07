@@ -34,6 +34,49 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: checks from the reviewers' own work (AIJ-93)
+
+The P&L Flux console adds what the August data supports from CK's manual review and Chris's
+reports. Engines and ruleset are unchanged; everything is computed from the GL export in
+`build_pages.py`. The console version is still 2.0.0 until a new one is minted.
+
+- **Credits in expense accounts** (By Department): each account and department whose month or
+  year to date nets below zero, with its largest credit lines and commentary. Aug 2026 has 12,
+  mostly employee insurance contributions on 6104000.
+- **Bonus accrual** (Payroll Analytics): the month's GL 6102000 against the pool at target ÷ 12,
+  in total. Aug 2026: $132,181 against $125,344. Not by department, because the roster's
+  departments are not the ledger's; the payroll tax piece needs the payroll register.
+- **Billed twice after a gap** (Adjustments, Section C): two or more bills this month, none last
+  month, billed in two of the four months before, at least 1.5 times the usual month and at or
+  over the threshold. Aug 2026 has 4.
+- **Related party: Flagship** (SOX & GAAP): Flagship-named vendors and journals, by account,
+  over three months. Aug 2026: $430,605.
+- **Trailing averages** (Actual vs. Actual, MoM): each account's 3- and 6-month averages.
+
+Both consoles:
+
+- **Reviewed & Cleared** (GL) says what was checked: each vendor lists the checks it passed and
+  the ones that could not apply, and why. The Review and Routine tags are gone from it: nothing
+  there was flagged, and $2,500 or more is a plain label. Account group headers are neutral.
+- **A confirmed vendor folds** to its name; clicking the name opens and closes it.
+- **Every account number shows its name**: in line tables, engine text, payroll labels, plan-only
+  accounts and the Export page. Accounts the chart lacks take their name from the GL export or
+  the Balance Sheet. `tests/audit_account_names.js`, run by `make test`, checks every page.
+- **Navigation**: the open section is an outlined group, section titles carry a chevron and
+  more space, and the bar is marked up for screen readers (expanded sections, the current
+  page, each section's pages as a group).
+- **Tabs** are folder tabs, the current one open into its panel, and are announced as tabs.
+- **Tables** fit the card: headers wrap, so no table scrolls sideways at 1280px or wider.
+  `tests/audit_table_width.js` checks it.
+
+Not built, because the data does not support them: department-level bonus (the roster's
+departments), the accrual roll-forward (the accruals log is not supplied), small amounts
+capitalized below a threshold (Serif's asset policy sets none), reading prepaid terms from line
+text (most lines carry none; the invoice is the source), and a prior-month forecast column
+(the workbook holds the August cut and the June plan only).
+
+---
+
 ## Console 2.0.0: 2026-10-06
 
 The updated UI replaces the 1.8 console in both jumpstarts. It is laid out as Chris's August

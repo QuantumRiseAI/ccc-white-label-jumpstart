@@ -140,6 +140,11 @@ decision record each time you ask for a rerun or a hand-off.
 | `Draft the questions email.` | One email per owner department, from the questions in your decision record, for you to send |
 | `Build the NetSuite import.` | Drafts any entry the console lacks, then checks the **Export to NetSuite, CSV** you download. A person imports it. |
 | `Summarize the session.` | The hand-off: runs, decisions, what is left, checks not run, where the record is |
+| `List the follow-ups.` | A checklist of everything waiting on someone, from your decision record, with an ID, owner, due date and status for each |
+| `Check the posted entries.` | Compares what posted in NetSuite with the import you approved: Matches, Differences found or Not found, entry by entry |
+| `What is the support for Journal Entry 1234?` | Finds the item, the decision, the note and who approved it, in the decision records you attach, or says there is none |
+| `What came up again this month?` | With earlier months' decision records, lists what is corrected month after month, and a fix at the source |
+| `Check this invoice against the SOW.` | Compares the bill with the contract terms you attach, proration included |
 | Anything the console does not show | An ad hoc cut, labeled as one |
 
 ### Asking for Something New
@@ -151,6 +156,10 @@ the run or from the exports through the scripts' own readers, and labels it **Ad
 finding**, with the run and the filter. It never adds a finding and never settles an item. If
 it bears on an item, Claude names the item and you decide it. If you want the same cut every
 month, say so: it may belong in the console as a check.
+
+Other cuts to ask for: who requested the PO behind a line, and that person's department;
+how a vendor was coded by department, program and project over the last year; what a
+$5,000 threshold would catch next to the current one.
 
 ### Connectors
 
@@ -298,8 +307,8 @@ left on it. Run log and Settings are the icons at the right.
 
 Every flag and vendor is a card: its current coding (and the recommended one, on a flag), the
 document with its NetSuite and Coupa links, the vendor's last three months by account and
-department with the line descriptions, and its lines. An item at or over the threshold is
-marked Review.
+department with the line descriptions, and its lines. Every account number shows its name. An
+item at or over the threshold is marked Review.
 
 ### CapEx and Prepaid, Both Directions
 
@@ -315,7 +324,14 @@ from the vendor's usual expense account and department.
   department or amount marks it **Modified**, which needs a note. The entry shows whether it
   balances; **Reset** brings back the proposal.
 * **A vendor** on Reviewed & Cleared or New This Period is **confirmed**, or **recoded**: the
-  Journal Entry opens, filled in with its coding, to edit, with a note.
+  Journal Entry opens, filled in with its coding, to edit, with a note. A confirmed vendor
+  folds to its name; click the name to open it again.
+
+Reviewed & Cleared holds the vendors no check flagged. Each card says which checks it passed:
+coded as in the two months before, account matching its Coupa PO, not a prepaid or capital
+purchase, and coded as planned. A check with nothing to compare against says so (no bills in
+the two months before, no Coupa PO, no plan line) rather than passing. Confirm each vendor, or
+recode it if the coding is wrong, starting with those at $2,500 or more.
 
 A draft from Claude sits on its card with **Use this**, which copies the note and sets the
 recommended decision. Only the current month gets an entry.
