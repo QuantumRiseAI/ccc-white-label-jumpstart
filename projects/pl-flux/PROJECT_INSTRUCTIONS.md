@@ -183,18 +183,25 @@ opens its pages beside its title.
   month, and the close checklist: each page, what is open on it and what that is worth.
 * **Analysis**:
   * **Actual vs. Actual (MoM)**, with a YoY tab: one line per P&L account, marked Review at or
-    over the threshold, with a commentary field;
+    over the threshold, with its 3- and 6-month trailing averages and a commentary field;
   * **Actual vs. Budget**, against the June plan, with year-to-date burn;
-  * **By Department (MoM)**, with each department's accounts and top vendors;
+  * **By Department (MoM)**, with each department's accounts and top vendors, then **Credits in
+    Expense Accounts**: each account and department whose month or year to date nets below
+    zero, with its largest credit lines;
   * **Payroll Analytics**: each department's GL salary, bonus, benefits and payroll tax
-    against the UKG roster, and the roster itself.
+    against the UKG roster, the roster itself, and the month's bonus accrual against the pool
+    at target, in total only (the roster's departments are not the ledger's).
 * **Close Workflow**:
   * **Balance Sheet Flux**, against the prior month, year end and the prior year, with
     commentary on each line;
   * **Adjustments**: Section A holds the proposed Journal Entries, each filled in and
     editable, to approve, reject or edit (Modified, with a note); Section B holds the forecast
-    revisions, to acknowledge or mark No Action. The NetSuite CSV downloads here;
+    revisions, to acknowledge or mark No Action; Section C lists vendors **billed twice after a
+    gap**: two or more bills this month, none last month, billed in at least two of the four
+    months before, and at least 1.5 times the usual month and at or over the threshold, which
+    may be a missed accrual coming back. The NetSuite CSV downloads here;
   * **SOX & GAAP**: the tie-outs of the ledger to the Income Statement and Balance Sheet, the
+    Flagship related-party schedule (Flagship-named vendors and journals, three months), the
     GAAP checklist, the source data and the sign-off.
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
   supplied, what each check found, the estimated cost of a run, the inputs and the build

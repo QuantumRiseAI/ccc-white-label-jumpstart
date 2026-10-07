@@ -320,11 +320,17 @@ commentary; the close checklist counts it open until it has some. Actual vs. Act
 vs. Budget, By Department and Balance Sheet Flux each take commentary on their lines. A draft
 from Claude sits on its line with **Use this**, which copies it into the field.
 
+Actual vs. Actual (MoM) also shows each account's average over the 3 and 6 months before.
+By Department ends with **Credits in Expense Accounts**: every account and department whose
+month or year to date nets below zero, with the largest credit lines and a commentary field.
+
 ### Payroll Analytics
 
 Each department's GL salary, bonus, benefits and payroll tax for the month against the UKG
 roster: headcount, salaries, the theoretical monthly salary and payroll tax, and the bonus
-pool at target. The roster itself is listed by department.
+pool at target. The roster itself is listed by department. **Bonus Accrual** compares the
+month's GL bonus with the pool at target ÷ 12, in total only: the roster's departments are
+not the ledger's. Payroll tax on the bonus needs the payroll register.
 
 ### Adjustments
 
@@ -335,6 +341,10 @@ pool at target. The roster itself is listed by department.
   whether it balances; **Reset** brings back the proposal. Entries Claude drafted are here too.
 * **Section B, forecast revisions**: where the month's forecast and the ledger differ.
   **Acknowledge & Flag** sends it to FP&A; **No Action** leaves it.
+* **Section C, billed twice after a gap**: a vendor with two or more bills this month and none
+  last month, billed in at least two of the four months before, whose month is at least 1.5
+  times its usual month and at or over the threshold. It may be a missed accrual coming back,
+  so the commentary says whether last month needed one.
 
 **Download NetSuite JE CSV** holds every entry approved, or modified with a note, as edited:
 External ID, Date, Account, Department, Debit, Credit and Memo, with the note in the memo. An
@@ -346,8 +356,10 @@ The tie-outs come first: GL debits against credits; operating expenses, total ex
 income against the Income Statement; net income against the change in the Balance Sheet's Net
 Income; the balance sheet balancing; and the month's change in cash, prepaid expenses, fixed
 assets, accumulated depreciation, accounts payable and accrued expenses against GL activity.
-Each shows both figures and Pass, or the difference. Then the GAAP checklist, the source data,
-and the sign-off: Prepared by, Controller Review and CFO Approval.
+Each shows both figures and Pass, or the difference. Then **Related Party: Flagship**, the
+Flagship-named vendors and the journals whose memo names Flagship, by account over three
+months; the intercompany policy is a draft. Then the GAAP checklist, the source data, and the
+sign-off: Prepared by, Controller Review and CFO Approval.
 
 ### The Threshold
 

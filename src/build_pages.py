@@ -127,6 +127,18 @@ ytd = sum(l["amount"] for p, ls in by_period.items() if p.endswith(PERIOD[-4:]) 
 gl_6x = sum(l["amount"] for l in gl_now if l["account_code"][:1] == "6")
 pl_lines_now = sum(1 for l in gl_now if PNL(l["account_code"]))
 DEPTS = sorted({l["department"] for ls in by_period.values() for l in ls if l.get("department")})
+acct_month = defaultdict(lambda: defaultdict(float))    # P&L account -> period -> net
+for _p, _ls in by_period.items():
+    for _l in _ls:
+        if PNL(_l["account_code"]):
+            acct_month[_l["account_code"]][_p] += _l["amount"]
+
+
+def trailing(acct, n):
+    """The account's average over the n months before the period, from the GL."""
+    ms = [SS.shift(PERIOD, -k) for k in range(1, n + 1)]
+    have = [m for m in ms if m in by_period]
+    return sum(acct_month[acct].get(m, 0.0) for m in have) / len(have) if len(have) == n else None
 HIST_MONTHS = [SS.shift(PERIOD, -2), PRIOR, PERIOD]
 vendor_lines = defaultdict(lambda: defaultdict(list))   # vendor -> month -> lines
 for m in HIST_MONTHS:
@@ -300,6 +312,7 @@ th{font-size:var(--text--2);text-transform:uppercase;letter-spacing:.04em;color:
   padding:.7em .8em;border-bottom:1px solid var(--color-hairline);white-space:nowrap;background-color:var(--color-stark)}
 td{padding:.65em .8em;border-bottom:1px solid var(--color-hairline);vertical-align:top}
 td.n2,th.n2{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.n2 small{display:block;color:var(--color-fg-secondary);font-size:var(--text--2)}
 .mono{font-family:var(--font-mono);font-size:.9em}
 .code{display:block;font-family:var(--font-mono);font-size:var(--text--2);color:var(--color-fg-secondary)}
 tr.grp td{background-color:var(--color-bg-primary);font-size:var(--text--2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;text-align:left;color:var(--color-fg-primary)}
@@ -1055,9 +1068,10 @@ def flux():
             live = [r for r in s["rows"] if round(r.get("actual") or 0) or round(r.get(base) or 0)]
             if not live:
                 continue
-            out.append('<tr class="grp"><td colspan="6">' + e(s["label"].split(" - ", 1)[-1]) + "</td></tr>")
+            out.append('<tr class="grp"><td colspan="%d">' % (8 if kind == "mom" else 6) + e(s["label"].split(" - ", 1)[-1]) + "</td></tr>")
             for r in live:
                 v = (r.get(base) or 0) - (r.get("actual") or 0)       # favorable positive
+                avgs = "".join('<td class="n2">%s</td>' % money(trailing(r["account_code"], n)) for n in (3, 6)) if kind == "mom" else ""
                 fv += v if v > 0 else 0
                 uf += v if v < 0 else 0
                 fid = r.get("mom_finding") if kind == "mom" else None
@@ -1069,11 +1083,12 @@ def flux():
                 if dn:
                     used_com.add(r["account_code"])
                 out.append('<tr data-var="%s"><td><span class="code">%s</span>%s</td><td class="n2">%s</td><td class="n2">%s</td>'
-                           '<td class="n2">%s</td><td class="n2">%s</td><td><div class="cm">%s</div>%s<textarea class="c" rows="1" data-note="%s" placeholder="Commentary"></textarea></td></tr>'
+                           '<td class="n2">%s</td><td class="n2">%s</td>%s<td><div class="cm">%s</div>%s<textarea class="c" rows="1" data-note="%s" placeholder="Commentary"></textarea></td></tr>'
                            % (round(v, 2), e(r["account_code"]), e(r["account_leaf"]), money(r["actual"]), money(r.get(base)), fav(v), fav(v, pct(v, r.get(base))) if r.get(base) else "&ndash;",
-                              line if round(v) else "No change.", draft("com:" + key, dn, key) if dn else "", key))
+                              avgs, line if round(v) else "No change.", draft("com:" + key, dn, key) if dn else "", key))
         head = ("<thead><tr><th>Account</th><th class=\"n2\">" + e(PERIOD) + "</th><th class=\"n2\">" + e(label) + "</th><th class=\"n2\">$ Var</th>"
-                "<th class=\"n2\">% Var</th><th style=\"width:42%\">Commentary</th></tr></thead>")
+                "<th class=\"n2\">% Var</th>" + ('<th class="n2">3-mo avg</th><th class="n2">6-mo avg</th>' if kind == "mom" else "")
+                + "<th style=\"width:%s\">Commentary</th></tr></thead>" % ("34%" if kind == "mom" else "42%"))
         sm = ('<div class="sumline">Favorable: <b>' + money(fv) + "</b> Unfavorable: <b class=\"unf\">" + money(uf) + "</b> To review: <b data-ccount></b></div>")
         return sm + '<div class="tw"><table>' + head + "<tbody>" + "".join(out) + "</tbody></table></div>"
     ch = opex["actual"] - opex["prior"]
@@ -1145,11 +1160,34 @@ def flux():
                      % (k, "" if k == 0 else " hidden", tile(e(PERIOD) + " Total", money(r["actual"])), tile(e(PRIOR) + " Total", money(r["prior"])),
                         tile("MoM Variance", fav(v, ("&#9660; " if v > 0 else "&#9650; ") + money(abs(v))), fav(v, (pct(v, r["prior"]).lstrip("+-") + (" favorable" if v > 0 else " unfavorable")) if r["prior"] else "")),
                         tile("Reg. Headcount", str(len(reg)), ("Avg salary " + short(avg)) if avg else ""), e(PERIOD), e(PRIOR), "".join(trs)))
+    # Credits in expense accounts: an account and department whose month or year to date
+    # nets below zero, with the credit lines behind it.
+    yr = [m for m in by_period if m.endswith(PERIOD[-4:]) and SS.period_key(m) <= SS.period_key(PERIOD)]
+    cnet = defaultdict(lambda: [0.0, 0.0])
+    for m in yr:
+        for l in by_period[m]:
+            if l["account_code"][:1] in "67":
+                k_ = (l["account_code"], l["department"] or "Non-Specific")
+                cnet[k_][1] += l["amount"]
+                if m == PERIOD:
+                    cnet[k_][0] += l["amount"]
+    credits = sorted([(k_, v_) for k_, v_ in cnet.items() if round(v_[0]) < 0 or round(v_[1]) < 0], key=lambda kv: min(kv[1]))
+    crows = []
+    for (a, d), (mnet, ynet) in credits:
+        ls = sorted([l for l in by_period.get(PERIOD, []) if l["account_code"] == a and (l["department"] or "Non-Specific") == d and l["amount"] < 0], key=lambda l: l["amount"])[:2]
+        why = "; ".join("%s %s%s, %s, %s" % (e(l["txn_type"]), e(l["document_number"]), doc_links(l["document_number"]), e((l.get("vendor_or_name") or "").strip() or desc(l) or "no description"), money(l["amount"], True)) for l in ls)
+        crows.append('<tr data-var="%s"><td><span class="code">%s</span>%s</td><td>%s</td><td class="n2">%s</td><td class="n2">%s</td><td><div class="cm">%s</div>'
+                     '<textarea class="c" rows="1" data-note="cr:%s:%s" placeholder="Commentary"></textarea></td></tr>'
+                     % (round(min(mnet, ynet), 2), e(a), e(acct_name(a)), e(d), money(mnet), money(ynet),
+                        ("Largest credits in " + MON + ": " + why + ".") if why else "No credit lines in " + e(MON) + "; the year to date nets below zero.", e(a), e(d)))
+    credits_card = ('<div class="card"><div class="ch">Credits in Expense Accounts<span class="r note">%s</span></div><div class="tw"><table><thead><tr><th>Account</th><th>Department</th>'
+                    '<th class="n2">%s</th><th class="n2">YTD</th><th style="width:42%%">Commentary</th></tr></thead><tbody>%s</tbody></table></div></div>'
+                    % (count(len(crows), "account") + " netting below zero", e(PERIOD), "".join(crows) or '<tr><td colspan="5" class="note">None this month or year to date.</td></tr>'))
     pages.append(page("dept", hero("By Department, " + MON + " vs. " + PRIOR + " (Month-over-Month)", "", [
         ("Departments", str(len(drows)), ""), ("Largest (" + MON + ")", e(big["department"]), short(big["actual"]) + " " + MON + " spend"),
         ("Biggest Swing", e(swing["department"]), fav(-swing["change"], ("&#9660; " if swing["change"] < 0 else "&#9650; ") + short(abs(swing["change"])))),
         ("Total P&amp;L (" + MON + ")", short(sum(r["actual"] for r in dm["rows"])), "")])
-        + '<div class="card" data-tabbox><div class="tabs">' + "".join(tabs_) + "</div>" + "".join(panes) + "</div>"))
+        + '<div class="card" data-tabbox><div class="tabs">' + "".join(tabs_) + "</div>" + "".join(panes) + "</div>" + credits_card))
 
     # ----- Payroll Analytics
     SS_CAP, SS_R, MED_R, SUI_R, SUI_CAP = 176100, .062, .0145, .03, 15000
@@ -1197,6 +1235,16 @@ def flux():
                          fav(-((r.get("salaries") or 0) - mon), money((r.get("salaries") or 0) - mon)), MON, money(r.get("bonus")), MON, money(r.get("benefits")), avgb, taxbars, money(tax), 100 * tax / mon,
                          MON, money(glt), fav(-(glt - tax), ("+" if glt > tax else "") + money(glt - tax)), money(bon), e(r["department"]), roster))
     t = pay.get("total") or {}
+    # The bonus accrual against the pool at target, in total. The roster's departments
+    # are not the ledger's, so it is not compared department by department.
+    gl_bon = sum(r.get("bonus") or 0 for r in (pay.get("rows") or []))
+    bdiff = gl_bon - tot["bon"] / 12
+    bonus_card = ('<div class="card"><div class="ch">Bonus Accrual, All Departments</div><div class="tw"><table><thead><tr><th>Check</th><th class="n2">GL 6102000 %s</th>'
+                  '<th class="n2">Pool at target &divide; 12</th><th class="n2">Difference</th><th style="width:40%%">Commentary</th></tr></thead><tbody>'
+                  '<tr data-var="%s"><td>Bonus accrued this month</td><td class="n2">%s</td><td class="n2">%s</td><td class="n2">%s</td><td><div class="cm">Total only: the roster&rsquo;s '
+                  'departments differ from the ledger&rsquo;s. Payroll tax on the bonus needs the payroll register.</div><textarea class="c" rows="1" data-note="bonus:total" placeholder="Commentary">'
+                  '</textarea></td></tr></tbody></table></div></div>'
+                  % (MON, round(abs(bdiff), 2), money(gl_bon), money(tot["bon"] / 12), fav(-bdiff, ("+" if bdiff > 0 else "") + money(bdiff))))
     comp.append('<tr class="tot"><td>Total</td><td class="n2">%d</td><td class="n2">&ndash;</td><td class="n2">%s</td><td class="n2">&ndash;</td><td class="n2">&ndash;</td><td class="n2">&ndash;</td>'
                 '<td class="n2">%s</td><td class="n2">%.1f%%</td><td class="n2">%s</td><td class="n2">&ndash;</td><td class="n2">&ndash;</td><td class="n2">%s</td></tr>'
                 % (tot["hc"], money(tot["mon"]), money(tot["tax"]), 100 * tot["tax"] / (tot["mon"] or 1), money(t.get("taxes")), money(tot["bon"])))
@@ -1206,7 +1254,7 @@ def flux():
         + '<div class="card"><div class="ch">Compensation Summary, All Departments (Monthly, Regular Employees)</div><div class="tw"><table><thead><tr><th>Department</th><th class="n2">HC</th>'
           '<th class="n2">Avg Salary</th><th class="n2">Monthly Salary</th><th class="n2">SS (6.2%)</th><th class="n2">Medicare (1.45%)</th><th class="n2">SUI (~3%)</th><th class="n2">Total Tax</th>'
           '<th class="n2">PT % Wages</th><th class="n2">GL 6103000 ' + MON + '</th><th class="n2">GL vs. Theoretical</th><th class="n2">Avg Bonus %</th><th class="n2">Est. Bonus Pool</th></tr></thead><tbody>'
-        + "".join(comp) + '</tbody></table></div></div><div class="card" data-tabbox><div class="ch">Department Detail, Payroll Breakdown &amp; Roster</div><div class="tabs">' + "".join(ptabs) + "</div>" + "".join(ppanes) + "</div>"))
+        + "".join(comp) + '</tbody></table></div></div>' + bonus_card + '<div class="card" data-tabbox><div class="ch">Department Detail, Payroll Breakdown &amp; Roster</div><div class="tabs">' + "".join(ptabs) + "</div>" + "".join(ppanes) + "</div>"))
 
     # ----- Balance Sheet Flux
     def bs_table(cmpm, word):
@@ -1318,12 +1366,45 @@ def flux():
                        '<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
                        % (rid, round(abs(v), 2), e(r["account"] + " " + acct_name(r["account"]) + ((" / " + r["department"]) if r.get("department") else "")), e(r["account"]), e(acct_name(r["account"])), (" / " + e(r["department"])) if r.get("department") else "",
                           "Ledger %s, forecast %s, difference %s" % (money(r.get("ledger")), money(r.get("model")), money(v)), e(f.get("recommendation") or f.get("title") or ""), rid, "Forecast revision " + e(r["account"]), rid, "Forecast revision " + e(r["account"]), rid))
+    # Billed twice after a gap: two or more bills this month, none last month, billed in
+    # at least two of the four months before, and this month at least 1.5 times the usual
+    # month and at or over the threshold. It may be a missed accrual coming back.
+    hist = [SS.shift(PERIOD, -k) for k in range(2, 6)]
+    vb = defaultdict(lambda: defaultdict(list))
+    for m in [PERIOD, PRIOR] + hist:
+        for l in by_period.get(m, []):
+            if l["txn_type"] == "Bill" and PNL(l["account_code"]) and (l.get("vendor_or_name") or "").strip():
+                vb[l["vendor_or_name"].strip()][m].append(l)
+    dbl = []
+    for vname, ms in vb.items():
+        now = ms.get(PERIOD) or []
+        billed = [m for m in hist if ms.get(m)]
+        if len({l["document_number"] for l in now}) < 2 or ms.get(PRIOR) or len(billed) < 2:
+            continue
+        amt, usual = sum(l["amount"] for l in now), sum(sum(l["amount"] for l in ms[m]) for m in billed) / len(billed)
+        if amt >= thr and amt >= 1.5 * usual:
+            dbl.append((vname, amt, usual, billed, now))
+    dbl.sort(key=lambda x: -x[1])
+    drows_ = []
+    for vname, amt, usual, billed, now in dbl:
+        bydoc = defaultdict(list)
+        for l in now:
+            bydoc[l["document_number"]].append(l)
+        docs_ = "; ".join("%s%s %s, %s" % (e(d_), doc_links(d_), money(sum(l["amount"] for l in ls_), True), e(desc(ls_[0]) or "no description"))
+                          for d_, ls_ in sorted(bydoc.items(), key=lambda kv: -sum(l["amount"] for l in kv[1]))[:3])
+        drows_.append('<tr data-var="%s"><td><b>%s</b></td><td class="n2">%s<small>%s</small></td><td class="n2">%s</td><td>%s</td><td><div class="cm">%s.</div>'
+                      '<textarea class="c" rows="1" data-note="dbl:%s" placeholder="Commentary"></textarea></td></tr>'
+                      % (round(amt, 2), e(vname), money(amt, True), count(len(bydoc), "bill"), money(usual), e(", ".join(m[:3] for m in sorted(billed, key=SS.period_key))),
+                         "None in " + e(PRIOR[:3]) + ". " + docs_, e(vname)))
+    dbl_section = ('<h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section C: Billed Twice After a Gap</h3><div class="card"><div class="tw"><table><thead><tr><th>Vendor</th>'
+                   '<th class="n2">%s</th><th class="n2">Usual month</th><th>Billed in</th><th style="width:40%%">Commentary</th></tr></thead><tbody>%s</tbody></table></div></div>'
+                   % (e(PERIOD), "".join(drows_) or '<tr><td colspan="5" class="note">None this month.</td></tr>'))
     pages.append(page("adj", hero("Accounting Adjustments &amp; Forecast Revisions, ".replace("&amp;", "&") + PERIOD, "", [
         ("Accounting Adj", str(len(ent)), "Affect P&amp;L / BS"), ("Forecast Revisions", str(len(revs)), "No Journal Entry required"),
         ("P&amp;L Impact (if all approved)", fav(impact, ("&#9660; " if impact > 0 else "&#9650; ") + short(abs(impact))), "Favorable" if impact > 0 else "Unfavorable"),
         ("Reviewed", '<span data-prog>0%</span>', '<span data-progn></span>')])
         + '<div class="card"><div class="ch">NetSuite Journal Entries<button class="pill solid r" data-export>Download NetSuite JE CSV</button></div></div><h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section A: Accounting Adjustments</h3>' + "".join(cards_a)
-        + '<h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section B: Forecast / Budget Revisions</h3>' + "".join(cards_b)))
+        + '<h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section B: Forecast / Budget Revisions</h3>' + "".join(cards_b) + dbl_section))
 
     # ----- SOX & GAAP
     asc = [("ASC 225-10", "Income Statement Presentation"), ("ASC 250-10", "Consistent Accounting Periods"), ("ASC 280-10", "Segment / Department Reporting"),
@@ -1363,6 +1444,24 @@ def flux():
     unbal = [x for x in ent if abs(round(sum((l.get("debit") or 0) - (l.get("credit") or 0) for l in x["lines"]), 2)) >= 0.01]
     ties.append('<tr><td>Proposed Journal Entries balance</td><td class="n2" colspan="2">%d of %d</td><td>%s</td></tr>' % (len(ent) - len(unbal), len(ent), "Pass" if not unbal else '<span class="unf">Fail</span>'))
     tie_note = "" if ISR else '<p class="note pad">Income Statement tie-outs did not run: they need the NetSuite Income Statement by month report.</p>'
+    # Related party: Flagship-named vendors, and journals whose memo names Flagship.
+    m3 = [SS.shift(PERIOD, -2), PRIOR, PERIOD]
+    rp = defaultdict(lambda: defaultdict(float))
+    for m in m3:
+        for l in by_period.get(m, []):
+            who = (l.get("vendor_or_name") or "").strip()
+            if PNL(l["account_code"]) and ("flagship" in who.lower() or "flagship" in (l.get("memo") or "").lower()):
+                rp[(who or "Journal: " + (l.get("memo") or "").strip()[:60], l["account_code"])][m] += l["amount"]
+    rp_rows = sorted(rp.items(), key=lambda kv: -abs(kv[1].get(PERIOD, 0)))
+    rp_html = "".join('<tr><td>%s</td><td><span class="code">%s</span>%s</td>%s<td class="n2">%s</td></tr>'
+                      % (e(who), e(a), e(acct_name(a)), "".join('<td class="n2">%s</td>' % money(v_.get(m)) for m in m3), fav(v_.get(PRIOR, 0) - v_.get(PERIOD, 0), money(v_.get(PERIOD, 0) - v_.get(PRIOR, 0))))
+                      for (who, a), v_ in rp_rows)
+    rp_tot = [sum(v_.get(m, 0) for _, v_ in rp_rows) for m in m3]
+    rp_card = ('<div class="card"><div class="ch">Related Party: Flagship<span class="r note">Flagship-named vendors and journals; the intercompany policy is a draft</span></div>'
+               '<div class="tw"><table><thead><tr><th>Vendor or journal</th><th>Account</th>' + "".join('<th class="n2">%s</th>' % e(m) for m in m3) + '<th class="n2">Change</th></tr></thead><tbody>'
+               + (rp_html or '<tr><td colspan="6" class="note">None.</td></tr>')
+               + ('<tr class="tot"><td>Total</td><td></td>' + "".join('<td class="n2">%s</td>' % money(x) for x in rp_tot) + '<td class="n2">%s</td></tr>' % money(rp_tot[2] - rp_tot[1]) if rp_rows else "")
+               + "</tbody></table></div></div>")
     roles = [("prep", "Prepared by"), ("ctrl", "Controller Review"), ("cfo", "CFO Approval")]
     sign = "".join('<div class="sign"><b>%s</b><input class="f" data-sname="%s" placeholder="Name"><input class="f" data-sdate="%s" placeholder="Date"><button class="pill" data-signbtn="%s">Sign</button></div>'
                    % (lab, k, k, k) for k, lab in roles)
@@ -1370,7 +1469,7 @@ def flux():
         ("GAAP Items", str(len(asc)), '<span data-ckdone></span>'), ("Sources", str(len(M["inputs"]) + len([x for x in V.get("inputs", []) if x.get("path") not in {y["path"] for y in M["inputs"]}])), "Read as exported"),
         ("Sign-offs", '<span data-signs></span>', ""), ("AI Disclosed", "Yes", "")])
         + '<div class="card"><div class="ch">Tie-Outs</div><div class="tw"><table class="ties"><thead><tr><th>Check</th><th class="n2">Amount</th><th class="n2">Against</th><th>Result</th></tr></thead><tbody>'
-        + "".join(ties) + "</tbody></table></div>" + tie_note + "</div>"
+        + "".join(ties) + "</tbody></table></div>" + tie_note + "</div>" + rp_card
         + '<div class="split"><div class="card"><div class="ch">GAAP Compliance Checklist</div>' + ck + '</div><div><div class="card"><div class="ch">Source Data Validation</div><div class="tw"><table>'
           '<thead><tr><th>Report</th><th>File</th><th class="n2">Status</th></tr></thead><tbody>' + src + '</tbody></table></div></div><div class="card"><div class="ch">Management Sign-Off</div><div class="pad">'
         + sign + '</div></div><div class="card"><div class="pad note"><b>AI disclosure.</b> Figures, variances and proposed entries are computed by the flux engine from the exports listed. '
