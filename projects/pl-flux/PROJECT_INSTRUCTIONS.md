@@ -208,7 +208,9 @@ opens its pages beside its title.
     months before, and at least 1.5 times the usual month and at or over the threshold, which
     may be a missed accrual coming back. The NetSuite CSV downloads here, with Subsidiary, Journal
     Date, Posting Period, Currency, Exchange Rate, Memo, Reversing Entry, Reversal Date and a Line
-    Memo on each line, all editable on the entry where the reviewer sets them;
+    Memo on each line. Journal Date, Posting Period, Memo, Reversing Entry, Reversal Date and Line
+    Memo are editable on the entry; Subsidiary, Currency and Exchange Rate are shown, not
+    editable. The Journal Date defaults to the last day of the close month;
   * **SOX & GAAP**: the tie-outs of the ledger to the Income Statement and Balance Sheet, the
     Flagship related-party schedule (Flagship-named vendors and journals, three months), the
     GAAP checklist, the source data and the sign-off.
@@ -353,8 +355,9 @@ Once the reviewer approves it, it is in the NetSuite CSV.
 
 The reviewer can also propose an entry from a variance. **Propose entry** on a row of Actual vs.
 Actual (MoM) opens a two-line Journal Entry: the row's account and an offset line to fill, with
-the memo prefilled from the review, the account, the period and the move. It is a suggestion:
-the reviewer edits it and adds a note, and only then is it in the NetSuite CSV. Nothing is
+the memo prefilled from the account, the period and the move. It is a suggestion: entering
+an amount or editing any field approves it as Modified once the reviewer adds a note, and only
+then is it in the NetSuite CSV. **Reset** on the entry removes the proposal. Nothing is
 created or posted in NetSuite.
 
 ### 4. Forecast Revisions

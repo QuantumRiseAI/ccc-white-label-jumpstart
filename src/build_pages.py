@@ -204,16 +204,16 @@ def history(vendor):
 
 def je_editor(iid, lines, when=None, label=None):
     """A proposed Journal Entry, filled in and editable. The page fills the values."""
-    rows = "".join('<tr><td><input class="f mono" data-jef="%s|%d|account" list="accts" size="9" aria-label="Account"><small data-jean="%s|%d"></small></td>'
-                   '<td><input class="f" data-jef="%s|%d|department" list="depts" aria-label="Department"></td>'
-                   '<td class="n2"><input class="f num" data-jef="%s|%d|debit" inputmode="decimal" aria-label="Debit"></td>'
-                   '<td class="n2"><input class="f num" data-jef="%s|%d|credit" inputmode="decimal" aria-label="Credit"></td>'
-                   '<td><input class="f wide" data-jef="%s|%d|memo" aria-label="Line Memo"></td></tr>'
-                   % ((iid, i) * 6) for i in range(len(lines)))
+    rows = "".join('<tr><td><input class="f mono" data-jef="%s|%d|account" list="accts" size="9" aria-label="Account, line %d"><small data-jean="%s|%d"></small></td>'
+                   '<td><input class="f" data-jef="%s|%d|department" list="depts" aria-label="Department, line %d"></td>'
+                   '<td class="n2"><input class="f num" data-jef="%s|%d|debit" inputmode="decimal" aria-label="Debit, line %d"></td>'
+                   '<td class="n2"><input class="f num" data-jef="%s|%d|credit" inputmode="decimal" aria-label="Credit, line %d"></td>'
+                   '<td><input class="f wide" data-jef="%s|%d|memo" aria-label="Line Memo, line %d"></td></tr>'
+                   % (iid, i, i + 1, iid, i, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1) for i in range(len(lines)))
     head = ('<div class="jf"><label>Subsidiary<span>%s</span></label><label>Currency<span>%s</span></label><label>Exchange Rate<span>%s</span></label>'
-            '<label>Journal Date<input class="f" data-jeh="%s|date"></label><label>Posting Period<input class="f" data-jeh="%s|period"></label>'
+            '<label>Journal Date<input class="f" type="date" data-jeh="%s|date"></label><label>Posting Period<input class="f" data-jeh="%s|period"></label>'
             '<label>Reversing Entry<select class="f" data-jeh="%s|reversing"><option>N</option><option>Y</option></select></label>'
-            '<label>Reversal Date<input class="f" data-jeh="%s|reversal_date"></label>'
+            '<label>Reversal Date<input class="f" type="date" data-jeh="%s|reversal_date"></label>'
             '<label class="memo">Memo<input class="f" data-jeh="%s|memo"></label></div>' % (e(JE_SUBSIDIARY), JE_CURRENCY, JE_RATE, iid, iid, iid, iid, iid))
     return ('<div class="jee" data-je="%s"%s%s><div class="jh"><span class="l">Journal Entry</span><span data-jebal></span>'
             '<button class="lk" data-jereset="%s" hidden>Reset</button></div>%s<div class="tw"><table><thead><tr><th>Account</th><th>Department</th>'
@@ -280,10 +280,11 @@ def je_finish(je):
     posting period, currency, exchange rate, reversal) and a Line Memo on each line."""
     for j in je.values():
         rev = j.pop("reverses", "") or ""
+        was, j["date"] = j["date"], PERIOD_END   # corrections are booked in the open close month
         j.update({"subsidiary": JE_SUBSIDIARY, "period": PERIOD, "currency": JE_CURRENCY, "rate": JE_RATE,
                   "reversing": "Y" if rev else "N", "reversal_date": rev})
         for l in j["lines"]:
-            l["memo"] = j["memo"]
+            l["memo"] = j["memo"] + ((" | Original date " + was) if was and was != PERIOD_END else "")
     return je
 
 # ---------- the design ----------
@@ -621,8 +622,8 @@ const KEY = 'serif-console::' + DATA.kind + '::' + DATA.run;
 /* The review's state. Each of STORES is a map of item to value: decisions,
    commentary and notes, entry edits, the GAAP checklist, sign-off and the audit
    log. The threshold is this browser's setting. */
-const STORES = ['dec', 'notes', 'je', 'ck', 'sign', 'log'];
-let S = {dec: {}, notes: {}, sign: {}, ck: {}, je: {}, log: {}, thr: DATA.thr};
+const STORES = ['dec', 'notes', 'je', 'jh', 'ck', 'sign', 'log'];
+let S = {dec: {}, notes: {}, sign: {}, ck: {}, je: {}, jh: {}, log: {}, thr: DATA.thr};
 try { S = Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
 if (Array.isArray(S.log)){ const o = {}; S.log.forEach((l, i) => { o[String(l.at).replace(/[^0-9]/g, '') + i] = l; }); S.log = o; }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -833,7 +834,7 @@ function saveRecord(){
 function planRecord(rec){
   const here = {dec: new Set($$('[data-item],[data-jerow]').map(x => x.dataset.item || x.dataset.jerow)), ck: new Set($$('[data-ckrow]').map(x => x.dataset.ckrow)),
                 sign: new Set($$('[data-sname]').map(x => x.dataset.sname)), notes: new Set($$('[data-note]').map(x => x.dataset.note))};
-  here.je = new Set(Object.keys(DATA.je)); here.log = null;
+  here.je = new Set(Object.keys(DATA.je)); here.jh = here.je; here.log = null;
   const p = {take: {}, add: 0, kept: 0, missed: 0};
   STORES.forEach(n => { p.take[n] = [];
     Object.keys(rec[n] || {}).forEach(k => { const v = rec[n][k];
@@ -904,8 +905,10 @@ document.addEventListener('click', ev => {
   if (ck){ if (blocked()) return; S.ck[ck.dataset.ck] = ck.dataset.v; save(); refresh(); return; }
   const x = ev.target.closest('[data-export]'); if (x){ exportCSV(); return; }
   const pr = ev.target.closest('[data-propose]');
-  if (pr){ const row = $('[data-jerow="' + pr.dataset.propose + '"]'); row.hidden = !row.hidden && !S.dec[pr.dataset.propose]; paintJE(); return; }
-  const rs = ev.target.closest('[data-jereset]'); if (rs){ if (blocked()) return; delete S.je[rs.dataset.jereset]; save(); refresh(); return; }
+  if (pr){ const row = $('[data-jerow="' + pr.dataset.propose + '"]'); row.hidden = !row.hidden && !S.dec[pr.dataset.propose]; refresh(); return; }
+  const rs = ev.target.closest('[data-jereset]'); if (rs){ if (blocked()) return; const id = rs.dataset.jereset; delete S.je[id]; delete S.jh[id];
+    if (DATA.je[id].proposal){ delete S.dec[id]; delete S.notes[id]; logAdd({id, label: 'Propose entry', v: 'cleared', note: ''}); }
+    save(); refresh(); return; }
   const u = ev.target.closest('[data-use]');
   if (u){ if (blocked()) return; const d = DATA.drafts[u.dataset.use]; S.notes[d.target] = d.note;
     if (d.item && d.v) S.dec[d.item] = {v: d.v, at: new Date().toISOString(), by_uid: Shared.uid()};
@@ -965,7 +968,7 @@ function paintItems(){
 /* counts: what is open on each page, and in each section */
 function counts(){
   $$('[data-c]').forEach(el => { const items = $$('#p-' + el.dataset.c + ' [data-item]');
-    const open = items.filter(x => !decided(x.dataset.item)).length; el.textContent = open || ''; });
+    const open = items.filter(x => !decided(x.dataset.item)).length + jeOpen(el.dataset.c).length; el.textContent = open || ''; });
   $$('[data-cs]').forEach(el => { const n = $$('.sub[data-s="' + el.dataset.cs + '"] [data-c]').reduce((a, x) => a + (Number(x.textContent) || 0), 0);
     el.textContent = n || ''; });
 }
@@ -990,20 +993,28 @@ function download(name, text, type){
 const csv = rows => rows.map(r => r.map(c => { const s = String(c == null ? '' : c); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\n');
 /* Proposed Journal Entries: filled in from the run, edited in place. An edit
    is kept in S.je and marks the item Modified (Recode on a vendor line). */
-const jeS = id => Array.isArray(S.je[id]) ? {lines: S.je[id], head: {}} : S.je[id];   // an edit: its lines and the header fields changed
-const jeOf = id => S.je[id] ? Object.assign({}, DATA.je[id], jeS(id).head, {lines: jeS(id).lines}) : DATA.je[id];
+const jeOf = id => { const b = DATA.je[id], j = Object.assign({}, b, S.jh[id] || {});   // S.je holds the lines, S.jh the header fields edited
+  j.lines = (S.je[id] || b.lines).map(l => l.memo == null ? Object.assign({}, l, {memo: j.memo}) : l); return j; };
 const jeBal = j => Math.round(j.lines.reduce((a, l) => a + (Number(l.debit) || 0) - (Number(l.credit) || 0), 0) * 100) / 100;
 const jeNoop = j => { const m = {}; j.lines.forEach(l => { const k = (l.account || '') + '|' + (l.department || ''); m[k] = (m[k] || 0) + (Number(l.debit) || 0) - (Number(l.credit) || 0); });
   return Object.values(m).every(v => Math.abs(v) < 0.005); };
-const jeLive = id => { const d = S.dec[id]; return !!d && ['approve', 'modify', 'recode'].indexOf(d.v) > -1 && !!DATA.je[id]; };
-const jeReady = id => { const j = jeOf(id); return jeLive(id) && decided(id) && !jeBal(j) && !jeNoop(j) && j.lines.every(l => (l.account || '').trim()) && (j.reversing !== 'Y' || !!(j.reversal_date || '').trim()); };
+const jeEdited = id => !!(S.je[id] || S.jh[id]);
+const jeLive = id => { const d = S.dec[id]; return !!d && ['approve', 'modify', 'recode'].indexOf(d.v) > -1 && !!DATA.je[id] && (!DATA.je[id].proposal || jeEdited(id)); };
+const isoOk = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '') && !isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s;
+/* why an entry cannot go into the import yet, or '' */
+const jeWhy = id => { const j = jeOf(id);
+  return jeBal(j) ? 'out of balance' : jeNoop(j) ? 'unchanged' : !decided(id) ? 'missing note' : !j.lines.every(l => (l.account || '').trim()) ? 'missing account'
+    : !isoOk(j.date) ? 'Journal Date is not a valid date' : !/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}$/.test(j.period || '') ? 'Posting Period is not Mon YYYY'
+    : j.reversing === 'Y' && !(j.reversal_date || '').trim() ? 'reversal date missing' : j.reversing === 'Y' && !(isoOk(j.reversal_date) && j.reversal_date > j.date) ? 'Reversal Date is not a date after the Journal Date' : ''; };
+const jeReady = id => jeLive(id) && decided(id) && !jeWhy(id);
+const jeOpen = pg => $$('#p-' + pg + ' [data-jerow]').filter(r => jeEdited(r.dataset.jerow) && !(jeLive(r.dataset.jerow) && jeReady(r.dataset.jerow)));   // proposals begun and not ready
 function editJE(t){
   if (Shared.ro()) return;
   const [id, i, f] = (t.dataset.jeh || t.dataset.jef).split('|');
-  if (!S.je[id]) S.je[id] = {lines: JSON.parse(JSON.stringify(DATA.je[id].lines)), head: {}};
-  else if (Array.isArray(S.je[id])) S.je[id] = jeS(id);
-  if (t.dataset.jeh) S.je[id].head[i] = t.value.trim();
-  else S.je[id].lines[i][f] = f === 'debit' || f === 'credit' ? (Number(String(t.value).replace(/[^0-9.]/g, '')) || 0) : t.value.trim();
+  if (t.dataset.jeh){ const H = S.jh[id] || (S.jh[id] = {}), old = jeOf(id).memo; H[i] = t.value.trim();
+    if (i === 'memo'){ if (!S.je[id]) S.je[id] = JSON.parse(JSON.stringify(jeOf(id).lines)); S.je[id].forEach(l => { if (l.memo == null || l.memo === old) l.memo = H.memo; }); } }
+  else { if (!S.je[id]) S.je[id] = JSON.parse(JSON.stringify(DATA.je[id].lines));
+    S.je[id][i][f] = f === 'debit' || f === 'credit' ? (Number(String(t.value).replace(/[^0-9.]/g, '')) || 0) : t.value.trim(); }
   const box = t.closest('[data-je]'), v = box.dataset.when || 'modify', d = S.dec[id];
   if (!d || d.v !== v){ const it = t.closest('[data-item]'), lb = it && it.querySelector('[data-d]');
     S.dec[id] = {v, at: new Date().toISOString(), by_uid: Shared.uid()}; logAdd({id, label: lb ? lb.dataset.label : box.dataset.label || id, v, note: S.notes[id] || ''}); }
@@ -1013,7 +1024,7 @@ function paintJE(){
   const m2 = v => (v < 0 ? '($' : '$') + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + (v < 0 ? ')' : '');
   $$('[data-je]').forEach(box => { const id = box.dataset.je, d = S.dec[id], j = jeOf(id);
     if (box.dataset.when) box.hidden = !(d && d.v === box.dataset.when);
-    box.classList.toggle('edited', !!S.je[id]);
+    box.classList.toggle('edited', jeEdited(id));
     const jr = box.closest('[data-jerow]'); if (jr && d) jr.hidden = false;
     box.querySelectorAll('[data-jeh]').forEach(inp => { if (inp !== document.activeElement) inp.value = j[inp.dataset.jeh.split('|')[1]] || ''; });
     const rd = box.querySelector('[data-jeh$="|reversal_date"]'); if (rd) rd.disabled = j.reversing !== 'Y';
@@ -1022,19 +1033,20 @@ function paintJE(){
     box.querySelectorAll('[data-jean]').forEach(s => { const i = s.dataset.jean.split('|')[1]; s.textContent = DATA.acct[(j.lines[i].account || '').trim()] || ''; });
     const b = jeBal(j), st = box.querySelector('[data-jebal]');
     st.innerHTML = b ? '<span class="unf">Out of balance by ' + m2(b) + '</span>' : jeNoop(j) ? 'No change yet' : 'Balanced';
-    box.querySelector('[data-jereset]').hidden = !S.je[id]; });
+    box.querySelector('[data-jereset]').hidden = !jeEdited(id); });
+  $$('[data-propose]').forEach(b => { const r = $('[data-jerow="' + b.dataset.propose + '"]'); b.setAttribute('aria-expanded', r && !r.hidden ? 'true' : 'false'); });
 }
 function exportCSV(){
   const rows = [['External ID', 'Subsidiary', 'Journal Date', 'Posting Period', 'Currency', 'Exchange Rate', 'Memo', 'Reversing Entry', 'Reversal Date', 'Account', 'Department', 'Debit', 'Credit', 'Line Memo']];
-  const held = Object.keys(DATA.je).filter(id => jeLive(id) && !jeReady(id)).length;
+  const held = Object.keys(DATA.je).filter(id => jeLive(id) && !jeReady(id)).map(id => jeOf(id).memo.slice(0, 60) + ': ' + jeWhy(id)).join('; ');
   Object.keys(DATA.je).forEach(id => { if (!jeReady(id)) return;
     const j = jeOf(id); j.lines.forEach(l => rows.push([j.id, j.subsidiary, j.date, j.period, j.currency, j.rate, j.memo + (S.notes[id] ? ' | ' + S.notes[id] : ''), j.reversing,
       j.reversing === 'Y' ? j.reversal_date : '', l.account, l.department || '', l.debit || '', l.credit || '', l.memo || ''])); });
-  if (rows.length === 1){ alertBox(held ? held + ' entries are out of balance, unchanged or missing a note.' : 'Approve an entry first: only approved entries go into the import.'); return; }
-  if (held) alertBox(held + ' entries left out: out of balance, unchanged or missing a note.');
+  if (rows.length === 1){ alertBox(held ? 'Left out: ' + held + '.' : 'Approve an entry first: only approved entries go into the import.'); return; }
+  if (held) alertBox('Left out: ' + held + '.');
   download('serif-' + DATA.kind + '-netsuite-' + DATA.slug + '.csv', csv(rows));
 }
-function alertBox(msg){ const t = $('#tip'); t.innerHTML = esc(msg); t.style.display = 'block'; t.style.left = '40%'; t.style.top = '80px'; setTimeout(() => t.style.display = 'none', 2200); }
+function alertBox(msg){ const t = $('#tip'); t.innerHTML = esc(msg); t.style.display = 'block'; t.style.left = '40%'; t.style.top = '80px'; setTimeout(() => t.style.display = 'none', Math.max(2200, msg.length * 45)); }
 /* The close checklist: each page, what is open on it, and what that is worth.
    Open is a flag with no decision, or a line at or over the threshold with no
    commentary. */
@@ -1047,6 +1059,8 @@ function checklist(){
     /* A page's other comparisons (year on year, year to date) restate its lines; they count once, on the first. */
     pg.querySelectorAll('tr[data-var]').forEach(tr => { if (tr.closest('[data-alt]')) return; const a = Math.abs(Number(tr.dataset.var) || 0); if (a < thr) return;
       total++; const t = tr.querySelector('textarea[data-note]'); if (!t || !(S.notes[t.dataset.note] || '').trim()){ open++; value += a; } });
+    $$('#p-' + pid + ' [data-jerow]').filter(r => jeEdited(r.dataset.jerow)).forEach(r => { total++; });
+    jeOpen(pid).forEach(r => { open++; value += jeOf(r.dataset.jerow).lines.reduce((a, l) => a + (Number(l.debit) || 0), 0); });
     if (!total) return;
     rows.push('<tr class="xp' + (open ? ' open' : '') + '" data-go="' + pid + '"><td><b>' + esc(b.textContent.replace(/\d+$/, '').trim()) + '</b></td><td>' +
       (open ? '<span class="unf">' + open + ' open of ' + total + '</span>' : 'Done, ' + total + ' of ' + total) + '</td><td class="n2">' + (open ? money(value) : '') + '</td></tr>'); });
@@ -1188,20 +1202,15 @@ def flux():
                         + (" (" + format(abs(100 * v / r[base]), ".1f") + "%)" if r.get(base) else "") + "." + (" Largest vendors: " + e(vend) + "." if vend else ""))
                 key = kind + ":" + r["account_code"]
                 pj = jr = ""
-                if kind == "mom":
+                if kind == "mom" and round(v):
                     pid = sid("PROP", key)
                     usd = lambda x: ("($" if x < 0 else "$") + format(abs(x), ",.0f") + (")" if x < 0 else "")
-                    t3, t6 = trailing(r["account_code"], 3), trailing(r["account_code"], 6)
-                    why = ("P&L Flux, Actual vs. Actual (MoM), %s vs. %s. Account %s %s: %s %s MoM%s (%s %s, %s %s%s). "
-                           "Proposed because the reviewer marked this variance as needing a correction or reclass; the offset line is for the reviewer to complete."
-                           % (PERIOD, PRIOR, r["account_code"], leaf_of(r), usd(abs(v)), "favorable" if v > 0 else "unfavorable",
-                              " (" + format(abs(100 * v / r[base]), ".1f") + "%)" if r.get(base) else "", PERIOD, usd(r["actual"]), PRIOR, usd(r.get(base) or 0),
-                              "".join("; %d-month average %s" % (n, usd(t)) for n, t in ((3, t3), (6, t6)) if t is not None)))
-                    je[pid] = {"id": "SERIF-" + SLUG + "-" + pid, "date": PERIOD_END, "memo": why,
+                    why = "P&L flux reclass, %s %s, %s: %s %s MoM" % (r["account_code"], leaf_of(r), PERIOD, usd(abs(v)), "favorable" if v > 0 else "unfavorable")
+                    je[pid] = {"id": "SERIF-" + SLUG + "-" + pid, "date": PERIOD_END, "memo": why, "proposal": True,
                                "lines": je_lines([{"account": r["account_code"]}, {"account": ""}])}
-                    pj = '<button class="lk" data-propose="%s">Propose entry</button>' % pid
-                    jr = ('<tr class="jr" data-jerow="%s" hidden><td colspan="8">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note"></textarea></td></tr>'
-                          % (pid, je_editor(pid, je[pid]["lines"], label="Propose entry " + r["account_code"]), pid))
+                    pj = '<button class="lk" data-propose="%s" aria-expanded="false" aria-controls="jr-%s">Propose entry</button>' % (pid, pid)
+                    jr = ('<tr class="jr" id="jr-%s" data-jerow="%s" hidden><td colspan="8">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note"></textarea></td></tr>'
+                          % (pid, pid, je_editor(pid, je[pid]["lines"], label="Propose entry " + r["account_code"]), pid))
                 dn = txt((RAW_DRAFTS.get("commentary") or {}).get(r["account_code"])) if kind == "mom" else ""
                 if dn:
                     used_com.add(r["account_code"])
@@ -1916,7 +1925,7 @@ function refresh(){
   const ex = $('[data-exportrows]'); if (ex){ const r = [];
     Object.keys(DATA.je).forEach(id => { if (!jeLive(id)) return; const j = jeOf(id), ok = jeReady(id);
       j.lines.forEach((l, i) => r.push('<tr><td>' + (i ? '' : named(j.memo)) + '</td><td><span class="mono">' + esc(l.account) + '</span><small>' + esc(DATA.acct[(l.account || '').trim()] || '') + '</small></td><td>' + esc(l.department || '') + '</td><td class="n2">' + (Number(l.debit) ? money(l.debit) : '') +
-        '</td><td class="n2">' + (Number(l.credit) ? money(l.credit) : '') + '</td><td>' + (i ? '' : ok ? 'Ready' : '<span class="unf">' + (jeBal(j) ? 'Out of balance' : jeNoop(j) ? 'No change' : !decided(id) ? 'Add a note' : j.reversing === 'Y' && !(j.reversal_date || '').trim() ? 'Missing reversal date' : 'Missing account') + '</span>') + '</td></tr>')); });
+        '</td><td class="n2">' + (Number(l.credit) ? money(l.credit) : '') + '</td><td>' + (i ? '' : ok ? 'Ready' : '<span class="unf">' + jeWhy(id).replace(/^./, c => c.toUpperCase()) + '</span>') + '</td></tr>')); });
     ex.innerHTML = r.length ? r.join('') : '<tr><td colspan="6" class="note">No approved entries yet.</td></tr>'; }
 }
 show('ov');

@@ -111,13 +111,33 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       const btn = p.locator('#p-ava [data-propose]').first(); const pid = await btn.getAttribute('data-propose');
       await btn.click();
       ok(await p.locator('[data-jerow="' + pid + '"]').isVisible(), 'pl: Propose entry opens a Journal Entry on the variance row');
-      ok(await p.evaluate(pid => !S.dec[pid] && /Actual vs\. Actual \(MoM\)/.test(jeOf(pid).memo) && !jeReady(pid), pid), 'pl: the proposal is a suggestion: memo from the review, nothing approved');
+      ok(await p.evaluate(pid => !S.dec[pid] && /^P&L flux reclass, \d{7} .+, Aug 2026: \$[\d,]+ (un)?favorable MoM$/.test(jeOf(pid).memo) && jeOf(pid).memo.length < 200 && !jeLive(pid) && !jeReady(pid), pid), 'pl: the proposal is a suggestion with a short memo, nothing approved');
+      ok(await p.evaluate(pid => $('[data-propose="' + pid + '"]').getAttribute('aria-expanded') === 'true' && jeOf(pid).date === '2026-08-31' && jeOf(pid).period === 'Aug 2026', pid), 'pl: Propose entry is expanded; dated the last day of the close month');
+      ok(await p.locator('#p-ava [data-pane="mom"] tr[data-var="0"] [data-propose]').count() === 0, 'pl: no Propose entry on a row with no variance');
+      // begun and not finished is open, with the reason on export; Reset is the way back
+      await p.fill('[data-jef="' + pid + '|0|debit"]', '500');
+      ok(await p.evaluate(pid => jeOpen('ava').length === 1 && /open of/.test($('[data-checklist]').textContent) && jeWhy(pid) === 'out of balance', pid), 'pl: a begun proposal counts as open');
+      await p.evaluate(() => exportCSV());
+      ok(/Left out: .*out of balance/.test(await p.evaluate(() => $('#tip').textContent)), 'pl: the export names why an entry was left out');
+      await p.click('[data-jereset="' + pid + '"]');
+      ok(await p.evaluate(pid => !S.dec[pid] && !S.je[pid] && !S.jh[pid] && !S.notes[pid] && !jeLive(pid) && jeOpen('ava').length === 0, pid), 'pl: Reset clears a proposal, nothing is held');
+      await p.fill('[data-jef="' + pid + '|0|debit"]', '500');
       await p.fill('[data-jef="' + pid + '|1|account"]', '2206000');
       await p.fill('[data-jef="' + pid + '|0|debit"]', '500'); await p.fill('[data-jef="' + pid + '|1|credit"]', '500');
       await p.fill('[data-jef="' + pid + '|0|memo"]', 'Reclass test line');
       await p.selectOption('[data-jeh="' + pid + '|reversing"]', 'Y');
       ok(await p.evaluate(pid => { S.notes[pid] = 'Reviewer note'; return !jeReady(pid); }, pid), 'pl: reversing without a reversal date is held');
+      await p.fill('[data-jeh="' + pid + '|reversal_date"]', '2026-08-01');
+      ok(await p.evaluate(pid => jeWhy(pid) === 'Reversal Date is not a date after the Journal Date', pid), 'pl: a reversal date before the Journal Date is held');
+      await p.fill('[data-jeh="' + pid + '|period"]', 'August');
+      ok(await p.evaluate(pid => jeWhy(pid) === 'Posting Period is not Mon YYYY', pid), 'pl: a Posting Period that is not Mon YYYY is held');
+      await p.fill('[data-jeh="' + pid + '|period"]', 'Aug 2026');
       await p.fill('[data-jeh="' + pid + '|reversal_date"]', '2026-09-01');
+      // saved edits keep main's shape: lines in je, header fields in jh; a record from main (no jh, lines without a Line Memo) still loads
+      ok(await p.evaluate(pid => Array.isArray(S.je[pid]) && !Array.isArray(S.jh[pid]) && recordOf().je[pid] === S.je[pid], pid), 'pl: S.je keeps the lines array; header edits are in their own store');
+      ok(await p.evaluate(() => { const id = Object.keys(DATA.je).find(k => !DATA.je[k].proposal), lines = DATA.je[id].lines.map(l => ({account: l.account, department: l.department, debit: l.debit, credit: l.credit}));
+        const rec = {kind: 'serif-decision-record', console_kind: 'flux', dec: {}, notes: {}, je: {[id]: lines}, ck: {}, sign: {}, log: {}}; planRecord(rec); const was = S.je[id]; S.je[id] = lines;
+        const ok_ = jeOf(id).lines.every(l => l.memo === DATA.je[id].memo); if (was) S.je[id] = was; else delete S.je[id]; return ok_; }), 'pl: a record in main\'s format loads; Line Memo defaults to the entry memo');
       ok(await p.evaluate(pid => jeReady(pid), pid), 'pl: a balanced, noted proposal is ready');
       const [d2] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
       const rowsCsv = d2 ? fs.readFileSync(await d2.path(), 'utf8').split('\n') : [];
@@ -148,7 +168,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     await q.setInputFiles('#recfile', recPath); await q.waitForTimeout(300);
     ok(await q.locator('#ask').isVisible(), k + ': loading asks first, on the page');
     await q.click('[data-askok]'); await q.waitForTimeout(200);
-    ok(await q.evaluate(id => (S.dec[id] || {}).v === 'modify' && jeS(id).lines[0].department === 'Finance', id), k + ': record loads the decision and the edit');
+    ok(await q.evaluate(id => (S.dec[id] || {}).v === 'modify' && (S.je[id] || [])[0].department === 'Finance', id), k + ': record loads the decision and the edit');
     await c2.close();
   }
 

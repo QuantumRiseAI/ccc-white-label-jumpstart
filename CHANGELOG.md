@@ -39,7 +39,8 @@ serif-pl-flux-aug2026-v1.8.2.html
 - **Propose entry** on each Actual vs. Actual (MoM) row (P&L Flux) opens an editable two-line
   Journal Entry that goes through the same approval gate and NetSuite CSV as the others; the NetSuite
   CSV and the entry editor now carry Subsidiary, Journal Date, Posting Period, Currency,
-  Exchange Rate, Memo, Reversing Entry, Reversal Date and a Line Memo on each line.
+  Exchange Rate, Memo, Reversing Entry, Reversal Date and a Line Memo on each line. Entries are
+  dated the last day of the close month, with the transaction date in the Line Memo.
 
 ## Unreleased: executive summary, payroll commentary, Project files (7 Oct)
 
