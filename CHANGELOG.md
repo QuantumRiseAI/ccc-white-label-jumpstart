@@ -58,7 +58,10 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 - **Fix**: the coding build finished each proposed Journal Entry twice (once for the flux
   hand-off), and the second pass dropped the original transaction date from every Line Memo.
-  Each entry is now finished once; 92 Line Memos carry the date again.
+  Each entry is now finished once; 92 Line Memos carry the date again. The same second pass
+  reset Claude-drafted reversing entries to Reversing N with no Reversal Date, and let the flux
+  hand-off book an entry whose reversal date fell before its Journal Date; both now hold as the
+  console does.
 - **Docs**: the review corrects lines posted in the close period, so its corrections are
   in-period. An out-of-period adjustment (a line posted in a closed period) is drafted on
   request, dated in the close month, with the Memo naming the period, for the controller.

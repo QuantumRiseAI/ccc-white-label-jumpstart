@@ -294,9 +294,9 @@ Draft an entry where the coding is wrong and no proposed entry in `views.entries
 
 * **Current month only.** Earlier months are context. They were closed in their own month.
   If the reviewer asks you to correct a line posted in an earlier, closed period, that is an
-  out-of-period adjustment: date it in the close month, start the Memo
-  `Out-of-period correction, Jun 2026 |`, and tell the reviewer it needs the controller's
-  approval.
+  out-of-period adjustment: date it in the close month, start the Memo with the period it
+  corrects, for example `Out-of-period correction Jun'26 | Lab supplies recoded from
+  facilities | Aug'26`, and tell the reviewer it needs the controller's approval.
 * Credit each posted line's account and department. Debit the corrected account and
   department. The entry balances.
 * Each line carries the account code and name, department, vendor and document numbers.
