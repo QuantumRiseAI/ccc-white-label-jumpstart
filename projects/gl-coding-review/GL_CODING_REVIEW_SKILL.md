@@ -15,8 +15,7 @@ Engine findings, in `findings`:
 | `T0.ABERRANT_POSTING_LAG` | Run log | A line dated three or more months before its period, or after it |
 | `T1.DEPT_INCONSISTENCY` | Dept & Entity, "Department" | A department other than the vendor's usual one in earlier months |
 | `T4.PO_ACCOUNT_MISMATCH` | Dept & Entity, "Account vs. Coupa" | An account other than the one the vendor's Coupa POs were approved against |
-| `T4.ITEM_ACCOUNT_DRIFT` | Dept & Entity, "Account vs. Coupa" | One item text on Coupa PO lines coded to more than one account |
-| `T4.COMMODITY_ACCOUNT_DRIFT` | Dept & Entity, "Account vs. Coupa" | A one-off item on an account other than its commodity's dominant account (commodity with 5 or more PO lines) |
+| `T4.ITEM_ACCOUNT_DRIFT` | Dept & Entity, "Account vs. Coupa" | A Coupa PO line in the close month on an account other than the one the same item had on earlier lines of the year (a tie in that history sets no expectation). Lines under the review threshold are a count and a total. Not run when the Coupa export has no Item column |
 | `T3.IRC_274A_ENTERTAINMENT` | Run log | Entertainment, 0% deductible |
 | `T3.IRC_274N_MEALS` | Run log | Meals, 50% deductible |
 | `T3.IRC_274B_GIFTS` | Run log | Gifts, $25 per recipient |

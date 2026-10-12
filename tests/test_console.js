@@ -106,10 +106,9 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.locator('[data-item="' + r + '"] > .ib').isVisible() && !(await p.evaluate(r => !!S.dec[r], r)), 'gl: undoing the confirm leaves it open');
     }
     if (k === 'gl'){
-      const drift = p.locator('[data-item^="D-"] .ih b', {hasText: 'HUMAN CD8/NK PANEL V02 LEGENDP'});
-      ok(await drift.count() === 1, 'gl: the same item on two accounts is listed (Fisher CD8/NK panel)');
-      const txt = await p.evaluate(() => [...document.querySelectorAll('[data-item^="D-"]')].find(i => /CD8\/NK PANEL V02 LEGENDP/.test(i.querySelector('.ih b').textContent)).textContent);
-      ok(/6509000/.test(txt) && /6607000/.test(txt), 'gl: the item card names both accounts');
+      const txt = await p.evaluate(() => { const c = [...document.querySelectorAll('#p-dept [data-item^="D-"]')].find(i => /Coupa PO/.test(i.textContent) && /DraI/.test(i.textContent)); return c ? c.querySelector('.ih b').textContent + ' | ' + c.textContent : ''; });
+      ok(/^New England BioLabs Inc \|/.test(txt) && /6501100/.test(txt) && /6410000/.test(txt), 'gl: an item on an account other than its usual one shows its supplier and both accounts (DraI)');
+      ok(/under \$2,500/.test(await p.locator('#p-dept > .note, #p-dept p.note').first().innerText()), 'gl: item drift under the threshold is a count and a total');
     }
     if (k === 'pl'){
       ok(await p.locator('#p-ava [data-pane="mom"] th', {hasText: '3-mo avg'}).count() === 1, 'pl: MoM carries trailing averages');

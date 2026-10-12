@@ -189,8 +189,8 @@ CHECK_NAMES = {
     "T1.DEPT_INCONSISTENCY": "Department against the vendor's usual coding",
     "T1.MISSING_PROJECT_CODE": "Missing project code", "T1.MEMO_FORMAT": "Memo format",
     "T1.VENDOR_NAME_VARIANTS": "Vendor name variants", "T1B.UNALLOCATED_SPEND": "Unallocated spend",
-    "T4.PO_ACCOUNT_MISMATCH": "Account against the Coupa PO", "T4.ITEM_ACCOUNT_DRIFT": "Same item on different accounts",
-    "T4.COMMODITY_ACCOUNT_DRIFT": "One-off item against its commodity's account", "T4.OFF_PO_SPEND": "Spend with no PO",
+    "T4.PO_ACCOUNT_MISMATCH": "Account against the Coupa PO", "T4.ITEM_ACCOUNT_DRIFT": "Item on an account other than its usual one",
+    "T4.OFF_PO_SPEND": "Spend with no PO",
     "T4.OPEN_COMMITMENTS": "Open PO commitments",
     "T3.IRC_274A_ENTERTAINMENT": "Entertainment, IRC 274(a)", "T3.IRC_274N_MEALS": "Meals, IRC 274(n)",
     "T3.IRC_274B_GIFTS": "Gifts, IRC 274(b)", "T3.IRC_174_BASE": "R&D base, IRC 174",
@@ -222,6 +222,7 @@ def checks_card(run):
         if r not in ran:
             ran.append(r)
     notes = {x.get("rule_id"): x for x in m.get("rules_not_run") or []}
+    ran += [r for r in notes if r not in ran]
     if not ran:
         return ""
     rows = []

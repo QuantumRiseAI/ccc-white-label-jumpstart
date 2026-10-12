@@ -34,7 +34,6 @@ const files = process.argv.slice(2).length ? process.argv.slice(2) : [B + 'conso
             const code = m[1], name = acct[code];
             const around = (ln.slice(m.index) + ' ' + (lines[i + 1] || '')).slice(0, 200).toLowerCase();
             if (/(Bill|Journal|Credit|Invoice|Payment|Check|Deposit)\s+$|[-A-Z]$/i.test(ln.slice(0, m.index).slice(-12)) && !/ - $/.test(ln.slice(0, m.index).slice(-3))) continue;
-            if (!name && /^ \(no name in the exports\)/.test(ln.slice(m.index + 7))) continue;
             if (!name){ if (/\d{8,}/.test(ln.slice(Math.max(0, m.index - 1), m.index + 9))) continue; out.set(pid + ' | ' + code + ' (no name known) | ' + ln.trim().slice(0, 120), 1); continue; }
             if (!around.includes(name.toLowerCase().slice(0, 12))) out.set(pid + ' | ' + code + ' ' + name + ' | ' + ln.trim().slice(0, 120), 1);
           }
