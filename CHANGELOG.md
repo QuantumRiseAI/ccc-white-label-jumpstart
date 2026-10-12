@@ -54,6 +54,18 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 - The cost estimate prices Claude Sonnet 5.5 ($2 input, $0.20 cached, $10 output per million; was the Sonnet 4.6 $3 / $0.30 / $15) and assumes 500 tokens of output per script run (was 2,000); the scripts print at most about 300 tokens each. Aug 2026: coding about $0.62 (847K tokens), flux about $1.08 (1.77M tokens).
 
+## Unreleased: Line Memo keeps the original date (SERIF-126)
+
+- **Fix**: the coding build finished each proposed Journal Entry twice (once for the flux
+  hand-off), and the second pass dropped the original transaction date from every Line Memo.
+  Each entry is now finished once; 92 Line Memos carry the date again. The same second pass
+  reset Claude-drafted reversing entries to Reversing N with no Reversal Date, and let the flux
+  hand-off book an entry whose reversal date fell before its Journal Date; both now hold as the
+  console does.
+- **Docs**: the review corrects lines posted in the close period, so its corrections are
+  in-period. An out-of-period adjustment (a line posted in a closed period) is drafted on
+  request, dated in the close month, with the Memo naming the period, for the controller.
+
 ## Unreleased: Journal Entries from variances, NetSuite fields (SERIF-125, SERIF-126)
 
 - **Propose entry** on each Actual vs. Actual (MoM) row (P&L Flux) opens an editable two-line

@@ -300,6 +300,8 @@ def je_finish(je):
     """The NetSuite Journal Entry fields the run can fill: the header (subsidiary,
     posting period, currency, exchange rate, reversal) and a Line Memo on each line."""
     for j in je.values():
+        if "period" in j:   # already finished (the coding build hands the same entries to the flux)
+            continue
         rev = j.pop("reverses", "") or ""
         was, j["date"] = j["date"], PERIOD_END   # corrections are booked in the open close month
         j.update({"subsidiary": JE_SUBSIDIARY, "period": PERIOD, "currency": JE_CURRENCY, "rate": JE_RATE,
