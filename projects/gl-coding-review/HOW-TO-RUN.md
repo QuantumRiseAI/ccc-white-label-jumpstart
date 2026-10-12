@@ -391,7 +391,7 @@ The engine prints a load summary before any finding. Read it in this order:
    and the report says so on its own page.
 3. **Findings**, grouped by the action they call for rather than by rule.
 
-The Aug 2026 run is the reference: 56 findings (engine 0.2.1), tie-out PASS, 50 proposed Journal Entries,
+The Aug 2026 run is the reference: 56 findings (engine 0.2.4), tie-out PASS, 50 proposed Journal Entries,
 all in balance. After any change to a script, run Aug 2026 again. If its numbers move, the
 script changed what it finds; say so rather than explaining the new figure as though it
 were expected.
@@ -406,4 +406,16 @@ See [`WHEN-DATA-BREAKS.md`](WHEN-DATA-BREAKS.md): ask for the export again, neve
 | Tie-out FAIL | The GL export is incomplete. Re-export; do not proceed. |
 | `0 findings` | Almost certainly the wrong file. Check the period in the load summary. |
 | A pending feed shows as absent | Expected. Its template exists but has no data yet. |
+
+## Accepted Exceptions
+
+To stop a vendor being flagged, add a row to `accepted_exceptions.csv` (`vendor`, `account`, `reason`,
+`approved_by`, `approved_on`; `account` may be blank for every account of that vendor) and upload it
+with the other files. Save it as CSV (UTF-8 or Excel's Comma delimited). It is data, not a rule change,
+and it covers only the department and account checks (`T1`, `T4`), not posting lag or tax. Matching
+findings are kept and counted, marked excepted with the reason, and listed under Accepted Exceptions on
+the Dept & Entity page. A row missing `vendor`, `reason` or `approved_by`, or with shifted columns, is
+not applied; rejected rows (with their line numbers), rows that match nothing and an unreadable file are
+printed in the load summary and shown on that page. The file is hashed into the run manifest when it has
+rows; absent or header-only is recorded as such.
 

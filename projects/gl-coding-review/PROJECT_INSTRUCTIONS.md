@@ -625,6 +625,19 @@ Header-only templates are feeds Serif has not sent. Each one's absence turns a c
 | `open_purchase_commitments.csv` | Commitments made outside Coupa |
 | `ebitda_addback_mapping.csv` | Add-back dimension checks |
 
+`accepted_exceptions.csv` is the one template a reviewer fills in. Each row (`vendor`, `account`,
+`reason`, `approved_by`, `approved_on`) says a vendor, optionally on one account (blank is every
+account), no longer needs a coding finding. `vendor`, `reason` and `approved_by` are required. It
+applies only to `T1.DEPT_INCONSISTENCY` and `T4.PO_ACCOUNT_MISMATCH`, never to posting lag, cutoff or
+tax findings, and it changes no rule: a covered finding stays in `findings`, is counted, and carries an
+`excepted` block with the reason and approver. Treat an excepted finding as excepted, not open: say
+"accepted by <approved_by>: <reason>", never call it clean, and do not propose a recode for it. A row
+that cannot be applied (missing field, shifted columns, no 7-digit account) is listed under
+`manifest.exceptions.rejected` with its line number, a row that matches nothing under `unmatched`, and
+an unreadable file is `malformed`; the load summary and the Dept & Entity page show all three. Report
+them. The file is hashed into the manifest when it has content; absent or header-only is recorded as
+such and changes nothing.
+
 ## Open Questions for Serif
 
 * Can Coupa add NetSuite PO reference, budget check status, amount invoiced, amount paid,

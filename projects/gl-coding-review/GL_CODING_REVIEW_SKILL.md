@@ -20,6 +20,9 @@ Engine findings, in `findings`:
 | `T3.IRC_274N_MEALS` | Run log | Meals, 50% deductible |
 | `T3.IRC_274B_GIFTS` | Run log | Gifts, $25 per recipient |
 
+A `T1` or `T4` finding with an `excepted` block is an accepted exception: a reviewer approved it
+(`approved_by`, `reason`). Report it as excepted and counted, never as open and never as clean.
+
 Duplicate vendor records: the engine reads a vendor name as one supplier. `VENDOR_PAIRS` in
 the engine's policy module lists each pair a reviewer has decided: "confirmed" pairs are read
 as one supplier before any check runs, "apart" pairs are never merged (Amazon Web Services
