@@ -34,6 +34,17 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+
+## Unreleased: duplicate vendor records (SERIF-17)
+
+- **GL Coding Review**: an explicit pair list, `VENDOR_PAIRS` in the engine's policy module,
+  applied to the GL and Coupa vendor names before the vendor-pattern checks. Only "confirmed"
+  pairs merge; Amazon Web Services and Amazon Capital Services are recorded as "apart"; the
+  Thermo Fisher Scientific and Fisher Scientific pair is "proposed", so Aug 2026 findings are
+  unchanged (the Fisher Scientific findings are real coding differences, not a duplicate
+  record). A list that contradicts itself (a record confirmed into two names, or merges
+  that would put an "apart" pair under one name) stops the run. Engine 0.2.3.
+
 ## Unreleased: item account drift (SERIF-26)
 
 - **GL Coding Review**: `T4.ITEM_ACCOUNT_DRIFT` flags a Coupa PO line in the close month (by PO

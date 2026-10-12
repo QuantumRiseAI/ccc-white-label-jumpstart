@@ -20,6 +20,13 @@ Engine findings, in `findings`:
 | `T3.IRC_274N_MEALS` | Run log | Meals, 50% deductible |
 | `T3.IRC_274B_GIFTS` | Run log | Gifts, $25 per recipient |
 
+Duplicate vendor records: the engine reads a vendor name as one supplier. `VENDOR_PAIRS` in
+the engine's policy module lists each pair a reviewer has decided: "confirmed" pairs are read
+as one supplier before any check runs, "apart" pairs are never merged (Amazon Web Services
+and Amazon Capital Services), "proposed" pairs are not applied (Thermo Fisher Scientific and
+Fisher Scientific; neither the GL nor Coupa has a Thermo Fisher Scientific record). `vendor_pairs`
+in `run.json` lists them. Names are never merged by similarity.
+
 Checks shown on the run log are counted there, not laid out as cards; report them when
 asked. Measures, in `metrics`, on no page: posting lag, missing project code, memo format, vendor
 name variants, unallocated P&L spend, off-PO spend, open PO commitments, and the IRC §174
