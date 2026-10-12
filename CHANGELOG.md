@@ -41,6 +41,18 @@ serif-pl-flux-aug2026-v1.8.2.html
   shows each account's booked correction, the adjusted movement, and flags on the adjusted
   figure; open coding findings are noted on the affected row and never applied.
 
+## Unreleased: Run log cost estimate
+
+- The cost estimate prices Claude Sonnet 5.5 ($2 input, $0.20 cached, $10 output per million; was the Sonnet 4.6 $3 / $0.30 / $15) and assumes 500 tokens of output per script run (was 2,000); the scripts print at most about 300 tokens each. Aug 2026: coding about $0.62 (847K tokens), flux about $1.08 (1.77M tokens).
+
+## Unreleased: Journal Entries from variances, NetSuite fields (SERIF-125, SERIF-126)
+
+- **Propose entry** on each Actual vs. Actual (MoM) row (P&L Flux) opens an editable two-line
+  Journal Entry that goes through the same approval gate and NetSuite CSV as the others; the NetSuite
+  CSV and the entry editor now carry Subsidiary, Journal Date, Posting Period, Currency,
+  Exchange Rate, Memo, Reversing Entry, Reversal Date and a Line Memo on each line. Entries are
+  dated the last day of the close month, with the transaction date in the Line Memo.
+
 
 ## Unreleased: duplicate vendor records (SERIF-17)
 

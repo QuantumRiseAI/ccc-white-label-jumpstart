@@ -87,6 +87,11 @@ const num = s => Number(String(s).replace(/[^0-9.\-]/g, '')) * (/\(/.test(s) ? -
     const lostP = path.join(tmp, 'lost.json'); fs.writeFileSync(lostP, JSON.stringify(lost));
     const l = build([...CODING, '--coding-record', lostP]);
     ok(/No flux row for 6999999/.test(l.r.stdout) && await (await open(l.out)).locator('#p-runlog td', {hasText: 'No flux row for 6999999'}).count() === 1, 'a correction with no flux row shows in the run log');
+    // header rules from the console: a reversal date not after the Journal Date holds the entry; a later one books it
+    const hdr = d => { const r = JSON.parse(JSON.stringify(recJ)); r.jh = {[fac[0]]: {reversing: 'Y', reversal_date: d}}; const f = path.join(tmp, 'h' + d + '.json'); fs.writeFileSync(f, JSON.stringify(r)); return build([...CODING, '--coding-record', f, '--coding-drafts', drafts]); };
+    const h1 = hdr('2026-08-01'), h2 = hdr('2026-09-01');
+    ok(/3 booked Journal Entries/.test(h1.r.stdout) && /Reversal Date is not a date after the Journal Date/.test(h1.r.stdout), 'a reversal date before the Journal Date holds the entry');
+    ok(/4 booked Journal Entries/.test(h2.r.stdout), 'a reversal date after the Journal Date books it');
     // bad records fail with a message
     const bad = JSON.parse(JSON.stringify(recJ)); bad.je[fac[0]] = [{account: '6607000', debit: '5,000', credit: 0}];
     const badP = path.join(tmp, 'bad.json'); fs.writeFileSync(badP, JSON.stringify(bad));
@@ -95,7 +100,7 @@ const num = s => Number(String(s).replace(/[^0-9.\-]/g, '')) * (/\(/.test(s) ? -
     const r2 = build(['--coding-record', rec]);
     ok(r2.r.status !== 0 && !/Traceback/.test(r2.r.stderr), 'a record without the coding run fails with a message');
     // the same page with no record: no extra columns
-    ok(await (await open(wo.out)).locator('#p-ava [data-pane="mom"] th').count() === 8, 'without the record the MoM table keeps its eight columns');
+    ok(await (await open(wo.out)).locator('#p-ava [data-pane="mom"] > .tw > table > thead th').count() === 8, 'without the record the MoM table keeps its eight columns');
   } finally {
     await b.close();
     fs.rmSync(tmp, {recursive: true, force: true});

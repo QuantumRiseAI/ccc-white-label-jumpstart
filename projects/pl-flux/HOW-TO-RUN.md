@@ -391,7 +391,7 @@ The engine reports every variance at or above **$2,500**, below which nothing is
 **Run log**, at the right of the bar, holds:
 - **Exports this month:** each export the month needs and the file supplied for it.
 - **What each check found:** every check, what it found and whether it ran.
-- **Estimated cost per close run:** one run through the API on Claude Sonnet at medium
+- **Estimated cost per close run:** one run through the API on Claude Sonnet 5.5 at medium
   effort, at list price. A run in the Claude Project is covered by the Claude seat.
 - **Inputs** and the **Build record:** the files, their fingerprints and the versions that
   made the console.
