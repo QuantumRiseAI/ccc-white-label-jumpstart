@@ -194,8 +194,6 @@ section opens its pages beside its title.
   (sources, the GL tie-out, the policies applied and the sign-off), and **Export**, the
   NetSuite CSV (header fields: Subsidiary, Journal Date, Posting Period, Currency, Exchange Rate,
   Memo, Reversing Entry, Reversal Date; line fields: Account, Department, Debit, Credit, Line Memo).
-  Every entry is dated in the close month; a correction to an earlier month is tagged
-  Out-of-period, its Memo says which month, and Export totals them for the controller.
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
   supplied, what each check found, the estimated cost of a run, the inputs and the build
   record. Settings has the threshold, the decision record (save and load) and **Bring in the
@@ -295,6 +293,10 @@ change the coding.
 Draft an entry where the coding is wrong and no proposed entry in `views.entries` covers it.
 
 * **Current month only.** Earlier months are context. They were closed in their own month.
+  If the reviewer asks you to correct a line posted in an earlier, closed period, that is an
+  out-of-period adjustment: date it in the close month, start the Memo
+  `Out-of-period correction, Jun 2026 |`, and tell the reviewer it needs the controller's
+  approval.
 * Credit each posted line's account and department. Debit the corrected account and
   department. The entry balances.
 * Each line carries the account code and name, department, vendor and document numbers.

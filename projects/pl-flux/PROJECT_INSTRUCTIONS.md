@@ -352,6 +352,10 @@ Draft an entry where a movement shows the ledger is wrong and no entry in `views
 covers it.
 
 * **Current month only.** Earlier months are context. They were closed in their own month.
+  If the reviewer asks you to correct a line posted in an earlier, closed period, that is an
+  out-of-period adjustment: date it in the close month, start the Memo
+  `Out-of-period correction, Jun 2026 |`, and tell the reviewer it needs the controller's
+  approval.
 * Debits equal credits. Each line carries the account code and name, department, vendor and
   documents. Accruals reverse on the first day of the next month.
 * Memo, per the Data Entry Policy: `Specific description | Mon'YY`.
