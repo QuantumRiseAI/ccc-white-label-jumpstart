@@ -41,6 +41,29 @@ serif-pl-flux-aug2026-v1.8.2.html
   shows each account's booked correction, the adjusted movement, and flags on the adjusted
   figure; open coding findings are noted on the affected row and never applied.
 
+
+## Unreleased: duplicate vendor records (SERIF-17)
+
+- **GL Coding Review**: an explicit pair list, `VENDOR_PAIRS` in the engine's policy module,
+  applied to the GL and Coupa vendor names before the vendor-pattern checks. Only "confirmed"
+  pairs merge; Amazon Web Services and Amazon Capital Services are recorded as "apart"; the
+  Thermo Fisher Scientific and Fisher Scientific pair is "proposed", so Aug 2026 findings are
+  unchanged (the Fisher Scientific findings are real coding differences, not a duplicate
+  record). A list that contradicts itself (a record confirmed into two names, or merges
+  that would put an "apart" pair under one name) stops the run. Engine 0.2.3.
+
+## Unreleased: item account drift (SERIF-26)
+
+- **GL Coding Review**: `T4.ITEM_ACCOUNT_DRIFT` flags a Coupa PO line in the close month (by PO
+  line date; later lines are never read) whose account differs from the account the same item
+  had on earlier lines of the year. Item text is matched ignoring case and spacing; a tie in
+  the history sets no expectation. The amount is that line's. It shows on Dept & Entity beside
+  "Account vs. Coupa" with the supplier as the vendor; lines under the review threshold are
+  a count and a total. Aug 2026: 3 cards ($35,435.15) and 220 lines under $2,500 ($29,409.46).
+  Reported as not run when the Coupa export has no Item column. Engine 0.2.2, ruleset
+  `2026.10-uc1-coding-only+coupa`, procurement rules 1.1.0. Its findings are numbered after the
+  other findings, so no existing id moves.
+
 ## Unreleased: executive summary, payroll commentary, Project files (7 Oct)
 
 - **Executive Summary** (P&L Flux, Executive Overview): Claude drafts it into `drafts.json`
