@@ -149,6 +149,13 @@ def named(text):
 
 
 en = lambda s: named(e(s))
+
+
+def en_drift(s):
+    """en() for the Coupa drift findings, whose accounts can be balance sheet accounts the
+    exports never name (1515000): the number then says so instead of standing bare."""
+    return re.sub(r"(?<![\d#])\b([1-8]\d{6})\b(?!\d)(?! \(no name)",
+                  lambda m: m.group(1) + ("" if acct_name(m.group(1)) else " (no name in the exports)"), en(s))
 # A flux row's name: the engine's leaf, or the chart's name where the leaf is only the number.
 leaf_of = lambda r: (r.get("account_leaf") if r.get("account_leaf") not in (None, "", r.get("account_code")) else acct_name(r["account_code"])) or ""
 acct_month = defaultdict(lambda: defaultdict(float))    # P&L account -> period -> net
@@ -1697,10 +1704,11 @@ def coding():
         dcards.append(card(iid, x["memo"] or "Drafted Journal Entry", x["debits"], x["debits"] >= thr, "&ndash;", "&ndash;", None,
                            '<div><div class="l">Type</div><div class="x">Drafted by Claude</div></div>', e(x["support"]), "", FLAG_ACTS, "", je_editor(iid, je[iid]["lines"])))
     ents = {x["finding_id"]: x for x in V.get("entries") or []}
-    dfind = sorted([f for f in GLR["findings"] if f["rule_id"] in ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")], key=lambda f: -(f.get("amount_at_risk") or 0))
+    dfind = sorted([f for f in GLR["findings"] if f["rule_id"] in ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH", "T4.ITEM_ACCOUNT_DRIFT", "T4.COMMODITY_ACCOUNT_DRIFT")], key=lambda f: -(f.get("amount_at_risk") or 0))
     for f in dfind:
         iid = sid("D", f["rule_id"], f.get("title"))
         x = ents.get(f["finding_id"])
+        nm = en_drift if f["rule_id"].endswith("_ACCOUNT_DRIFT") else en
         vname = (f.get("transaction") or {}).get("vendor_or_name") or f["title"].split(":")[0].split(" coded to ")[0]
         if x:
             crl = [l for l in x["lines"] if l.get("credit")]
@@ -1714,11 +1722,11 @@ def coding():
                 doc = next((i for r in vrows if r["vendor"] == vname for i in (r.get("detail") or {}).get("items") or [] if i["document"] in docs), doc)
         else:
             ev = f.get("evidence") or {}
-            cur, rec, doc = en(ev.get("observed") or ""), '<span class="arrow">&rarr;</span> ' + en(ev.get("expected") or ""), line_doc(vname)
+            cur, rec, doc = nm(ev.get("observed") or ""), '<span class="arrow">&rarr;</span> ' + nm(ev.get("expected") or ""), line_doc(vname)
         typ = "Department" if f["rule_id"].startswith("T1") else "Account vs. Coupa"
         items.append(("dept", iid, typ, vname, (doc or {}).get("text") or "", f.get("amount_at_risk") or 0, "", ""))
         dcards.append(card(iid, vname, f.get("amount_at_risk") or 0, (f.get("amount_at_risk") or 0) >= thr, cur, rec, doc,
-                           '<div><div class="l">Type</div><div class="x">' + e(typ) + "</div></div>", en(f.get("recommendation") or ""), "", FLAG_ACTS,
+                           '<div><div class="l">Type</div><div class="x">' + e(typ) + "</div></div>", nm(f.get("recommendation") or ""), "", FLAG_ACTS,
                            lines_html(vname, docs=set(d for l in (x or {}).get("lines", []) for d in (l.get("documents") or [])) or None),
                            (je_editor(iid, je[iid]["lines"]) if iid in je else "") + history(vname)))
 

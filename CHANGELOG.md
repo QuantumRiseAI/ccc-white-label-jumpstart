@@ -34,6 +34,15 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: item and commodity account drift (SERIF-26)
+
+- **GL Coding Review**: two Coupa checks, `T4.ITEM_ACCOUNT_DRIFT` (the same item text on more
+  than one account; Aug 2026 file: 177 items, 671 lines off the leading account) and
+  `T4.COMMODITY_ACCOUNT_DRIFT` (a one-off item against its commodity's dominant account,
+  commodities with 5 or more lines; 12 lines). They show on Dept & Entity beside "Account vs.
+  Coupa". Ruleset `2026.10-uc1-coding-only+coupa`, procurement rules 1.1.0. An account the
+  exports do not name (1515000) is shown with "(no name in the exports)".
+
 ## Unreleased: executive summary, payroll commentary, Project files (7 Oct)
 
 - **Executive Summary** (P&L Flux, Executive Overview): Claude drafts it into `drafts.json`
