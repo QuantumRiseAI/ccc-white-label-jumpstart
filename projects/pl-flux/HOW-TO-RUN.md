@@ -59,7 +59,8 @@ To carry the GL Coding Review's booked corrections into Actual vs. Actual (MoM),
 run and its decision record to the build:
 `--coding-run <coding run.json> --coding-record <coding decision record .json>`. Each account
 shows the correction, the adjusted movement, and flags on the adjusted figure. Open coding
-findings are noted on the affected row, never applied. Without them, nothing changes.
+findings are noted on the affected row, never applied. A coding `drafts.json` goes in with
+`--coding-drafts`, so decisions on Journal Entries Claude drafted there apply too.
 
 In the Claude Project, Claude then writes `drafts.json` and builds again with
 `--drafts drafts.json`, which puts its drafts into the console beside the items they belong

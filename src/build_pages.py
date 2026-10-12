@@ -41,6 +41,7 @@ ap.add_argument("--flux-run", help="the P&L Flux run.json, after serif_views.py 
 ap.add_argument("--gl", nargs="+", help="the NetSuite Custom General Ledger export(s), as NetSuite writes them")
 ap.add_argument("--income-statement", help="the NetSuite Income Statement by month report, for the flux tie-outs")
 ap.add_argument("--coding-record", help="the GL Coding Review decision record (JSON, format 3), with --coding-run: booked corrections adjust the P&L flux (--only flux)")
+ap.add_argument("--coding-drafts", help="the GL Coding Review's drafts.json, with --coding-record: Journal Entries Claude drafted there, so a decision on one can be applied")
 ap.add_argument("--drafts", help="Claude's drafts.json for the console being built (with --only)")
 ap.add_argument("--out", help="output folder")
 A = ap.parse_args()
@@ -57,11 +58,16 @@ GLR = json.load(open(A.coding_run)) if A.coding_run else EMPTY
 GL_X, IS_X = A.gl, A.income_statement
 CODING_REC = None
 if A.coding_record:
-    if A.only != "flux" or not A.coding_run:
-        sys.exit("Pass --coding-record with --only flux and the coding run, --coding-run.")
-    CODING_REC = json.load(open(A.coding_record, encoding="utf-8"))
-    if CODING_REC.get("kind") != "serif-decision-record" or CODING_REC.get("console_kind") != "coding" or CODING_REC.get("format") != 3:
+    if A.only != "flux" or not A.flux_run or not A.coding_run:
+        sys.exit("Pass --coding-record with --only flux, the flux run (--flux-run) and the coding run (--coding-run).")
+    try:
+        CODING_REC = json.load(open(A.coding_record, encoding="utf-8"))
+    except (OSError, ValueError) as ex:
+        sys.exit("--coding-record cannot be read as JSON: %s" % ex)
+    if not isinstance(CODING_REC, dict) or CODING_REC.get("kind") != "serif-decision-record" or CODING_REC.get("console_kind") != "coding" or CODING_REC.get("format") != 3:
         sys.exit("--coding-record is not a GL Coding Review decision record (format 3).")
+    if not all(isinstance(CODING_REC.get(k) or {}, dict) for k in ("dec", "notes", "je")):
+        sys.exit("--coding-record is malformed: dec, notes and je must each be an object.")
     if CODING_REC.get("period") != PLR["manifest"]["period"] or GLR["manifest"]["period"] != PLR["manifest"]["period"]:
         sys.exit("The coding run and decision record must be for the flux's period, " + PLR["manifest"]["period"] + ".")
 M = (PLR if A.flux_run else GLR)["manifest"]
@@ -69,6 +75,9 @@ SLUG = M["period"].replace(" ", "").lower()
 if A.drafts and not A.only:
     sys.exit("Pass --only with --drafts: drafts belong to one console.")
 RAW_DRAFTS = json.load(open(A.drafts, encoding="utf-8")) if A.drafts else {}
+CODING_DRAFTS = json.load(open(A.coding_drafts, encoding="utf-8")) if A.coding_drafts else {}
+if A.coding_drafts and not A.coding_record:
+    sys.exit("Pass --coding-drafts with --coding-record.")
 o = A.out or os.path.dirname(os.path.abspath(A.flux_run or A.coding_run))
 OUTS = {"flux": o, "coding": o}
 
@@ -1051,11 +1060,12 @@ CODING_BUILT = {}
 def coding_corrections():
     """What the GL Coding Review's decision record did to this period's P&L accounts: the net
     of every booked Journal Entry (approved, or modified or recoded with a note, balanced and
-    changing something) by account, as the console's own rules read them, and the open
-    findings (no decision yet) by account. Open findings are never applied."""
+    changing something) by account, as the console's own rules read them. Open findings, and
+    decisions held for a note or a balanced entry, are listed by account and never applied.
+    Returns the corrections, the open lines, and the lines for the run log."""
     global RAW_DRAFTS
-    keep, seen = RAW_DRAFTS, set(_SEEN)
-    RAW_DRAFTS = {}
+    keep, seen, kept_drafts, kept_skipped = RAW_DRAFTS, set(_SEEN), dict(DRAFTS), len(SKIPPED)
+    RAW_DRAFTS = CODING_DRAFTS
     _SEEN.clear()
     try:
         coding()
@@ -1063,25 +1073,44 @@ def coding_corrections():
         RAW_DRAFTS = keep
         _SEEN.clear()
         _SEEN.update(seen)
+        DRAFTS.clear()
+        DRAFTS.update(kept_drafts)
+        del SKIPPED[kept_skipped:]
     je, items = CODING_BUILT["je"], CODING_BUILT["items"]
+    known = {it[1]: it[3] for it in items}
     dec, notes, edits = (CODING_REC.get(k) or {} for k in ("dec", "notes", "je"))
-    booked, corr, held = [], defaultdict(float), 0
+
+    def amt(v, iid):
+        try:
+            return float(v or 0)
+        except (TypeError, ValueError):
+            sys.exit("--coding-record: Journal Entry %s has an amount that is not a number: %r" % (iid, v))
+    booked, held, missing, corr, opened = [], [], [], defaultdict(float), defaultdict(list)
     for iid, d in dec.items():
-        if d.get("v") not in ("approve", "modify", "recode") or iid not in je:
+        if iid not in je and iid not in known:
+            missing.append(iid)
+            continue
+        if not isinstance(d, dict) or d.get("v") not in ("approve", "modify", "recode") or iid not in je:
             continue
         lines = edits.get(iid) or je[iid]["lines"]
-        by = defaultdict(float)
+        by, net = defaultdict(float), defaultdict(float)
         for l in lines:
-            by[(l.get("account") or "", l.get("department") or "")] += float(l.get("debit") or 0) - float(l.get("credit") or 0)
-        if (d["v"] != "approve" and not str(notes.get(iid) or "").strip()) or abs(sum(by.values())) >= 0.005 \
-                or all(abs(v) < 0.005 for v in by.values()) or not all((l.get("account") or "").strip() for l in lines):
-            held += 1
+            dr_cr = amt(l.get("debit"), iid) - amt(l.get("credit"), iid)
+            by[((l.get("account") or "").strip(), l.get("department") or "")] += dr_cr
+            net[(l.get("account") or "").strip()] += dr_cr
+        why = ("no note" if d["v"] != "approve" and not str(notes.get(iid) or "").strip() else "out of balance" if abs(sum(by.values())) >= 0.005
+               else "no change" if all(abs(v) < 0.005 for v in by.values()) else "an account missing" if not all(a for a, _ in by) else "")
+        vendor = known.get(iid) or je[iid]["memo"]
+        if why:
+            held.append((iid, vendor, why))
+            for a, v in net.items():
+                if PNL(a) and round(v):
+                    opened[a].append((vendor, v))
             continue
         booked.append(iid)
-        for l in lines:
-            if PNL(l["account"].strip()):
-                corr[l["account"].strip()] += float(l.get("debit") or 0) - float(l.get("credit") or 0)
-    opened = defaultdict(list)
+        for a, v in net.items():
+            if PNL(a):
+                corr[a] += v
     for it in items:
         if it[1] in dec:
             continue
@@ -1091,7 +1120,17 @@ def coding_corrections():
         for a, v in net.items():
             if PNL(a) and round(v):
                 opened[a].append((it[3], v))
-    return {a: round(v, 2) for a, v in corr.items() if round(v)}, dict(opened), len(booked), held, sum(1 for it in items if it[1] not in dec)
+    notes_out = []
+    if CODING_REC.get("run_id") != GLR["manifest"]["run_id"]:
+        notes_out.append("The record was saved against coding run %s, not %s; entries match by what they are" % (CODING_REC.get("run_id"), GLR["manifest"]["run_id"]))
+    if missing:
+        drafted = [i for i in missing if i.startswith("DR-")]
+        notes_out.append("%s not in this run, not applied%s" % (count(len(missing), "decision"),
+                         (" (%d on Journal Entries Claude drafted: pass --coding-drafts)" % len(drafted)) if drafted and not CODING_DRAFTS else ""))
+    if held:
+        notes_out.append("%s held, not applied: %s" % (count(len(held), "decision"), "; ".join("%s (%s)" % (v, w) for _, v, w in held[:5]) + (" and %d more" % (len(held) - 5) if len(held) > 5 else "")))
+    return ({a: round(v, 2) for a, v in corr.items() if round(v)}, dict(opened), len(booked), notes_out,
+            sum(1 for it in items if it[1] not in dec))
 
 
 def flux():
@@ -1191,7 +1230,7 @@ def flux():
                         '<span><i style="background:var(--color-mid-gray)"></i>Lowers the loss</span></div></div>' + exec_summary + CHECKLIST))
 
     # ----- Actual vs. Actual
-    corr, opened, n_booked, n_held, n_open = coding_corrections() if CODING_REC else ({}, {}, 0, 0, 0)
+    corr, opened, n_booked, coding_notes, n_open = coding_corrections() if CODING_REC else ({}, {}, 0, [], 0)
     placed = set()
 
     def var_table(kind):
@@ -1215,7 +1254,7 @@ def flux():
                 fid = r.get("mom_finding") if kind == "mom" else None
                 vend = basis(fid) if fid else ""
                 line = (money(abs(v)) + (" favorable " if v > 0 else " unfavorable ") + ("MoM" if kind == "mom" else "YoY") + (" adjusted" if cv else "")
-                        + (" (" + format(abs(100 * v / r[base]), ".1f") + "%)" if r.get(base) else "") + "." + (" Largest vendors: " + e(vend) + "." if vend else ""))
+                        + (" (" + format(abs(100 * v / r[base]), ".1f") + "%)" if r.get(base) else "") + "." + (" Largest vendors" + (" (before coding corrections)" if cv else "") + ": " + e(vend) + "." if vend else ""))
                 if cv:
                     line += " Reported " + money(abs(vr)) + (" favorable" if vr > 0 else " unfavorable") + ", " + money(abs(cv)) + (" moved out" if cv < 0 else " moved in") + " by booked coding corrections."
                 ops = opened.get(r["account_code"]) if adj else None
@@ -1228,7 +1267,7 @@ def flux():
                 dn = txt((RAW_DRAFTS.get("commentary") or {}).get(r["account_code"])) if kind == "mom" else ""
                 if dn:
                     used_com.add(r["account_code"])
-                cols = ('<td class="n2">%s</td><td class="n2">%s</td>' % (money(cv) if cv else "", fav(v) if cv else "")) if adj else ""
+                cols = ('<td class="n2">%s</td><td class="n2">%s</td>' % (fav(-cv) if cv else "", fav(v))) if adj else ""
                 out.append('<tr data-var="%s"><td><span class="code">%s</span>%s</td><td class="n2">%s</td><td class="n2">%s</td>'
                            '<td class="n2">%s</td>%s<td class="n2">%s</td>%s<td><div class="cm">%s</div>%s<textarea class="c" rows="1" data-note="%s" placeholder="Commentary"></textarea></td></tr>'
                            % (round(v, 2), e(r["account_code"]), e(leaf_of(r)), money(r["actual"]), money(r.get(base)), fav(vr), cols, fav(v, pct(v, r.get(base))) if r.get(base) else "&ndash;",
@@ -1250,9 +1289,11 @@ def flux():
 
     if CODING_REC:
         lost = sorted(set(corr) - placed)
-        print("Coding corrections: %d booked Journal Entries move %d accounts; %d open findings noted, not applied%s%s." % (
-            n_booked, len(corr), n_open, ("; %d decided but not booked (missing note, out of balance or no change)" % n_held) if n_held else "",
-            ("; no flux row for " + ", ".join(lost)) if lost else ""))
+        if lost:
+            coding_notes.append("No flux row for " + ", ".join(a + " " + acct_name(a) + " " + money(corr[a]) for a in lost))
+        print("Coding corrections: %d booked Journal Entries move %d accounts; %d open findings noted, not applied." % (n_booked, len(corr), n_open))
+        for x in coding_notes:
+            print("  " + x + ".")
     # ----- Actual vs. Budget
     bud_rows = [(s, r) for s, r in rows if r.get("budget") is not None]
     act_p = sum(r["actual"] or 0 for s, r in bud_rows)
@@ -1653,7 +1694,8 @@ function refresh(){
 show('ov');
 """
     pages.append(runlog(PLR, "flux", read=[("Also read", "GL Coding Review run %s and its decision record %s, saved %s" % (
-        GLR["manifest"]["run_id"], hashlib.sha256(open(A.coding_record, "rb").read()).hexdigest()[:16], str(CODING_REC.get("saved_at") or "")[:16].replace("T", " ")))] if CODING_REC else ()))
+        GLR["manifest"]["run_id"], hashlib.sha256(open(A.coding_record, "rb").read()).hexdigest()[:16], str(CODING_REC.get("saved_at") or "")[:16].replace("T", " ")))]
+        + [("Coding corrections", x) for x in coding_notes] if CODING_REC else ()))
     return shell("Serif P&L Flux - " + PERIOD, "P&L Flux", sections, pages, data, js)
 
 

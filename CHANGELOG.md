@@ -39,8 +39,7 @@ serif-pl-flux-aug2026-v1.8.2.html
 - **P&L Flux with the GL Coding Review**: `build_pages.py --only flux` takes the coding run
   (`--coding-run`) and the coding decision record (`--coding-record`). Actual vs. Actual (MoM)
   shows each account's booked correction, the adjusted movement, and flags on the adjusted
-  figure; open coding findings are noted on the affected row and never applied. Without the
-  inputs, nothing changes.
+  figure; open coding findings are noted on the affected row and never applied.
 
 ## Unreleased: executive summary, payroll commentary, Project files (7 Oct)
 
