@@ -34,6 +34,13 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: coding corrections in the P&L flux (SERIF-44)
+
+- **P&L Flux with the GL Coding Review**: `build_pages.py --only flux` takes the coding run
+  (`--coding-run`) and the coding decision record (`--coding-record`). Actual vs. Actual (MoM)
+  shows each account's booked correction, the adjusted movement, and flags on the adjusted
+  figure; open coding findings are noted on the affected row and never applied.
+
 ## Unreleased: Run log cost estimate
 
 - The cost estimate prices Claude Sonnet 5.5 ($2 input, $0.20 cached, $10 output per million; was the Sonnet 4.6 $3 / $0.30 / $15) and assumes 500 tokens of output per script run (was 2,000); the scripts print at most about 300 tokens each. Aug 2026: coding about $0.62 (847K tokens), flux about $1.08 (1.77M tokens).

@@ -19,6 +19,7 @@ Artifact with the db and user capabilities, in a review shared by everyone with
 access. Every figure is computed here from the runs and the NetSuite exports.
 """
 import argparse
+from datetime import datetime
 import calendar
 import hashlib
 import html
@@ -41,6 +42,8 @@ ap.add_argument("--coding-run", help="the GL Coding Review run.json, after serif
 ap.add_argument("--flux-run", help="the P&L Flux run.json, after serif_views.py --keep-names --balance-sheet")
 ap.add_argument("--gl", nargs="+", help="the NetSuite Custom General Ledger export(s), as NetSuite writes them")
 ap.add_argument("--income-statement", help="the NetSuite Income Statement by month report, for the flux tie-outs")
+ap.add_argument("--coding-record", help="the GL Coding Review decision record (JSON, format 3), with --coding-run: booked corrections adjust the P&L flux (--only flux)")
+ap.add_argument("--coding-drafts", help="the GL Coding Review's drafts.json, with --coding-record: Journal Entries Claude drafted there, so a decision on one can be applied")
 ap.add_argument("--drafts", help="Claude's drafts.json for the console being built (with --only)")
 ap.add_argument("--out", help="output folder")
 A = ap.parse_args()
@@ -55,11 +58,28 @@ if not A.gl:
 PLR = json.load(open(A.flux_run)) if A.flux_run else EMPTY
 GLR = json.load(open(A.coding_run)) if A.coding_run else EMPTY
 GL_X, IS_X = A.gl, A.income_statement
+CODING_REC = None
+if A.coding_record:
+    if A.only != "flux" or not A.flux_run or not A.coding_run:
+        sys.exit("Pass --coding-record with --only flux, the flux run (--flux-run) and the coding run (--coding-run).")
+    try:
+        CODING_REC = json.load(open(A.coding_record, encoding="utf-8"))
+    except (OSError, ValueError) as ex:
+        sys.exit("--coding-record cannot be read as JSON: %s" % ex)
+    if not isinstance(CODING_REC, dict) or CODING_REC.get("kind") != "serif-decision-record" or CODING_REC.get("console_kind") != "coding" or CODING_REC.get("format") != 3:
+        sys.exit("--coding-record is not a GL Coding Review decision record (format 3).")
+    if not all(isinstance(CODING_REC.get(k) or {}, dict) for k in ("dec", "notes", "je", "jh")):
+        sys.exit("--coding-record is malformed: dec, notes, je and jh must each be an object.")
+    if CODING_REC.get("period") != PLR["manifest"]["period"] or GLR["manifest"]["period"] != PLR["manifest"]["period"]:
+        sys.exit("The coding run and decision record must be for the flux's period, " + PLR["manifest"]["period"] + ".")
 M = (PLR if A.flux_run else GLR)["manifest"]
 SLUG = M["period"].replace(" ", "").lower()
 if A.drafts and not A.only:
     sys.exit("Pass --only with --drafts: drafts belong to one console.")
 RAW_DRAFTS = json.load(open(A.drafts, encoding="utf-8")) if A.drafts else {}
+CODING_DRAFTS = json.load(open(A.coding_drafts, encoding="utf-8")) if A.coding_drafts else {}
+if A.coding_drafts and not A.coding_record:
+    sys.exit("Pass --coding-drafts with --coding-record.")
 o = A.out or os.path.dirname(os.path.abspath(A.flux_run or A.coding_run))
 OUTS = {"flux": o, "coding": o}
 
@@ -535,7 +555,7 @@ RUNLOG_SVG = ('<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke
               '<path d="M3.5 2.5h9v11h-9z"/><path d="M5.8 5.5h4.4M5.8 8h4.4M5.8 10.5h2.6"/></svg>')
 
 
-def runlog(run, kind, also=None):
+def runlog(run, kind, also=None, read=()):
     """The run log: the exports, what each check found, the estimated cost of a
     run, every input, and the build record."""
     m, views = run.get("manifest") or {}, run.get("views") or {}
@@ -565,6 +585,7 @@ def runlog(run, kind, also=None):
     if also:
         am = also.get("manifest") or {}
         rec.append(("Also read", "P&L Flux run %s, for the CapEx and Prepaid screens" % am.get("run_id")))
+    rec.extend(read)
     out.append('<div class="card"><h3>Build record</h3><div class="tw"><table><tbody>'
                + "".join('<tr><td>%s</td><td class="mono">%s</td></tr>' % (e(a), e(b)) for a, b in rec) + "</tbody></table></div></div>")
     return page("runlog", "<h3>Run Log</h3>" + "".join(out))
@@ -1087,6 +1108,96 @@ function marks(){
 # =====================================================================
 # P&L Flux
 # =====================================================================
+CODING_BUILT = {}
+
+
+def coding_corrections():
+    """What the GL Coding Review's decision record did to this period's P&L accounts: the net
+    of every booked Journal Entry (approved, or modified or recoded with a note, balanced and
+    changing something) by account, as the console's own rules read them. Open findings, and
+    decisions held for a note or a balanced entry, are listed by account and never applied.
+    Returns the corrections, the open lines, and the lines for the run log."""
+    global RAW_DRAFTS
+    keep, seen, kept_drafts, kept_skipped = RAW_DRAFTS, set(_SEEN), dict(DRAFTS), len(SKIPPED)
+    RAW_DRAFTS = CODING_DRAFTS
+    _SEEN.clear()
+    try:
+        coding()
+    finally:
+        RAW_DRAFTS = keep
+        _SEEN.clear()
+        _SEEN.update(seen)
+        DRAFTS.clear()
+        DRAFTS.update(kept_drafts)
+        del SKIPPED[kept_skipped:]
+    je, items = CODING_BUILT["je"], CODING_BUILT["items"]
+    known = {it[1]: it[3] for it in items}
+    dec, notes, edits, heads = (CODING_REC.get(k) or {} for k in ("dec", "notes", "je", "jh"))
+
+    def iso_ok(t):
+        try:
+            return bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", t or "")) and bool(datetime.strptime(t, "%Y-%m-%d"))
+        except ValueError:
+            return False
+
+    def amt(v, iid):
+        try:
+            return float(v or 0)
+        except (TypeError, ValueError):
+            sys.exit("--coding-record: Journal Entry %s has an amount that is not a number: %r" % (iid, v))
+    booked, held, missing, corr, opened = [], [], [], defaultdict(float), defaultdict(list)
+    for iid, d in dec.items():
+        if iid not in je and iid not in known:
+            missing.append(iid)
+            continue
+        if not isinstance(d, dict) or d.get("v") not in ("approve", "modify", "recode") or iid not in je:
+            continue
+        lines = edits[iid] if iid in edits else je[iid]["lines"]
+        head = dict(je[iid], **(heads.get(iid) or {}))        # the console's jeOf: the run's header, then the header fields edited
+        by, net = defaultdict(float), defaultdict(float)
+        for l in lines:
+            dr_cr = amt(l.get("debit"), iid) - amt(l.get("credit"), iid)
+            by[((l.get("account") or "").strip(), l.get("department") or "")] += dr_cr
+            net[(l.get("account") or "").strip()] += dr_cr
+        # the console's jeWhy, in its order; the note rule is decided()
+        why = ("out of balance" if round(sum(by.values()), 2) else "unchanged" if all(abs(v) < 0.005 for v in by.values())
+               else "no note" if d["v"] != "approve" and not str(notes.get(iid) or "").strip() else "an account missing" if not all(a for a, _ in by)
+               else "Journal Date is not a valid date" if not iso_ok(head.get("date")) else "Posting Period is not Mon YYYY" if not re.fullmatch(r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}", head.get("period") or "")
+               else "reversal date missing" if head.get("reversing") == "Y" and not (head.get("reversal_date") or "").strip()
+               else "Reversal Date is not a date after the Journal Date" if head.get("reversing") == "Y" and not (iso_ok(head.get("reversal_date")) and head["reversal_date"] > head["date"]) else "")
+        vendor = known.get(iid) or je[iid]["memo"]
+        if why:
+            held.append((iid, vendor, why))
+            for a, v in net.items():
+                if PNL(a) and round(v):
+                    opened[a].append((vendor, v))
+            continue
+        booked.append(iid)
+        for a, v in net.items():
+            if PNL(a):
+                corr[a] += v
+    for it in items:
+        if it[1] in dec:
+            continue
+        net = defaultdict(float)
+        for l in je[it[1]]["lines"] if it[1] in je else []:
+            net[l["account"]] += (l.get("debit") or 0) - (l.get("credit") or 0)
+        for a, v in net.items():
+            if PNL(a) and round(v):
+                opened[a].append((it[3], v))
+    notes_out = []
+    if CODING_REC.get("run_id") != GLR["manifest"]["run_id"]:
+        notes_out.append("The record was saved against coding run %s, not %s; entries match by what they are" % (CODING_REC.get("run_id"), GLR["manifest"]["run_id"]))
+    if missing:
+        drafted = [i for i in missing if i.startswith("DR-")]
+        notes_out.append("%s not in this run, not applied%s" % (count(len(missing), "decision"),
+                         (" (%d on Journal Entries Claude drafted: pass --coding-drafts)" % len(drafted)) if drafted and not CODING_DRAFTS else ""))
+    if held:
+        notes_out.append("%s held, not applied: %s" % (count(len(held), "decision"), "; ".join("%s (%s)" % (v, w) for _, v, w in held[:5]) + (" and %d more" % (len(held) - 5) if len(held) > 5 else "")))
+    return ({a: round(v, 2) for a, v in corr.items() if round(v)}, dict(opened), len(booked), notes_out,
+            sum(1 for it in items if it[1] not in dec))
+
+
 def flux():
     T = PLR["tables"][0]
     secs = T["sections"]
@@ -1184,23 +1295,39 @@ def flux():
                         '<span><i style="background:var(--color-mid-gray)"></i>Lowers the loss</span></div></div>' + exec_summary + CHECKLIST))
 
     # ----- Actual vs. Actual
+    corr, opened, n_booked, coding_notes, n_open = coding_corrections() if CODING_REC else ({}, {}, 0, [], 0)
+    placed = set()
+
     def var_table(kind):
         base, label = ("prior", PRIOR) if kind == "mom" else ("prior_year", PY)
+        adj = kind == "mom" and CODING_REC is not None
         out, fv, uf = [], 0.0, 0.0
         for s in secs:
-            live = [r for r in s["rows"] if round(r.get("actual") or 0) or round(r.get(base) or 0)]
+            live = [r for r in s["rows"] if round(r.get("actual") or 0) or round(r.get(base) or 0) or (adj and r["account_code"] in corr)]
             if not live:
                 continue
-            out.append('<tr class="grp"><td colspan="%d">' % (8 if kind == "mom" else 6) + e(s["label"].split(" - ", 1)[-1]) + "</td></tr>")
+            out.append('<tr class="grp"><td colspan="%d">' % ((10 if adj else 8) if kind == "mom" else 6) + e(s["label"].split(" - ", 1)[-1]) + "</td></tr>")
             for r in live:
-                v = (r.get(base) or 0) - (r.get("actual") or 0)       # favorable positive
+                v = vr = (r.get(base) or 0) - (r.get("actual") or 0)       # favorable positive
+                cv = corr.get(r["account_code"], 0.0) if adj else 0.0
+                if cv:
+                    v = vr - cv                                            # the movement after the booked corrections
+                    placed.add(r["account_code"])
                 avgs = "".join('<td class="n2">%s</td>' % money(trailing(r["account_code"], n)) for n in (3, 6)) if kind == "mom" else ""
                 fv += v if v > 0 else 0
                 uf += v if v < 0 else 0
                 fid = r.get("mom_finding") if kind == "mom" else None
                 vend = basis(fid) if fid else ""
-                line = (money(abs(v)) + (" favorable " if v > 0 else " unfavorable ") + ("MoM" if kind == "mom" else "YoY")
-                        + (" (" + format(abs(100 * v / r[base]), ".1f") + "%)" if r.get(base) else "") + "." + (" Largest vendors: " + e(vend) + "." if vend else ""))
+                line = (money(abs(v)) + (" favorable " if v > 0 else " unfavorable ") + ("MoM" if kind == "mom" else "YoY") + (" adjusted" if cv else "")
+                        + (" (" + format(abs(100 * v / r[base]), ".1f") + "%)" if r.get(base) else "") + "." + (" Largest vendors" + (" (before coding corrections)" if cv else "") + ": " + e(vend) + "." if vend else ""))
+                if cv:
+                    line += " Reported " + money(abs(vr)) + (" favorable" if vr > 0 else " unfavorable") + ", " + money(abs(cv)) + (" moved out" if cv < 0 else " moved in") + " by booked coding corrections."
+                ops = opened.get(r["account_code"]) if adj else None
+                if not round(v):
+                    line = "No change" + (" adjusted." if cv else ".") + line[line.index(" Reported"):] if cv else "No change."
+                if ops:
+                    line += "<div class=\"note\">Open coding findings, not applied: " + "; ".join(
+                        e(vn) + " " + money(abs(ov)) + (" out" if ov < 0 else " in") for vn, ov in ops[:3]) + (" and %d more" % (len(ops) - 3) if len(ops) > 3 else "") + ".</div>"
                 key = kind + ":" + r["account_code"]
                 pj = jr = ""
                 if kind == "mom" and round(v):
@@ -1210,20 +1337,21 @@ def flux():
                     je[pid] = {"id": "SERIF-" + SLUG + "-" + pid, "date": PERIOD_END, "memo": why, "proposal": True,
                                "lines": je_lines([{"account": r["account_code"]}, {"account": ""}])}
                     pj = '<button class="lk" data-propose="%s" aria-expanded="false" aria-controls="jr-%s">Propose entry</button>' % (pid, pid)
-                    jr = ('<tr class="jr" id="jr-%s" data-jerow="%s" hidden><td colspan="8">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note"></textarea></td></tr>'
-                          % (pid, pid, je_editor(pid, je[pid]["lines"], label="Propose entry " + r["account_code"]), pid))
+                    jr = ('<tr class="jr" id="jr-%s" data-jerow="%s" hidden><td colspan="%d">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note"></textarea></td></tr>'
+                          % (pid, pid, 10 if adj else 8, je_editor(pid, je[pid]["lines"], label="Propose entry " + r["account_code"]), pid))
                 dn = txt((RAW_DRAFTS.get("commentary") or {}).get(r["account_code"])) if kind == "mom" else ""
                 if dn:
                     used_com.add(r["account_code"])
+                cols = ('<td class="n2">%s</td><td class="n2">%s</td>' % (fav(-cv) if cv else "", fav(v))) if adj else ""
                 out.append('<tr data-var="%s"><td><span class="code">%s</span>%s</td><td class="n2">%s</td><td class="n2">%s</td>'
-                           '<td class="n2">%s</td><td class="n2">%s</td>%s<td><div class="cm">%s</div>%s<textarea class="c" rows="1" data-note="%s" placeholder="Commentary"></textarea>%s</td></tr>'
-                           % (round(v, 2), e(r["account_code"]), e(leaf_of(r)), money(r["actual"]), money(r.get(base)), fav(v), fav(v, pct(v, r.get(base))) if r.get(base) else "&ndash;",
-                              avgs, line if round(v) else "No change.", draft("com:" + key, dn, key) if dn else "", key, pj))
+                           '<td class="n2">%s</td>%s<td class="n2">%s</td>%s<td><div class="cm">%s</div>%s<textarea class="c" rows="1" data-note="%s" placeholder="Commentary"></textarea>%s</td></tr>'
+                           % (round(v, 2), e(r["account_code"]), e(leaf_of(r)), money(r["actual"]), money(r.get(base)), fav(vr), cols, fav(v, pct(v, r.get(base))) if r.get(base) else "&ndash;",
+                              avgs, line, draft("com:" + key, dn, key) if dn else "", key, pj))
                 out.append(jr)
         head = ("<thead><tr><th>Account</th><th class=\"n2\">" + e(PERIOD) + "</th><th class=\"n2\">" + e(label) + "</th><th class=\"n2\">$ Var</th>"
-                "<th class=\"n2\">% Var</th>" + ('<th class="n2">3-mo avg</th><th class="n2">6-mo avg</th>' if kind == "mom" else "")
+                + ('<th class="n2">Corrections</th><th class="n2">Adj. $ Var</th>' if adj else "") + "<th class=\"n2\">" + ("Adj. % Var" if adj else "% Var") + "</th>" + ('<th class="n2">3-mo avg</th><th class="n2">6-mo avg</th>' if kind == "mom" else "")
                 + "<th style=\"width:%s\">Commentary</th></tr></thead>" % ("34%" if kind == "mom" else "42%"))
-        sm = ('<div class="sumline">Favorable: <b>' + money(fv) + "</b> Unfavorable: <b class=\"unf\">" + money(uf) + "</b> To review: <b data-ccount></b></div>")
+        sm = ('<div class="sumline">Favorable: <b>' + money(fv) + "</b> Unfavorable: <b class=\"unf\">" + money(uf) + "</b> To review: <b data-ccount></b>" + (" Corrections booked: <b>" + str(n_booked) + "</b> Journal Entries" if adj else "") + "</div>")
         return sm + '<div class="tw"><table>' + head + "<tbody>" + "".join(out) + "</tbody></table></div>"
     ch = opex["actual"] - opex["prior"]
     chy = opex["actual"] - opex["prior_year"]
@@ -1235,6 +1363,13 @@ def flux():
         + '<div class="card" data-tabbox><div class="tabs"><button class="on" data-tab="mom">MoM: ' + e(MON + " vs. " + PRIOR) + '</button><button data-tab="yoy">YoY: '
         + e(MON + " " + PERIOD[-2:] + " vs. " + PY) + '</button></div><div data-pane="mom">' + var_table("mom") + '</div><div data-pane="yoy" data-alt hidden>' + var_table("yoy") + "</div></div>"))
 
+    if CODING_REC:
+        lost = sorted(set(corr) - placed)
+        if lost:
+            coding_notes.append("No flux row for " + ", ".join(a + " " + acct_name(a) + " " + money(corr[a]) for a in lost))
+        print("Coding corrections: %d booked Journal Entries move %d accounts; %d open findings noted, not applied." % (n_booked, len(corr), n_open))
+        for x in coding_notes:
+            print("  " + x + ".")
     # ----- Actual vs. Budget
     bud_rows = [(s, r) for s, r in rows if r.get("budget") is not None]
     act_p = sum(r["actual"] or 0 for s, r in bud_rows)
@@ -1634,7 +1769,9 @@ function refresh(){
 }
 show('ov');
 """
-    pages.append(runlog(PLR, "flux"))
+    pages.append(runlog(PLR, "flux", read=[("Also read", "GL Coding Review run %s and its decision record %s, saved %s" % (
+        GLR["manifest"]["run_id"], hashlib.sha256(open(A.coding_record, "rb").read()).hexdigest()[:16], str(CODING_REC.get("saved_at") or "")[:16].replace("T", " ")))]
+        + [("Coding corrections", x) for x in coding_notes] if CODING_REC else ()))
     return shell("Serif P&L Flux - " + PERIOD, "P&L Flux", sections, pages, data, js)
 
 
@@ -1922,6 +2059,7 @@ def coding():
                 ("Transparency", [("clear", "Reviewed & Cleared"), ("new", "New This Period")]),
                 ("Documentation", [("audit", "Audit Log"), ("sox", "SOX Documentation"), ("export", "Export")])]
     SKIPPED.extend("vendor note for " + k for k in (RAW_DRAFTS.get("vendors") or {}) if k not in used_ven)
+    CODING_BUILT.update(je=je_finish(je), items=items)
     data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "je": je_finish(je), "icons": {}, "drafts": DRAFTS}
     js = r"""
 function refresh(){

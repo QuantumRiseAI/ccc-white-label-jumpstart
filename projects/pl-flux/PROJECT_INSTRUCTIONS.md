@@ -65,6 +65,13 @@ python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite
   --income-statement netsuite_income_statement_by_month_*.xls --out out/sep2026
 ```
 
+When the reviewer attaches the GL Coding Review's run (`run.json`, from that Project) and its decision
+record, add `--coding-run <that run.json> --coding-record <that record>` (and `--coding-drafts <its drafts.json>`
+when it has drafted Journal Entries) to the build (and to the
+build with `--drafts`). Actual vs. Actual (MoM) then shows each account's booked correction (a
+Journal Entry approved, or modified or recoded with a note), the adjusted movement, and flags on the
+adjusted figure. Open coding findings are listed on the affected row and never applied. Say in the chat that the flux carries the corrections.
+
 The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.0.0.html`. Publish it as
 [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML yourself:
 if it needs a change, change the script and build again.
