@@ -62,7 +62,6 @@ serif-pl-flux-aug2026-v1.8.2.html
   Exchange Rate, Memo, Reversing Entry, Reversal Date and a Line Memo on each line. Entries are
   dated the last day of the close month, with the transaction date in the Line Memo.
 
-
 ## Unreleased: duplicate vendor records (SERIF-17)
 
 - **GL Coding Review**: an explicit pair list, `VENDOR_PAIRS` in the engine's policy module,
