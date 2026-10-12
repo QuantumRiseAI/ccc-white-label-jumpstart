@@ -624,6 +624,13 @@ Header-only templates are feeds Serif has not sent. Each one's absence turns a c
 | `open_purchase_commitments.csv` | Commitments made outside Coupa |
 | `ebitda_addback_mapping.csv` | Add-back dimension checks |
 
+`accepted_exceptions.csv` is the one template a reviewer fills in. Each row (`vendor`, `account`,
+`reason`, `approved_by`, `approved_on`) says a vendor, optionally on one account, no longer needs a
+finding. `vendor`, `reason` and `approved_by` are required; a row without them is not applied. The
+rules do not change: a finding the list covers stays in the run, is counted, and is marked excepted
+with its reason, on the Dept & Entity page. It is never shown as a clean result. The file is hashed
+into the run manifest like any input.
+
 ## Open Questions for Serif
 
 * Can Coupa add NetSuite PO reference, budget check status, amount invoiced, amount paid,

@@ -400,3 +400,11 @@ See [`WHEN-DATA-BREAKS.md`](WHEN-DATA-BREAKS.md): ask for the export again, neve
 | `0 findings` | Almost certainly the wrong file. Check the period in the load summary. |
 | A pending feed shows as absent | Expected. Its template exists but has no data yet. |
 
+## Accepted Exceptions
+
+To stop a vendor being flagged, add a row to `accepted_exceptions.csv` (`vendor`, `account`, `reason`,
+`approved_by`, `approved_on`; `account` may be blank for every account of that vendor) and upload it
+with the other files. It is data, not a rule change. Matching findings are kept and counted, marked
+excepted with the reason, and listed under Accepted Exceptions on the Dept & Entity page. A row
+missing `vendor`, `reason` or `approved_by` is not applied; the run manifest lists it as rejected.
+

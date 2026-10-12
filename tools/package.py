@@ -27,7 +27,8 @@ PROJECTS = {
         "scripts": ["serif_uc1_engine.py"] + SCRIPTS,
         "docs": ["PROJECT_INSTRUCTIONS.md", "HOW-TO-RUN.md", "GL_CODING_REVIEW_SKILL.md",
                  "serif-vendor-coding-baseline.md"],
-        "templates": TEMPLATES + ["ebitda_addback_mapping.csv", "netsuite_vendor_master.csv"],
+        "templates": TEMPLATES + ["accepted_exceptions.csv", "ebitda_addback_mapping.csv",
+                                  "netsuite_vendor_master.csv"],
     },
     "pl-flux": {
         "scripts": SCRIPTS,

@@ -1698,7 +1698,10 @@ def coding():
                            '<div><div class="l">Type</div><div class="x">Drafted by Claude</div></div>', e(x["support"]), "", FLAG_ACTS, "", je_editor(iid, je[iid]["lines"])))
     ents = {x["finding_id"]: x for x in V.get("entries") or []}
     dfind = sorted([f for f in GLR["findings"] if f["rule_id"] in ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")], key=lambda f: -(f.get("amount_at_risk") or 0))
+    excepted = [f for f in GLR["findings"] if f.get("excepted")]
     for f in dfind:
+        if f.get("excepted"):
+            continue
         iid = sid("D", f["rule_id"], f.get("title"))
         x = ents.get(f["finding_id"])
         vname = (f.get("transaction") or {}).get("vendor_or_name") or f["title"].split(":")[0].split(" coded to ")[0]
@@ -1802,7 +1805,8 @@ def coding():
     clean_lines = sum(((r.get("detail") or {}).get("count") or 0) for r in clear)
     hero_ = hero("GL Coding Review, " + PERIOD, "Serif Biomedicines, Inc. &middot; NetSuite Subsidiary 97", [
         ("Total Period Spend", money(spend), "%d vendors billed" % len(billed)),
-        ("Flags Identified", str(len(flagged)), "%s &middot; %.1f%% of period spend" % (money(famt), 100 * famt / spend)),
+        ("Flags Identified", str(len(flagged)), "%s &middot; %.1f%% of period spend" % (money(famt), 100 * famt / spend)
+         + (" &middot; %d accepted exceptions not counted here" % len(excepted) if excepted else "")),
         ("Clean Vendors", str(len(clear)), money(sum(r["amount"] for r in clear)) + " &middot; no flags"),
         ("Resolved", '<span data-resolved></span>', "Flags decided")])
     pages = []
@@ -1815,7 +1819,16 @@ def coding():
                 + ("".join(booked_) or none("No bills posted to " + accts.lower() + " accounts in " + PERIOD + ".")))
     pages.append(page("capex", "<h3>CapEx Flags</h3>" + two_way("Capital", cap_cards, cap_booked, "capex", "Fixed Assets")))
     pages.append(page("prepaid", "<h3>Prepaid Flags</h3>" + two_way("Prepaid", pre_cards, pre_booked, "prepaid", "Prepaid")))
-    pages.append(page("dept", '<h3>Dept &amp; Entity Flags <span class="note">%d items &middot; %s total</span></h3>' % (len(dcards), money(sum(i[5] for i in items if i[0] == "dept"), True)) + "".join(dcards)))
+    exc_html = ""
+    if excepted:
+        exc_html = ('<h4 class="dh">Accepted Exceptions<span class="note">%s &middot; %s &middot; kept and counted, not for review</span></h4>'
+                    '<div class="card"><div class="tw"><table><thead><tr><th>Finding</th><th>Vendor</th><th class="n2">Amount</th><th>Reason</th><th>Approved by</th></tr></thead><tbody>%s</tbody></table></div></div>'
+                    % (count(len(excepted), "item"), money(sum(f.get("amount_at_risk") or 0 for f in excepted), True),
+                       "".join('<tr><td>%s<small>%s</small></td><td>%s</td><td class="n2">%s</td><td>%s</td><td>%s</td></tr>' % (
+                           e(f["title"]), e(f["finding_id"]), e(f["excepted"]["vendor"]), money(f.get("amount_at_risk") or 0, True),
+                           e(f["excepted"]["reason"]), e(f["excepted"]["approved_by"] + (", " + f["excepted"]["approved_on"] if f["excepted"].get("approved_on") else "")))
+                               for f in excepted)))
+    pages.append(page("dept", '<h3>Dept &amp; Entity Flags <span class="note">%d items &middot; %s total</span></h3>' % (len(dcards), money(sum(i[5] for i in items if i[0] == "dept"), True)) + "".join(dcards) + exc_html))
     pages.append(page("clear", '<h3>Reviewed &amp; Cleared <span class="note">%d vendors &middot; %s</span></h3><div class="legend">No check flagged these vendors. '
                       'Confirm each one, or recode it if the coding is wrong. Start with those at $2,500 or more.</div>' % (len(clear), money(sum(r["amount"] for r in clear), True)) + "".join(ccards)))
     pages.append(page("new", '<h3>New This Period <span class="note">%d vendors &middot; first appearance in the ledger</span></h3><div class="legend">'

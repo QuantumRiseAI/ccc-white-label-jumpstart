@@ -34,6 +34,13 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: accepted exceptions (SERIF-64)
+
+- **Accepted exceptions** (GL Coding Review): a reviewer-maintained `templates/accepted_exceptions.csv`
+  (vendor, account, reason, approved_by, approved_on) is read by the coding engine as an input, hashed
+  into the run manifest. Matching findings are marked excepted, kept and counted, and listed with
+  their reason on the Dept & Entity page. No rule changes, so the ruleset version does not move.
+
 ## Unreleased: executive summary, payroll commentary, Project files (7 Oct)
 
 - **Executive Summary** (P&L Flux, Executive Overview): Claude drafts it into `drafts.json`
