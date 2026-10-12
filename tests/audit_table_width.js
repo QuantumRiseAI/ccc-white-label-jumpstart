@@ -14,7 +14,7 @@ const W = Number(process.argv[2]) || 1440;
     const res = await p.evaluate(() => {
       $$('[data-item]').forEach(x => { const id = x.dataset.item; if (DATA.je[id]) S.dec[id] = {v: DATA.je[id].when === 'recode' ? 'recode' : 'approve', at: ''}; }); refresh();
       const out = [];
-      $$('.page').forEach(pg => { $$('.page').forEach(p => p.hidden = p !== pg); $$('[data-pane]').forEach(x => x.hidden = false); $$('details').forEach(d => d.open = true);
+      $$('.page').forEach(pg => { $$('.page').forEach(p => p.hidden = p !== pg); $$('[data-pane],[data-jerow]').forEach(x => x.hidden = false); $$('details').forEach(d => d.open = true);
         pg.querySelectorAll('.tw').forEach(tw => { if (tw.offsetParent && tw.scrollWidth > tw.clientWidth + 1){
           const h = (tw.closest('.card') || tw.parentElement).querySelector('.ch, h3, .l');
           out.push(pg.id.slice(2) + ' | ' + (h ? h.textContent.trim().slice(0, 60) : '') + ' | ' + tw.scrollWidth + ' > ' + tw.clientWidth); } }); });

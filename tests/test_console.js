@@ -106,6 +106,23 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.locator('[data-item="' + r + '"] > .ib').isVisible() && !(await p.evaluate(r => !!S.dec[r], r)), 'gl: undoing the confirm leaves it open');
     }
     if (k === 'pl'){
+      // a variance row proposes an entry: the row's account, an offset to fill, the memo from the review; it joins the same CSV
+      await p.evaluate(() => show('ava'));
+      const btn = p.locator('#p-ava [data-propose]').first(); const pid = await btn.getAttribute('data-propose');
+      await btn.click();
+      ok(await p.locator('[data-jerow="' + pid + '"]').isVisible(), 'pl: Propose entry opens a Journal Entry on the variance row');
+      ok(await p.evaluate(pid => !S.dec[pid] && /Actual vs\. Actual \(MoM\)/.test(jeOf(pid).memo) && !jeReady(pid), pid), 'pl: the proposal is a suggestion: memo from the review, nothing approved');
+      await p.fill('[data-jef="' + pid + '|1|account"]', '2206000');
+      await p.fill('[data-jef="' + pid + '|0|debit"]', '500'); await p.fill('[data-jef="' + pid + '|1|credit"]', '500');
+      await p.fill('[data-jef="' + pid + '|0|memo"]', 'Reclass test line');
+      await p.selectOption('[data-jeh="' + pid + '|reversing"]', 'Y');
+      ok(await p.evaluate(pid => { S.notes[pid] = 'Reviewer note'; return !jeReady(pid); }, pid), 'pl: reversing without a reversal date is held');
+      await p.fill('[data-jeh="' + pid + '|reversal_date"]', '2026-09-01');
+      ok(await p.evaluate(pid => jeReady(pid), pid), 'pl: a balanced, noted proposal is ready');
+      const [d2] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
+      const rowsCsv = d2 ? fs.readFileSync(await d2.path(), 'utf8').split('\n') : [];
+      ok(/^\ufeff?External ID,Subsidiary,Journal Date,Posting Period,Currency,Exchange Rate,Memo,Reversing Entry,Reversal Date,Account,Department,Debit,Credit,Line Memo$/.test(rowsCsv[0] || ''), 'pl: the CSV carries the NetSuite header and line fields');
+      ok(rowsCsv.some(r => /"?Serif Biomedicines, Inc\.?"?,2026-08-31,Aug 2026,USD,1,.*,Y,2026-09-01,.*Reclass test line/.test(r)), 'pl: the proposed entry exports with subsidiary, posting period, reversal and line memo');
       ok(await p.locator('#p-ava [data-pane="mom"] th', {hasText: '3-mo avg'}).count() === 1, 'pl: MoM carries trailing averages');
       ok(await p.locator('#p-dept .ch', {hasText: 'Credits in Expense Accounts'}).count() === 1 && await p.locator('[data-note^="cr:"]').count() > 0, 'pl: credits in expense accounts listed');
       ok(await p.locator('[data-note="bonus:total"]').count() === 1, 'pl: bonus accrual check, in total');
@@ -131,7 +148,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     await q.setInputFiles('#recfile', recPath); await q.waitForTimeout(300);
     ok(await q.locator('#ask').isVisible(), k + ': loading asks first, on the page');
     await q.click('[data-askok]'); await q.waitForTimeout(200);
-    ok(await q.evaluate(id => (S.dec[id] || {}).v === 'modify' && (S.je[id] || [])[0].department === 'Finance', id), k + ': record loads the decision and the edit');
+    ok(await q.evaluate(id => (S.dec[id] || {}).v === 'modify' && jeS(id).lines[0].department === 'Finance', id), k + ': record loads the decision and the edit');
     await c2.close();
   }
 

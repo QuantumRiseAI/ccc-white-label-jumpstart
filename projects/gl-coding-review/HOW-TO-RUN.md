@@ -339,9 +339,13 @@ recommended decision. Only the current month gets an entry.
 ### Export
 
 **Export to NetSuite, CSV** on Documentation > Export holds every entry approved, modified or
-recoded with a note, as edited: External ID, Date, Account, Department, Debit, Credit and Memo,
-with the note in the memo. An entry out of balance, unchanged, or missing its note is left out,
-and the Export page shows each entry's status.
+recoded with a note, as edited. Header columns: External ID, Subsidiary (Serif Biomedicines, Inc.),
+Journal Date, Posting Period (the close month), Currency (USD), Exchange Rate (1), Memo (with the
+note), Reversing Entry (Y/N) and Reversal Date. Line columns: Account, Department, Debit, Credit and
+Line Memo. Journal Date, Posting Period, Memo, Reversing Entry, Reversal Date and Line Memo are
+editable on the entry. Class and Location are not carried. An entry out of balance, unchanged,
+missing its note, or reversing with no reversal date is left out, and the Export page shows each
+entry's status.
 
 ### The Threshold
 

@@ -206,7 +206,9 @@ opens its pages beside its title.
     revisions, to acknowledge or mark No Action; Section C lists vendors **billed twice after a
     gap**: two or more bills this month, none last month, billed in at least two of the four
     months before, and at least 1.5 times the usual month and at or over the threshold, which
-    may be a missed accrual coming back. The NetSuite CSV downloads here;
+    may be a missed accrual coming back. The NetSuite CSV downloads here, with Subsidiary, Journal
+    Date, Posting Period, Currency, Exchange Rate, Memo, Reversing Entry, Reversal Date and a Line
+    Memo on each line, all editable on the entry where the reviewer sets them;
   * **SOX & GAAP**: the tie-outs of the ledger to the Income Statement and Balance Sheet, the
     Flagship related-party schedule (Flagship-named vendors and journals, three months), the
     GAAP checklist, the source data and the sign-off.
@@ -348,6 +350,12 @@ covers it.
 
 The entry joins Adjustments, Section A, as `SERIF-DRAFT-1` and on, marked "Drafted by Claude".
 Once the reviewer approves it, it is in the NetSuite CSV.
+
+The reviewer can also propose an entry from a variance. **Propose entry** on a row of Actual vs.
+Actual (MoM) opens a two-line Journal Entry: the row's account and an offset line to fill, with
+the memo prefilled from the review, the account, the period and the move. It is a suggestion:
+the reviewer edits it and adds a note, and only then is it in the NetSuite CSV. Nothing is
+created or posted in NetSuite.
 
 ### 4. Forecast Revisions
 
