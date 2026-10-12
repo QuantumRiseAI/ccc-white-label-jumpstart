@@ -98,7 +98,7 @@ COST_PRICES = [{"model": "Claude Sonnet at medium effort", "input": 3.00, "cache
                 "output": 15.00}]
 COST_THINKING_TOKENS = 1_500
 COST_SYSTEM_TOKENS = 20_000
-COST_SCRIPT_TOKENS = 2_000
+COST_SCRIPT_TOKENS = 500
 COST_READ_CHUNK = 10
 COST_DRAFT_TOKENS = 150
 COST_SUMMARY_TOKENS = 3_000

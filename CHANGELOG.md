@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased: Run log cost estimate
+
+- The cost estimate assumes 500 tokens of output per script run (was 2,000); the three scripts print at most about 300 tokens each. Aug 2026: coding about $0.93 (847K tokens), flux about $1.62 (1.77M tokens).
+
 Three things version independently. A reader comparing two outputs needs all three
 to know why a number moved.
 
