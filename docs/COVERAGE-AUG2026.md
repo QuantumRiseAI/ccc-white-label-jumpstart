@@ -104,4 +104,4 @@ treatment.
 * No engine rules were changed.
 * The reviewer-flagged lines in the GL detail export cannot be identified; if the team marks the source file (highlight or a flag column), the
   same match can run at line level.
-* The working session with the reviewer is still open; these proposals are for that conversation, not a ruling.
+* These proposals are rule changes to consider, not a ruling.
