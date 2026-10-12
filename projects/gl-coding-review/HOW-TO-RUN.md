@@ -345,7 +345,10 @@ note), Reversing Entry (Y/N) and Reversal Date. Line columns: Account, Departmen
 Line Memo. Journal Date, Posting Period, Memo, Reversing Entry, Reversal Date and Line Memo are
 editable on the entry; Subsidiary, Currency and Exchange Rate are shown, not editable. Corrections
 are booked in the open close month: the Journal Date defaults to its last day and the
-transaction's own date goes in the Line Memo. Journal Date must be a valid date, Posting Period
+transaction's own date goes in the Line Memo. A correction to a transaction in an earlier,
+closed month is an out-of-period adjustment: its entry is tagged **Out-of-period**, its Memo
+starts "Out-of-period correction, Jun 2026", and the Export page totals the approved ones,
+which need the controller's approval. Journal Date must be a valid date, Posting Period
 reads Mon YYYY, and a Reversal Date must fall after the Journal Date. Class and Location are not carried. An entry out of balance, unchanged,
 missing its note, or reversing with no reversal date is left out, and the Export page shows each
 entry's status.

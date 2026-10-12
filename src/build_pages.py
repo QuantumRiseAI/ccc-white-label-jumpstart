@@ -236,7 +236,7 @@ def je_editor(iid, lines, when=None, label=None):
             '<label>Reversing Entry<select class="f" data-jeh="%s|reversing"><option>N</option><option>Y</option></select></label>'
             '<label>Reversal Date<input class="f" type="date" data-jeh="%s|reversal_date"></label>'
             '<label class="memo">Memo<input class="f" data-jeh="%s|memo"></label></div>' % (e(JE_SUBSIDIARY), JE_CURRENCY, JE_RATE, iid, iid, iid, iid, iid))
-    return ('<div class="jee" data-je="%s"%s%s><div class="jh"><span class="l">Journal Entry</span><span data-jebal></span>'
+    return ('<div class="jee" data-je="%s"%s%s><div class="jh"><span class="l">Journal Entry</span><span class="tag" data-jeoop hidden>Out-of-period</span><span data-jebal></span>'
             '<button class="lk" data-jereset="%s" hidden>Reset</button></div>%s<div class="tw"><table><thead><tr><th>Account</th><th>Department</th>'
             '<th class="n2">Debit</th><th class="n2">Credit</th><th>Line Memo</th></tr></thead><tbody>%s</tbody></table></div></div>'
             % (iid, (' data-when="%s" hidden' % when) if when else "", (' data-label="%s"' % e(label)) if label else "", iid, head, rows))
@@ -300,8 +300,13 @@ def je_finish(je):
     """The NetSuite Journal Entry fields the run can fill: the header (subsidiary,
     posting period, currency, exchange rate, reversal) and a Line Memo on each line."""
     for j in je.values():
+        if "period" in j:   # already finished (the coding build hands the same entries to the flux)
+            continue
         rev = j.pop("reverses", "") or ""
         was, j["date"] = j["date"], PERIOD_END   # corrections are booked in the open close month
+        if was and was[:7] < PERIOD_END[:7]:   # the transaction is in an earlier, closed month
+            j["oop"] = "%s %s" % (calendar.month_abbr[int(was[5:7])], was[:4])
+            j["memo"] = "Out-of-period correction, %s | %s" % (j["oop"], j["memo"])
         j.update({"subsidiary": JE_SUBSIDIARY, "period": PERIOD, "currency": JE_CURRENCY, "rate": JE_RATE,
                   "reversing": "Y" if rev else "N", "reversal_date": rev})
         for l in j["lines"]:
@@ -1047,6 +1052,7 @@ function paintJE(){
   $$('[data-je]').forEach(box => { const id = box.dataset.je, d = S.dec[id], j = jeOf(id);
     if (box.dataset.when) box.hidden = !(d && d.v === box.dataset.when);
     box.classList.toggle('edited', jeEdited(id));
+    const oo = box.querySelector('[data-jeoop]'); if (oo){ oo.hidden = !DATA.je[id].oop; oo.textContent = 'Out-of-period, ' + (DATA.je[id].oop || ''); }
     const jr = box.closest('[data-jerow]'); if (jr && d) jr.hidden = false;
     box.querySelectorAll('[data-jeh]').forEach(inp => { if (inp !== document.activeElement) inp.value = j[inp.dataset.jeh.split('|')[1]] || ''; });
     const rd = box.querySelector('[data-jeh$="|reversal_date"]'); if (rd) rd.disabled = j.reversing !== 'Y';
@@ -2076,7 +2082,7 @@ def coding():
                       + '<div class="card"><div class="ch">Policy Application Summary</div><div class="tw"><table><tbody>' + pol_rows + "</tbody></table></div></div>"
                       + '<div class="card"><div class="ch">Management Review &amp; Sign-Off</div><div class="pad">' + sign + "</div></div>"))
     pages.append(page("export", '<div class="card"><div class="ch">Export to NetSuite<button class="pill solid r" data-export>Export to NetSuite, CSV</button></div>'
-                      '<div class="tw"><table><thead><tr><th>Memo</th><th>Account</th><th>Department</th><th class="n2">Debit</th><th class="n2">Credit</th><th>Status</th></tr></thead><tbody data-exportrows></tbody></table></div></div>'))
+                      '<div class="tw"><table><thead><tr><th>Memo</th><th>Account</th><th>Department</th><th class="n2">Debit</th><th class="n2">Credit</th><th>Status</th></tr></thead><tbody data-exportrows></tbody></table></div><p class="note" data-exportoop></p></div>'))
     sections = [("Overview", [("ov", "Overview")]),
                 ("Review", [("capex", "CapEx Flags"), ("prepaid", "Prepaid Flags"), ("dept", "Dept & Entity")]),
                 ("Transparency", [("clear", "Reviewed & Cleared"), ("new", "New This Period")]),
@@ -2099,7 +2105,9 @@ function refresh(){
   const ex = $('[data-exportrows]'); if (ex){ const r = [];
     Object.keys(DATA.je).forEach(id => { if (!jeLive(id)) return; const j = jeOf(id), ok = jeReady(id);
       j.lines.forEach((l, i) => r.push('<tr><td>' + (i ? '' : named(j.memo)) + '</td><td><span class="mono">' + esc(l.account) + '</span><small>' + esc(DATA.acct[(l.account || '').trim()] || '') + '</small></td><td>' + esc(l.department || '') + '</td><td class="n2">' + (Number(l.debit) ? money(l.debit) : '') +
-        '</td><td class="n2">' + (Number(l.credit) ? money(l.credit) : '') + '</td><td>' + (i ? '' : ok ? 'Ready' : '<span class="unf">' + jeWhy(id).replace(/^./, c => c.toUpperCase()) + '</span>') + '</td></tr>')); });
+        '</td><td class="n2">' + (Number(l.credit) ? money(l.credit) : '') + '</td><td>' + (i ? '' : (ok ? 'Ready' : '<span class="unf">' + jeWhy(id).replace(/^./, c => c.toUpperCase()) + '</span>') + (DATA.je[id].oop ? ' &middot; Out-of-period, ' + esc(DATA.je[id].oop) : '')) + '</td></tr>')); });
+    const oop = Object.keys(DATA.je).filter(id => jeLive(id) && DATA.je[id].oop), amt = oop.reduce((t, id) => t + jeOf(id).lines.reduce((u, l) => u + (Number(l.debit) || 0), 0), 0);
+    const xo = $('[data-exportoop]'); if (xo) xo.textContent = oop.length ? 'Out-of-period corrections: ' + oop.length + ', ' + money(amt) + ' in debits, correcting ' + [...new Set(oop.map(id => DATA.je[id].oop))].join(', ') + '. Controller approval.' : '';
     ex.innerHTML = r.length ? r.join('') : '<tr><td colspan="6" class="note">No approved entries yet.</td></tr>'; }
 }
 show('ov');

@@ -109,6 +109,15 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       const txt = await p.evaluate(() => { const c = [...document.querySelectorAll('#p-dept [data-item^="D-"]')].find(i => /Coupa PO/.test(i.textContent) && /DraI/.test(i.textContent)); return c ? c.querySelector('.ih b').textContent + ' | ' + c.textContent : ''; });
       ok(/^New England BioLabs Inc \|/.test(txt) && /6501100/.test(txt) && /6410000/.test(txt), 'gl: an item on an account other than its usual one shows its supplier and both accounts (DraI)');
       ok(/under \$2,500/.test(await p.locator('#p-dept > .note, #p-dept p.note').first().innerText()), 'gl: item drift under the threshold is a count and a total');
+      const oop = await p.evaluate(() => { const ids = Object.keys(DATA.je).filter(k => DATA.je[k].oop), id = ids[0]; if (!id) return null;
+        const j = DATA.je[id], tag = document.querySelector('[data-je="' + id + '"] [data-jeoop]');
+        S.dec[id] = {v: 'approve', at: new Date().toISOString()}; refresh(); paintJE();
+        const note = (document.querySelector('[data-exportoop]') || {}).textContent || ''; delete S.dec[id]; refresh(); paintJE();
+        return {n: ids.length, memo: j.memo, date: j.date, lineMemo: j.lines[0].memo, tag: tag && !tag.hidden && tag.textContent, note, after: (document.querySelector('[data-exportoop]') || {}).textContent}; });
+      ok(oop && oop.n > 0 && /^Out-of-period correction, (Jan|Feb|Mar|Apr|May|Jun|Jul) 2026 \| /.test(oop.memo) && oop.date === '2026-08-31' && /Original date 2026-0[1-7]/.test(oop.lineMemo),
+         'gl: a correction to an earlier month is dated in the close month, marked out-of-period, original date kept' + (oop ? ' (' + oop.n + ')' : ''));
+      ok(oop && /^Out-of-period, \w{3} 2026$/.test(oop.tag || '') && /^Out-of-period corrections: 1, \$[\d,.]+ in debits, correcting \w{3} 2026\. Controller approval\.$/.test(oop.note) && oop.after === '',
+         'gl: the entry is tagged out-of-period and the Export page totals the approved ones');
     }
     if (k === 'pl'){
       // a variance row proposes an entry: the row's account, an offset to fill, the memo from the review; it joins the same CSV
