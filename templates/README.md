@@ -81,7 +81,7 @@ than reporting nothing.
   - Feeds: external research accrual, the largest single accrual risk in Serif's P&L
   - Maps to accounts `6501000`, `6501100`, `6502000`, `6502500`, `6504000`
 * `accepted_exceptions.csv`: findings a reviewer has accepted (vendor, account, reason, approver)
-  - Feeds: GL Coding Review. A matching finding is kept, counted and marked excepted with its reason
+  - Feeds: GL Coding Review. A matching department or account finding (T1, T4) is kept, counted and marked excepted with its reason
   - Reviewer-maintained, header-only until the first row. It is data, not a rule change
   - Without it: nothing is excepted
 * `ebitda_addback_mapping.csv`: credit agreement add-backs mapped to the NetSuite dimension

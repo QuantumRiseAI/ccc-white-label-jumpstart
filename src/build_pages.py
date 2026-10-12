@@ -1698,9 +1698,11 @@ def coding():
                            '<div><div class="l">Type</div><div class="x">Drafted by Claude</div></div>', e(x["support"]), "", FLAG_ACTS, "", je_editor(iid, je[iid]["lines"])))
     ents = {x["finding_id"]: x for x in V.get("entries") or []}
     dfind = sorted([f for f in GLR["findings"] if f["rule_id"] in ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")], key=lambda f: -(f.get("amount_at_risk") or 0))
-    excepted = [f for f in GLR["findings"] if f.get("excepted")]
+    excepted = [f for f in GLR["findings"] if f.get("excepted") and f["rule_id"] in ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")]
+    exc_amt = sum(f.get("amount_at_risk") or 0 for f in excepted)
+    exc_run = (GLR["manifest"].get("exceptions") or {})
     for f in dfind:
-        if f.get("excepted"):
+        if f in excepted:
             continue
         iid = sid("D", f["rule_id"], f.get("title"))
         x = ents.get(f["finding_id"])
@@ -1806,7 +1808,7 @@ def coding():
     hero_ = hero("GL Coding Review, " + PERIOD, "Serif Biomedicines, Inc. &middot; NetSuite Subsidiary 97", [
         ("Total Period Spend", money(spend), "%d vendors billed" % len(billed)),
         ("Flags Identified", str(len(flagged)), "%s &middot; %.1f%% of period spend" % (money(famt), 100 * famt / spend)
-         + (" &middot; %d accepted exceptions not counted here" % len(excepted) if excepted else "")),
+         + (" &middot; plus %s, %s" % (count(len(excepted), "accepted exception"), money(exc_amt)) if excepted else "")),
         ("Clean Vendors", str(len(clear)), money(sum(r["amount"] for r in clear)) + " &middot; no flags"),
         ("Resolved", '<span data-resolved></span>', "Flags decided")])
     pages = []
@@ -1820,8 +1822,14 @@ def coding():
     pages.append(page("capex", "<h3>CapEx Flags</h3>" + two_way("Capital", cap_cards, cap_booked, "capex", "Fixed Assets")))
     pages.append(page("prepaid", "<h3>Prepaid Flags</h3>" + two_way("Prepaid", pre_cards, pre_booked, "prepaid", "Prepaid")))
     exc_html = ""
+    issues = ([("Not applied", "the file is malformed: " + exc_run.get("error", ""))] if exc_run.get("status") == "malformed" else []) \
+        + [("Rejected, line %s" % r["row"], "%s: %s" % (r["vendor"] or "no vendor", "; ".join(r["problems"]))) for r in exc_run.get("rejected") or []] \
+        + [("Matched nothing, line %s" % r["row"], r["vendor"]) for r in exc_run.get("unmatched") or []]
+    if issues:
+        exc_html += ('<h4 class="dh">Accepted Exceptions: Rows Not Applied<span class="note">%s</span></h4><div class="card"><div class="tw"><table><tbody>%s</tbody></table></div></div>'
+                     % (count(len(issues), "problem"), "".join("<tr><td>%s</td><td>%s</td></tr>" % (e(a), e(b)) for a, b in issues)))
     if excepted:
-        exc_html = ('<h4 class="dh">Accepted Exceptions<span class="note">%s &middot; %s &middot; kept and counted, not for review</span></h4>'
+        exc_html += ('<h4 class="dh">Accepted Exceptions<span class="note">%s &middot; %s &middot; kept and counted, not for review</span></h4>'
                     '<div class="card"><div class="tw"><table><thead><tr><th>Finding</th><th>Vendor</th><th class="n2">Amount</th><th>Reason</th><th>Approved by</th></tr></thead><tbody>%s</tbody></table></div></div>'
                     % (count(len(excepted), "item"), money(sum(f.get("amount_at_risk") or 0 for f in excepted), True),
                        "".join('<tr><td>%s<small>%s</small></td><td>%s</td><td class="n2">%s</td><td>%s</td><td>%s</td></tr>' % (
@@ -1841,11 +1849,12 @@ def coding():
                    + [("Review period", PERIOD), ("NetSuite subsidiary", "Serif Biomedicines, Inc. (FL87, subsidiary 97)")])
     tie = GLR["manifest"].get("tie_out") or {}
     tie_rows = "".join('<tr><td>%s</td><td class="mono" style="text-align:right">%s</td></tr>' % (a, b) for a, b in [
-        (e(MON + " GL expense total (6xxxxxx)"), money(gl_6x, True)), ("Total flagged amount", money(famt, True)), ("Flagged as % of GL total", "%.2f%%" % (100 * famt / gl_6x)),
+        (e(MON + " GL expense total (6xxxxxx)"), money(gl_6x, True)), ("Total flagged amount", money(famt + exc_amt, True)), ("Flagged as % of GL total", "%.2f%%" % (100 * (famt + exc_amt) / gl_6x)),
+        *([("Of which accepted exceptions", "%d items, %s" % (len(excepted), money(exc_amt, True)))] if excepted else []),
         ("Ledger balances", ("Pass: " if tie.get("passed") else "Fail: ") + e(tie.get("note") or "")), ("Flags as subset of GL", "Pass: every flag is drawn from posted GL lines")])
     pol_rows = "".join('<tr><td>%s</td><td class="mono" style="text-align:right">%s</td></tr>' % (a, b) for a, b in [
         ("Vendors billed this month", str(len(billed))), ("P&amp;L lines this month", format(pl_lines_now, ",")), ("CapEx flags", str(len(cap_cards))), ("Prepaid flags", str(len(pre_cards))),
-        ("Department and account flags", str(len(dcards))), ("Vendors with no flags", str(len(clear))), ("New vendors", str(len(news)))])
+        ("Department and account flags", str(len(dcards))), *([("Accepted exceptions", "%d items, %s" % (len(excepted), money(exc_amt, True)))] if excepted else []), ("Vendors with no flags", str(len(clear))), ("New vendors", str(len(news)))])
     sign = "".join('<div class="sign"><b>%s</b><input class="f" data-sname="%s" placeholder="Name, title"><input class="f" data-sdate="%s" placeholder="Date"><button class="pill" data-signbtn="%s">Sign</button></div>'
                    % (lab, k, k, k) for k, lab in (("prep", "Prepared by"), ("rev", "Reviewed by"), ("appr", "Approved by")))
     pages.append(page("sox", '<h3>SOX Documentation</h3><div class="card"><div class="ch">Source Citations</div><div class="tw"><table><tbody>' + srcs + "</tbody></table></div></div>"

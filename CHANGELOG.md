@@ -38,8 +38,10 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 - **Accepted exceptions** (GL Coding Review): a reviewer-maintained `templates/accepted_exceptions.csv`
   (vendor, account, reason, approved_by, approved_on) is read by the coding engine as an input, hashed
-  into the run manifest. Matching findings are marked excepted, kept and counted, and listed with
-  their reason on the Dept & Entity page. No rule changes, so the ruleset version does not move.
+  into the run manifest when it has rows. Matching department and account findings (T1, T4) are marked
+  excepted, kept and counted, and listed with their reason on the Dept & Entity page; rejected and
+  unmatched rows are shown there and in the load summary. Engine 0.3.0 (run.json gains `excepted`,
+  `summary.excepted_*` and `manifest.exceptions`); no rule changes, so the ruleset version does not move.
 
 ## Unreleased: executive summary, payroll commentary, Project files (7 Oct)
 
