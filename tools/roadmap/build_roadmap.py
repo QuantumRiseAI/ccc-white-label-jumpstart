@@ -1,8 +1,8 @@
-"""Build the Serif AI Jumpstarts roadmap as one self-contained HTML page.
+"""Build the Serif AI Jumpstarts deployment brief: two printed pages for Scott.
 
     python3 tools/roadmap/build_roadmap.py [out.html]
 
-Content lives in roadmap_content.py; this lays it out in Serif's design system
+What it says is written here; the layout uses Serif's design system
 (src/serif_design.py and its inlined open fonts). Stdlib only.
 """
 import os
@@ -10,173 +10,152 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "src"))
-sys.path.insert(0, HERE)
 import serif_design as DS  # noqa: E402
-import roadmap_content as C  # noqa: E402
 
 DEFAULT_OUT = os.path.join(HERE, "..", "..", "..", "..", "6-deliverables",
-                           "2026-10-07 - Serif AI Jumpstarts - Roadmap.html")
+                           "2026-10-09 - Serif AI Jumpstarts - Deployment Brief.html")
 
-STAGES = ["Crawl", "Walk", "Run"]
+BODY = """
+<header>
+  <div class="mark">{logo}</div>
+  <div>
+    <p class="eyebrow">AI Jumpstarts &middot; GL Coding Review and P&amp;L Flux</p>
+    <h1>Deploying the jumpstarts: what it would give Serif</h1>
+    <p class="by">For Scott Keys &middot; October 9, 2026 &middot; Draft</p>
+  </div>
+</header>
+
+<h2>Where things stand</h2>
+<p>Both jumpstarts run as Claude Projects. Each close, the reviewer uploads the NetSuite, Coupa, UKG
+and forecast exports; scripts build the review console; Claude drafts notes, commentary and Journal
+Entries; the reviewer decides each item and downloads the approved entries as a NetSuite import.
+The same exports always give the same findings. What a chat cannot do:</p>
+<ul>
+  <li><b>Remember across months.</b> Decisions live in a saved file or that month's shared console;
+  a follow-up raised in September is not waiting in October.</li>
+  <li><b>Fetch its own data or run on its own.</b> Every close starts with exports and uploads, and
+  nothing runs until someone asks.</li>
+  <li><b>Stay set up.</b> Each update is re-uploaded to each Project by hand.</li>
+  <li><b>Check against NetSuite.</b> The import is checked to balance, not that every account is
+  valid and the period open.</li>
+</ul>
+
+<h2>What deploying it would mean, and where</h2>
+<p>The same scripts and console as a small web app: Serif's team signs in and the review is
+waiting. Behind it, a database that remembers decisions and follow-ups between closes, a scheduled
+job, read-only connections to NetSuite (and Coupa once Flagship IT's connector exists), and Claude,
+called by the app to draft as it does today. The rules do not change, and people still approve
+every entry.</p>
+<p><b>Our view:</b> host it in Flagship's own cloud (Azure, if that is where Flagship runs), behind
+the sign-in Serif already uses. The console carries ledger detail, names and pay; keeping it inside
+Flagship's environment means no new vendor holds Serif's data and the security review is one
+Flagship already runs. Vercel works too, but only on its Enterprise plan, which is where company
+sign-in and audit logs are, and it adds a vendor. Flagship IT sets the timing: they have to agree to
+host it, and they named separating each portfolio company's data as the blocker for anything hosted.</p>
+
+<h2>Why it would be worth it</h2>
+<ul class="two">
+  <li><b>No monthly uploads.</b> The ledger read from NetSuite through the connector Serif already
+  has; Coupa once its connector lands.</li>
+  <li><b>Follow-ups that last.</b> A permanent ID, owner, status and links to related items, open
+  across closes until fixed, closed against the entry that fixed it.</li>
+  <li><b>One live review.</b> Preparer and reviewer on the same decisions, sign-off in the app, the
+  invoice beside the line, Claude on hand for a question about any finding.</li>
+  <li><b>Ready before anyone opens it.</b> Runs weekly, then each close day.</li>
+  <li><b>Cleaner entries.</b> Coded like similar past entries, checked against NetSuite before upload,
+  and reclasses reversed on every dimension the original hit.</li>
+  <li><b>Fixed at the source.</b> Recurring issues flagged with what they have cost; each PO shows its
+  requester's department; Coupa guides account choices.</li>
+  <li><b>Bills checked against contracts.</b> Key terms per contract, so a bill that does not match
+  its SOW is caught.</li>
+  <li><b>An audit trail and room to grow.</b> Every change traced to its review and approver; later
+  jumpstarts and other Flagship companies on the same build.</li>
+</ul>
+
+<h2 class="pb">Cost of ownership</h2>
+<table>
+<thead><tr><th></th><th>Claude Projects, ongoing</th><th>Hosted app in Azure</th></tr></thead>
+<tbody>
+<tr><td>Claude</td><td>Six Team seats, about $180 a month</td><td>Usage through the API, about $10 to $110 a month</td></tr>
+<tr><td>Hosting</td><td>None</td><td>App, database, key store and monitoring, about $260 a month</td></tr>
+<tr><td>Upkeep</td><td>About 4 hours a month: updates, file uploads, run checks</td><td>About 16 hours a month: changes, monitoring, patching</td></tr>
+<tr class="tot"><td>Running cost</td><td>About $580 a month, $7,000 a year</td><td>About $1,870 a month, $22,500 a year</td></tr>
+<tr><td>One-time</td><td>None</td><td>The build, scoped and estimated separately</td></tr>
+</tbody></table>
+<p class="note">List prices, October 2026, to confirm against Serif's and Flagship's contracts; upkeep at
+$100 an hour; six users, three analyses a close day. Serif's Claude seats stay either way. Vercel's
+hosting costs about the same, plus its Enterprise plan, which is priced by negotiation. Upkeep, not
+hosting, is most of the difference, and it needs an owner: maintenance is outside the current SOW.
+Against it sit the hours the deployment saves each close, and the decision to post entries to
+NetSuite, which we would leave read-only until the checked import has run cleanly for a few closes.</p>
+
+<h2>Next steps</h2>
+<table class="steps">
+<thead><tr><th>When</th><th>Step</th><th>Depends on</th></tr></thead>
+<tbody>
+<tr><td>October close</td><td>Run the Projects on the September close, with our support; agree the
+  review thresholds.</td><td>Nothing</td></tr>
+<tr><td>October</td><td>Decide with Flagship IT where it would be hosted, and whether the ledger comes
+  through the NetSuite connector.</td><td>Flagship IT</td></tr>
+<tr><td>November close</td><td>Pull the ledger through the connector, read-only, and compare it line
+  by line with the saved search export.</td><td>The connector decision</td></tr>
+<tr><td>Once hosting is agreed</td><td>Build the hosted review: shared decisions, follow-ups across
+  closes, the checked NetSuite import.</td><td>Flagship IT; a scope and estimate</td></tr>
+<tr><td>After a few closes</td><td>Scheduled runs; Coupa, the payroll register, Expensify and the
+  sub-ledgers; posting approved entries.</td><td>Coupa connector; Serif's sign-off</td></tr>
+</tbody></table>
+<p class="note">Each step is scoped and estimated before it starts. Nothing past the October close is
+committed.</p>
+"""
 
 CSS = r"""
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--color-bg-primary);color:var(--color-fg-primary);font-family:var(--font-sans);
-  font-size:var(--text-0);line-height:1.55}
-.wrap{max-width:68rem;margin:0 auto;padding-inline:var(--spacing-sm-lg)}
-header.mast{background:var(--color-bg-inverse);color:var(--color-fg-inverse);padding-block:var(--spacing-lg-xl) var(--spacing-xl)}
-header.mast .logo{width:5.5rem;height:auto;color:var(--color-white);display:block;margin-bottom:var(--spacing-md)}
-.eyebrow{font-size:var(--text--1);letter-spacing:.06em;text-transform:uppercase;color:var(--color-warm-gray);margin:0 0 var(--spacing-xs)}
-h1{font-family:var(--font-serif);font-weight:400;font-size:var(--text-4);line-height:1.1;margin:0}
-.sub{font-size:var(--text-1);margin:var(--spacing-2xs) 0 0;color:var(--color-light-gray)}
-.meta{display:flex;flex-wrap:wrap;gap:var(--spacing-xs);align-items:center;margin-top:var(--spacing-md);font-size:var(--text--1);color:var(--color-warm-gray)}
-.pill{display:inline-block;border:1px solid currentColor;border-radius:var(--radius-pill);padding:.1em .7em;font-size:var(--text--2);letter-spacing:.04em;text-transform:uppercase}
-main{padding-block:var(--spacing-lg-xl)}
-section{margin-bottom:var(--spacing-lg-xl)}
-h2{font-family:var(--font-serif);font-weight:400;font-size:var(--text-3);line-height:1.2;margin:0 0 var(--spacing-sm)}
-h3{font-size:var(--text-1);font-weight:600;line-height:1.3;margin:0}
-p{margin:0 0 var(--spacing-xs)}
-.card{background:var(--color-stark);border-radius:var(--radius-sm);padding:var(--spacing-sm-md)}
-.two{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:var(--spacing-md)}
-@media (max-width:52rem){.two{grid-template-columns:1fr}}
-dl.rows{margin:0;display:grid;gap:var(--spacing-xs)}
-dl.rows div{display:grid;grid-template-columns:minmax(7rem,10rem) 1fr;gap:var(--spacing-xs);padding-bottom:var(--spacing-xs);border-bottom:1px solid var(--color-hairline)}
-dl.rows div:last-child{border-bottom:0;padding-bottom:0}
-dl.rows dt{font-weight:600;font-size:var(--text--1)}
-dl.rows dd{margin:0;font-size:var(--text--1);color:var(--color-fg-secondary)}
-@media (max-width:30rem){dl.rows div{grid-template-columns:1fr;gap:.2em}}
-.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:var(--spacing-xs)}
-.read .card{padding:var(--spacing-sm)}
-.read b{display:block;font-size:var(--text--1);margin-bottom:.25em}
-.read span{font-size:var(--text--1);color:var(--color-fg-secondary)}
-.lanes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--spacing-xs)}
-@media (max-width:52rem){.lanes{grid-template-columns:1fr}}
-.lane{background:var(--color-stark);border-radius:var(--radius-sm);padding:var(--spacing-sm);border-top:4px solid var(--color-mid-gray)}
-.lane.crawl{border-top-color:var(--color-warm-gray)}
-.lane.run{border-top-color:var(--color-red)}
-.lane h3{font-family:var(--font-serif);font-weight:400;font-size:var(--text-2)}
-.lane .what{font-size:var(--text--1);color:var(--color-fg-secondary);margin:.2em 0 var(--spacing-xs)}
-.lane ul{margin:0;padding:0;list-style:none;display:grid;gap:.35em}
-.lane li{font-size:var(--text--1)}
-.lane li a{color:inherit;text-decoration:none;border-bottom:1px solid var(--color-hairline)}
-.lane li a:hover{border-bottom-color:var(--color-red-text)}
-.lane li small{color:var(--color-fg-secondary)}
+  font-size:15px;line-height:1.5}
+.page{max-width:50rem;margin:var(--spacing-lg) auto;background:var(--color-stark);border-radius:var(--radius-sm);
+  padding:var(--spacing-lg) var(--spacing-lg-xl)}
+@media (max-width:40rem){.page{margin:0;border-radius:0;padding:var(--spacing-md) var(--spacing-sm)}}
+header{display:flex;gap:var(--spacing-md);align-items:flex-start;padding-bottom:var(--spacing-sm);
+  border-bottom:2px solid var(--color-fg-primary);margin-bottom:var(--spacing-sm)}
+header .logo{width:4.2rem;height:auto;color:var(--color-dark-gray);margin-top:.35rem}
+.eyebrow{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-fg-secondary);margin:0 0 .3em}
+h1{font-family:var(--font-serif);font-weight:400;font-size:28px;line-height:1.15;margin:0}
+.by{margin:.4em 0 0;font-size:13px;color:var(--color-fg-secondary)}
+h2{font-size:15px;font-weight:600;margin:1.15em 0 .35em;padding-left:.6em;border-left:3px solid var(--color-red)}
+p{margin:0 0 .55em}
+ul{margin:.2em 0 .6em;padding-left:1.1em}
+li{margin-bottom:.25em}
+ul.two{display:grid;grid-template-columns:1fr 1fr;column-gap:var(--spacing-md);padding-left:1.1em}
+@media (max-width:40rem){ul.two{grid-template-columns:1fr} header{flex-direction:column;gap:var(--spacing-xs)}}
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin:.3em 0 .5em}
+th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-fg-secondary);
+  font-weight:600;padding:.35em .5em;border-bottom:1px solid var(--color-fg-primary)}
+td{padding:.45em .5em;border-bottom:1px solid var(--color-hairline);vertical-align:top}
+td:first-child{width:26%}
+td small{color:var(--color-fg-secondary)}
+table.steps td:first-child{width:19%;font-weight:600}
+tr.tot td{font-weight:600;border-bottom:1px solid var(--color-fg-primary)}
+table.steps td:last-child{width:22%;color:var(--color-fg-secondary)}
+.note{font-size:13px;color:var(--color-fg-secondary)}
 .tw{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:var(--text--1)}
-th{text-align:left;font-weight:600;color:var(--color-fg-secondary);font-size:var(--text--2);text-transform:uppercase;letter-spacing:.04em;
-  padding:.5em .6em;border-bottom:1px solid var(--color-fg-primary);vertical-align:bottom}
-td{padding:.6em;border-bottom:1px solid var(--color-hairline);vertical-align:top}
-td.c{text-align:center}
-td a{color:inherit}
-.theme{background:var(--color-stark);border-radius:var(--radius-md);padding:var(--spacing-md-lg);margin-bottom:var(--spacing-md);break-inside:avoid}
-.theme .top{display:flex;flex-wrap:wrap;gap:var(--spacing-2xs);align-items:center;margin-bottom:var(--spacing-xs)}
-.num{font-family:var(--font-serif);font-size:var(--text-2);color:var(--color-red-text);margin-right:var(--spacing-3xs)}
-.tag{font-size:var(--text--2);letter-spacing:.04em;text-transform:uppercase;border-radius:var(--radius-pill);padding:.15em .7em;background:var(--color-bg-primary);color:var(--color-fg-secondary)}
-.tag.stage{background:var(--color-bg-inverse);color:var(--color-fg-inverse)}
-.theme h2{margin-bottom:.15em}
-.stand{font-family:var(--font-serif);font-style:italic;font-size:var(--text-1);color:var(--color-fg-secondary);margin:0 0 var(--spacing-sm)}
-.clusters{list-style:none;margin:var(--spacing-sm) 0 0;padding:0;display:grid;gap:var(--spacing-xs)}
-.clusters li{display:grid;grid-template-columns:1.2rem 1fr;gap:.4em;padding-top:var(--spacing-xs);border-top:1px solid var(--color-hairline)}
-.clusters .mk{color:var(--color-red-text);font-size:var(--text--1);line-height:1.9}
-.clusters b{display:block}
-.clusters span.t{color:var(--color-fg-secondary);font-size:var(--text--1)}
-.today{margin-top:var(--spacing-sm);background:var(--color-bg-primary);border-radius:var(--radius-xs);padding:var(--spacing-xs) var(--spacing-sm);font-size:var(--text--1)}
-.today b{margin-right:.4em}
-.closing{background:var(--color-bg-inverse);color:var(--color-fg-inverse);border-radius:var(--radius-md);padding:var(--spacing-md-lg)}
-.closing p{color:var(--color-light-gray)}
-footer{font-size:var(--text--2);color:var(--color-fg-secondary);padding-block:0 var(--spacing-lg)}
-footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--spacing-xs);border-top:1px solid var(--color-hairline);padding-top:var(--spacing-sm)}
+@page{size:letter;margin:.5in .55in}
 @media print{
-  body{background:#fff;font-size:10.5pt}
-  header.mast{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .closing,.tag.stage,.lane{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .theme,.card,.lane{border:1px solid var(--color-hairline)}
-  section,.theme{break-inside:avoid}
+  body{background:#fff;font-size:9.8pt}
+  .page{margin:0;padding:0;max-width:none;border-radius:0}
+  h1{font-size:19pt} table{font-size:9pt} th{font-size:8pt} .note{font-size:9pt}
+  h2{break-after:avoid} h2.pb{break-before:page;margin-top:0} tr,li{break-inside:avoid}
 }
 """
 
 
-def slug(n, name):
-    return "theme-%d" % n
-
-
-def stage_key(stage):
-    return stage.split()[0]
-
-
 def page():
-    e = lambda s: s  # content is authored HTML-safe in roadmap_content.py
-    themes = C.THEMES
-    decides = lambda t: sum(1 for c in t["clusters"] if c[2])
-
-    head = ('<header class="mast"><div class="wrap">' + DS.LOGO
-            + '<p class="eyebrow">' + C.DOC["eyebrow"] + '</p><h1>' + C.DOC["title"] + '</h1>'
-            + '<p class="sub">' + C.DOC["subtitle"] + '</p>'
-            + '<div class="meta"><span>' + C.DOC["date_line"] + '</span><span class="pill">'
-            + C.DOC["status"] + '</span></div></div></header>')
-
-    intro = ('<section class="two"><div><h2>What this is</h2>'
-             + "".join("<p>" + p + "</p>" for p in C.INTRO) + '</div>'
-             + '<div class="card"><h3 style="margin-bottom:var(--spacing-xs)">' + C.TODAY["heading"] + '</h3><dl class="rows">'
-             + "".join("<div><dt>%s</dt><dd>%s</dd></div>" % r for r in C.TODAY["rows"])
-             + '</dl></div></section>')
-
-    read = ('<section><h2>How to read it</h2><div class="read">'
-            + "".join('<div class="card"><b>%s</b><span>%s</span></div>' % r for r in C.HOW_TO_READ)
-            + '</div></section>')
-
-    lanes_what = {
-        "Crawl": "The two Claude Projects, as delivered: run each close by an analyst, from exports.",
-        "Walk": "A deployed solution: data that arrives on its own, state that lasts across closes, controls.",
-        "Run": "Agents working the close, with people approving what they propose.",
-    }
-    by_stage = {s: [] for s in STAGES}
-    for n, t in enumerate(themes, 1):
-        for s in STAGES:
-            if s in t["stage"].split():
-                by_stage[s].append((n, t))
-    lanes = '<section><h2>Crawl, Walk, Run</h2><div class="lanes">'
-    for s in STAGES:
-        items = by_stage[s]
-        lis = ("".join('<li><a href="#%s">%s</a> <small>&middot; %s</small></li>' % (slug(n, t["name"]), t["name"], t["dimension"])
-                       for n, t in items)
-               if items else "<li>GL Coding Review and P&amp;L Flux, in Serif's Claude organization</li>")
-        lanes += ('<div class="lane %s"><h3>%s</h3><p class="what">%s</p><ul>%s</ul></div>'
-                  % (s.lower(), s, lanes_what[s], lis))
-    lanes += "</div></section>"
-
-    rows = "".join(
-        '<tr><td><a href="#%s">%s</a></td><td>%s</td><td>%s</td><td class="c">%s</td><td class="c">%s</td></tr>'
-        % (slug(n, t["name"]), t["name"], t["dimension"], t["stage"], decides(t) or "&ndash;",
-           "&#10003;" if t.get("today") else "&ndash;")
-        for n, t in enumerate(themes, 1))
-    glance = ('<section><h2>At a glance</h2><div class="card tw"><table><thead><tr><th>Theme</th><th>Dimension</th>'
-              '<th>Stage</th><th style="text-align:center">&#9670; Serif decides</th><th style="text-align:center">Try it today</th></tr></thead>'
-              '<tbody>' + rows + '</tbody></table></div></section>')
-
-    blocks = []
-    for n, t in enumerate(themes, 1):
-        cl = "".join('<li><span class="mk">%s</span><div><b>%s</b><span class="t">%s</span></div></li>'
-                     % ("&#9670;" if d else "", lab, txt) for lab, txt, d in t["clusters"])
-        today = ('<div class="today"><b>Try it today</b>' + t["today"] + '</div>') if t.get("today") else ""
-        blocks.append('<article class="theme" id="%s"><div class="top"><span class="num">%02d</span>'
-                      '<span class="tag">%s</span><span class="tag stage">%s</span></div>'
-                      '<h2>%s</h2><p class="stand">%s</p><p>%s</p><ul class="clusters">%s</ul>%s</article>'
-                      % (slug(n, t["name"]), n, t["dimension"], t["stage"], t["name"], t["standfirst"], t["lead"], cl, today))
-    body_themes = '<section><h2>The themes</h2>' + "".join(blocks) + "</section>"
-
-    closing = ('<section class="closing"><h2>' + C.CLOSING["heading"] + '</h2>'
-               + "".join("<p>" + p + "</p>" for p in C.CLOSING["paragraphs"]) + "</section>")
-
-    foot = ('<footer><div class="wrap"><span>Serif Biomedicines &middot; ' + C.DOC["title"] + '</span>'
-            '<span>' + C.DOC["date_line"] + ' &middot; ' + C.DOC["status"] + '</span></div></footer>')
-
+    body = BODY.replace("{logo}", DS.LOGO)
+    body = body.replace("<table>", '<div class="tw"><table>').replace('<table class="steps">', '<div class="tw"><table class="steps">')
+    body = body.replace("</table>", "</table></div>")
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
-            '<title>Serif AI Jumpstarts Roadmap</title><style>' + DS.FONT_CSS + DS.TOKENS + CSS + '</style></head>'
-            '<body>' + head + '<main><div class="wrap">' + intro + read + lanes + glance + body_themes + closing
-            + '</div></main>' + foot + '</body></html>')
+            '<title>Serif AI Jumpstarts Deployment Brief</title><style>' + DS.FONT_CSS + DS.TOKENS + CSS
+            + '</style></head><body><main class="page">' + body + '</main></body></html>')
 
 
 if __name__ == "__main__":
