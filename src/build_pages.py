@@ -19,6 +19,8 @@ Artifact with the db and user capabilities, in a review shared by everyone with
 access. Every figure is computed here from the runs and the NetSuite exports.
 """
 import argparse
+from datetime import datetime
+import calendar
 import hashlib
 import html
 import json
@@ -40,6 +42,8 @@ ap.add_argument("--coding-run", help="the GL Coding Review run.json, after serif
 ap.add_argument("--flux-run", help="the P&L Flux run.json, after serif_views.py --keep-names --balance-sheet")
 ap.add_argument("--gl", nargs="+", help="the NetSuite Custom General Ledger export(s), as NetSuite writes them")
 ap.add_argument("--income-statement", help="the NetSuite Income Statement by month report, for the flux tie-outs")
+ap.add_argument("--coding-record", help="the GL Coding Review decision record (JSON, format 3), with --coding-run: booked corrections adjust the P&L flux (--only flux)")
+ap.add_argument("--coding-drafts", help="the GL Coding Review's drafts.json, with --coding-record: Journal Entries Claude drafted there, so a decision on one can be applied")
 ap.add_argument("--drafts", help="Claude's drafts.json for the console being built (with --only)")
 ap.add_argument("--out", help="output folder")
 A = ap.parse_args()
@@ -54,11 +58,28 @@ if not A.gl:
 PLR = json.load(open(A.flux_run)) if A.flux_run else EMPTY
 GLR = json.load(open(A.coding_run)) if A.coding_run else EMPTY
 GL_X, IS_X = A.gl, A.income_statement
+CODING_REC = None
+if A.coding_record:
+    if A.only != "flux" or not A.flux_run or not A.coding_run:
+        sys.exit("Pass --coding-record with --only flux, the flux run (--flux-run) and the coding run (--coding-run).")
+    try:
+        CODING_REC = json.load(open(A.coding_record, encoding="utf-8"))
+    except (OSError, ValueError) as ex:
+        sys.exit("--coding-record cannot be read as JSON: %s" % ex)
+    if not isinstance(CODING_REC, dict) or CODING_REC.get("kind") != "serif-decision-record" or CODING_REC.get("console_kind") != "coding" or CODING_REC.get("format") != 3:
+        sys.exit("--coding-record is not a GL Coding Review decision record (format 3).")
+    if not all(isinstance(CODING_REC.get(k) or {}, dict) for k in ("dec", "notes", "je", "jh")):
+        sys.exit("--coding-record is malformed: dec, notes, je and jh must each be an object.")
+    if CODING_REC.get("period") != PLR["manifest"]["period"] or GLR["manifest"]["period"] != PLR["manifest"]["period"]:
+        sys.exit("The coding run and decision record must be for the flux's period, " + PLR["manifest"]["period"] + ".")
 M = (PLR if A.flux_run else GLR)["manifest"]
 SLUG = M["period"].replace(" ", "").lower()
 if A.drafts and not A.only:
     sys.exit("Pass --only with --drafts: drafts belong to one console.")
 RAW_DRAFTS = json.load(open(A.drafts, encoding="utf-8")) if A.drafts else {}
+CODING_DRAFTS = json.load(open(A.coding_drafts, encoding="utf-8")) if A.coding_drafts else {}
+if A.coding_drafts and not A.coding_record:
+    sys.exit("Pass --coding-drafts with --coding-record.")
 o = A.out or os.path.dirname(os.path.abspath(A.flux_run or A.coding_run))
 OUTS = {"flux": o, "coding": o}
 
@@ -71,6 +92,8 @@ for r in (PLR, GLR):
     for k, v in (r["views"].get("accounts") or {}).items():
         ACC[k] = v.get("name") if isinstance(v, dict) else v
 acct_name = lambda c: ACC.get(c) or ""
+JE_SUBSIDIARY, JE_CURRENCY, JE_RATE = "Serif Biomedicines, Inc.", "USD", 1   # NetSuite subsidiary 97
+PERIOD_END = "%s-%02d-%02d" % (PERIOD[-4:], list(calendar.month_abbr).index(PERIOD[:3]), calendar.monthrange(int(PERIOD[-4:]), list(calendar.month_abbr).index(PERIOD[:3]))[1])
 LINKS = {}
 for r in (PLR, GLR):
     LINKS.update((r["views"].get("links") or {}).get("docs") or {})
@@ -200,17 +223,23 @@ def history(vendor):
             '<th class="n2">Amount</th><th>Description</th></tr></thead><tbody>' + "".join(out) + "</tbody></table></div></div>")
 
 
-def je_editor(iid, lines, when=None):
+def je_editor(iid, lines, when=None, label=None):
     """A proposed Journal Entry, filled in and editable. The page fills the values."""
-    rows = "".join('<tr><td><input class="f mono" data-jef="%s|%d|account" list="accts" size="9" aria-label="Account"><small data-jean="%s|%d"></small></td>'
-                   '<td><input class="f" data-jef="%s|%d|department" list="depts" aria-label="Department"></td>'
-                   '<td class="n2"><input class="f num" data-jef="%s|%d|debit" inputmode="decimal" aria-label="Debit"></td>'
-                   '<td class="n2"><input class="f num" data-jef="%s|%d|credit" inputmode="decimal" aria-label="Credit"></td></tr>'
-                   % ((iid, i) * 5) for i in range(len(lines)))
-    return ('<div class="jee" data-je="%s"%s><div class="jh"><span class="l">Journal Entry</span><span data-jebal></span>'
-            '<button class="lk" data-jereset="%s" hidden>Reset</button></div><div class="tw"><table><thead><tr><th>Account</th><th>Department</th>'
-            '<th class="n2">Debit</th><th class="n2">Credit</th></tr></thead><tbody>%s</tbody></table></div></div>'
-            % (iid, (' data-when="%s" hidden' % when) if when else "", iid, rows))
+    rows = "".join('<tr><td><input class="f mono" data-jef="%s|%d|account" list="accts" size="9" aria-label="Account, line %d"><small data-jean="%s|%d"></small></td>'
+                   '<td><input class="f" data-jef="%s|%d|department" list="depts" aria-label="Department, line %d"></td>'
+                   '<td class="n2"><input class="f num" data-jef="%s|%d|debit" inputmode="decimal" aria-label="Debit, line %d"></td>'
+                   '<td class="n2"><input class="f num" data-jef="%s|%d|credit" inputmode="decimal" aria-label="Credit, line %d"></td>'
+                   '<td><input class="f wide" data-jef="%s|%d|memo" aria-label="Line Memo, line %d"></td></tr>'
+                   % (iid, i, i + 1, iid, i, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1) for i in range(len(lines)))
+    head = ('<div class="jf"><label>Subsidiary<span>%s</span></label><label>Currency<span>%s</span></label><label>Exchange Rate<span>%s</span></label>'
+            '<label>Journal Date<input class="f" type="date" data-jeh="%s|date"></label><label>Posting Period<input class="f" data-jeh="%s|period"></label>'
+            '<label>Reversing Entry<select class="f" data-jeh="%s|reversing"><option>N</option><option>Y</option></select></label>'
+            '<label>Reversal Date<input class="f" type="date" data-jeh="%s|reversal_date"></label>'
+            '<label class="memo">Memo<input class="f" data-jeh="%s|memo"></label></div>' % (e(JE_SUBSIDIARY), JE_CURRENCY, JE_RATE, iid, iid, iid, iid, iid))
+    return ('<div class="jee" data-je="%s"%s%s><div class="jh"><span class="l">Journal Entry</span><span data-jebal></span>'
+            '<button class="lk" data-jereset="%s" hidden>Reset</button></div>%s<div class="tw"><table><thead><tr><th>Account</th><th>Department</th>'
+            '<th class="n2">Debit</th><th class="n2">Credit</th><th>Line Memo</th></tr></thead><tbody>%s</tbody></table></div></div>'
+            % (iid, (' data-when="%s" hidden' % when) if when else "", (' data-label="%s"' % e(label)) if label else "", iid, head, rows))
 
 
 _SEEN = set()
@@ -255,7 +284,7 @@ def drafted_entries(fids_ok=None):
             SKIPPED.append("Journal Entry %d (%s): does not balance or has a line with no account" % (i, txt(x.get("memo"))[:60]))
             continue
         out.append({"entry_id": "SERIF-DRAFT-%d" % i, "finding_id": "draft-%d" % i, "kind": "Drafted by Claude", "date": txt(x.get("date")),
-                    "memo": txt(x.get("memo")), "support": txt(x.get("reason")), "lines": lines, "debits": dr, "credits": cr})
+                    "memo": txt(x.get("memo")), "reverses": txt(x.get("reverses")), "support": txt(x.get("reason")), "lines": lines, "debits": dr, "credits": cr})
     return out
 
 
@@ -265,6 +294,19 @@ def count(n, word):
 
 def je_lines(lines):
     return [{"account": l["account"], "department": l.get("department") or "", "debit": round(l.get("debit") or 0, 2), "credit": round(l.get("credit") or 0, 2)} for l in lines]
+
+
+def je_finish(je):
+    """The NetSuite Journal Entry fields the run can fill: the header (subsidiary,
+    posting period, currency, exchange rate, reversal) and a Line Memo on each line."""
+    for j in je.values():
+        rev = j.pop("reverses", "") or ""
+        was, j["date"] = j["date"], PERIOD_END   # corrections are booked in the open close month
+        j.update({"subsidiary": JE_SUBSIDIARY, "period": PERIOD, "currency": JE_CURRENCY, "rate": JE_RATE,
+                  "reversing": "Y" if rev else "N", "reversal_date": rev})
+        for l in j["lines"]:
+            l["memo"] = j["memo"] + ((" | Original date " + was) if was and was != PERIOD_END else "")
+    return je
 
 # ---------- the design ----------
 CSS = DS.FONT_CSS + DS.TOKENS + r"""
@@ -412,6 +454,14 @@ input.f{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);pa
 .jee td{padding:.35em .8em;vertical-align:middle}
 .jee input.f{padding:.25em .4em;font-size:var(--text--2);width:100%;max-width:26ch}
 .jee input.mono{max-width:12ch}
+.jee .jf{display:flex;flex-wrap:wrap;gap:var(--spacing-xs) var(--spacing-sm);padding:.5em .8em;font-size:var(--text--2);border-bottom:1px solid var(--color-hairline)}
+.jee .jf label{display:flex;flex-direction:column;gap:.15em;color:var(--color-fg-secondary)}
+.jee .jf label span{color:var(--color-fg-primary);padding:.25em 0}
+.jee .jf input.f,.jee .jf select.f{width:auto;max-width:14ch}
+.jee .jf label.memo{flex:1 1 100%}
+.jee .jf label.memo input.f{width:100%;max-width:none}
+.jee input.wide{max-width:none}
+tr.jr > td{padding:.4em .8em}
 .jee input.num{text-align:right;font-variant-numeric:tabular-nums;max-width:12ch}
 .jee .jh [data-jebal]{text-transform:none;letter-spacing:0}
 .jee.edited{border-color:var(--color-dark-gray)}
@@ -505,7 +555,7 @@ RUNLOG_SVG = ('<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke
               '<path d="M3.5 2.5h9v11h-9z"/><path d="M5.8 5.5h4.4M5.8 8h4.4M5.8 10.5h2.6"/></svg>')
 
 
-def runlog(run, kind, also=None):
+def runlog(run, kind, also=None, read=()):
     """The run log: the exports, what each check found, the estimated cost of a
     run, every input, and the build record."""
     m, views = run.get("manifest") or {}, run.get("views") or {}
@@ -535,6 +585,7 @@ def runlog(run, kind, also=None):
     if also:
         am = also.get("manifest") or {}
         rec.append(("Also read", "P&L Flux run %s, for the CapEx and Prepaid screens" % am.get("run_id")))
+    rec.extend(read)
     out.append('<div class="card"><h3>Build record</h3><div class="tw"><table><tbody>'
                + "".join('<tr><td>%s</td><td class="mono">%s</td></tr>' % (e(a), e(b)) for a, b in rec) + "</tbody></table></div></div>")
     return page("runlog", "<h3>Run Log</h3>" + "".join(out))
@@ -593,8 +644,8 @@ const KEY = 'serif-console::' + DATA.kind + '::' + DATA.run;
 /* The review's state. Each of STORES is a map of item to value: decisions,
    commentary and notes, entry edits, the GAAP checklist, sign-off and the audit
    log. The threshold is this browser's setting. */
-const STORES = ['dec', 'notes', 'je', 'ck', 'sign', 'log'];
-let S = {dec: {}, notes: {}, sign: {}, ck: {}, je: {}, log: {}, thr: DATA.thr};
+const STORES = ['dec', 'notes', 'je', 'jh', 'ck', 'sign', 'log'];
+let S = {dec: {}, notes: {}, sign: {}, ck: {}, je: {}, jh: {}, log: {}, thr: DATA.thr};
 try { S = Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
 if (Array.isArray(S.log)){ const o = {}; S.log.forEach((l, i) => { o[String(l.at).replace(/[^0-9]/g, '') + i] = l; }); S.log = o; }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -803,9 +854,9 @@ function saveRecord(){
            JSON.stringify(recordOf(), null, 1), 'application/json');
 }
 function planRecord(rec){
-  const here = {dec: new Set($$('[data-item]').map(x => x.dataset.item)), ck: new Set($$('[data-ckrow]').map(x => x.dataset.ckrow)),
+  const here = {dec: new Set($$('[data-item],[data-jerow]').map(x => x.dataset.item || x.dataset.jerow)), ck: new Set($$('[data-ckrow]').map(x => x.dataset.ckrow)),
                 sign: new Set($$('[data-sname]').map(x => x.dataset.sname)), notes: new Set($$('[data-note]').map(x => x.dataset.note))};
-  here.je = new Set(Object.keys(DATA.je)); here.log = null;
+  here.je = new Set(Object.keys(DATA.je)); here.jh = here.je; here.log = null;
   const p = {take: {}, add: 0, kept: 0, missed: 0};
   STORES.forEach(n => { p.take[n] = [];
     Object.keys(rec[n] || {}).forEach(k => { const v = rec[n][k];
@@ -875,7 +926,11 @@ document.addEventListener('click', ev => {
   const ck = ev.target.closest('[data-ck]');
   if (ck){ if (blocked()) return; S.ck[ck.dataset.ck] = ck.dataset.v; save(); refresh(); return; }
   const x = ev.target.closest('[data-export]'); if (x){ exportCSV(); return; }
-  const rs = ev.target.closest('[data-jereset]'); if (rs){ if (blocked()) return; delete S.je[rs.dataset.jereset]; save(); refresh(); return; }
+  const pr = ev.target.closest('[data-propose]');
+  if (pr){ const row = $('[data-jerow="' + pr.dataset.propose + '"]'); row.hidden = !row.hidden && !S.dec[pr.dataset.propose]; refresh(); return; }
+  const rs = ev.target.closest('[data-jereset]'); if (rs){ if (blocked()) return; const id = rs.dataset.jereset; delete S.je[id]; delete S.jh[id];
+    if (DATA.je[id].proposal){ delete S.dec[id]; delete S.notes[id]; logAdd({id, label: 'Propose entry', v: 'cleared', note: ''}); }
+    save(); refresh(); return; }
   const u = ev.target.closest('[data-use]');
   if (u){ if (blocked()) return; const d = DATA.drafts[u.dataset.use]; S.notes[d.target] = d.note;
     if (d.item && d.v) S.dec[d.item] = {v: d.v, at: new Date().toISOString(), by_uid: Shared.uid()};
@@ -890,7 +945,7 @@ document.addEventListener('change', ev => { if (ev.target.id === 'recfile' && ev
 document.addEventListener('input', ev => {
   const t = ev.target;
   if (t.dataset.note !== undefined){ S.notes[t.dataset.note] = t.value; save(); return; }
-  if (t.dataset.jef){ editJE(t); return; }
+  if (t.dataset.jef || t.dataset.jeh){ editJE(t); return; }
   if (t.id === 'thr'){ const v = Number(String(t.value).replace(/[^0-9.]/g, '')); if (isFinite(v) && v > 0){ S.thr = v; save(); refresh(); } }
 });
 /* tabs are announced as tabs, the selected one marked */
@@ -935,7 +990,7 @@ function paintItems(){
 /* counts: what is open on each page, and in each section */
 function counts(){
   $$('[data-c]').forEach(el => { const items = $$('#p-' + el.dataset.c + ' [data-item]');
-    const open = items.filter(x => !decided(x.dataset.item)).length; el.textContent = open || ''; });
+    const open = items.filter(x => !decided(x.dataset.item)).length + jeOpen(el.dataset.c).length; el.textContent = open || ''; });
   $$('[data-cs]').forEach(el => { const n = $$('.sub[data-s="' + el.dataset.cs + '"] [data-c]').reduce((a, x) => a + (Number(x.textContent) || 0), 0);
     el.textContent = n || ''; });
 }
@@ -960,44 +1015,60 @@ function download(name, text, type){
 const csv = rows => rows.map(r => r.map(c => { const s = String(c == null ? '' : c); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\n');
 /* Proposed Journal Entries: filled in from the run, edited in place. An edit
    is kept in S.je and marks the item Modified (Recode on a vendor line). */
-const jeOf = id => S.je[id] ? Object.assign({}, DATA.je[id], {lines: S.je[id]}) : DATA.je[id];
+const jeOf = id => { const b = DATA.je[id], j = Object.assign({}, b, S.jh[id] || {});   // S.je holds the lines, S.jh the header fields edited
+  j.lines = (S.je[id] || b.lines).map(l => l.memo == null ? Object.assign({}, l, {memo: j.memo}) : l); return j; };
 const jeBal = j => Math.round(j.lines.reduce((a, l) => a + (Number(l.debit) || 0) - (Number(l.credit) || 0), 0) * 100) / 100;
 const jeNoop = j => { const m = {}; j.lines.forEach(l => { const k = (l.account || '') + '|' + (l.department || ''); m[k] = (m[k] || 0) + (Number(l.debit) || 0) - (Number(l.credit) || 0); });
   return Object.values(m).every(v => Math.abs(v) < 0.005); };
-const jeLive = id => { const d = S.dec[id]; return !!d && ['approve', 'modify', 'recode'].indexOf(d.v) > -1 && !!DATA.je[id]; };
-const jeReady = id => { const j = jeOf(id); return jeLive(id) && decided(id) && !jeBal(j) && !jeNoop(j) && j.lines.every(l => (l.account || '').trim()); };
+const jeEdited = id => !!(S.je[id] || S.jh[id]);
+const jeLive = id => { const d = S.dec[id]; return !!d && ['approve', 'modify', 'recode'].indexOf(d.v) > -1 && !!DATA.je[id] && (!DATA.je[id].proposal || jeEdited(id)); };
+const isoOk = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '') && !isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s;
+/* why an entry cannot go into the import yet, or '' */
+const jeWhy = id => { const j = jeOf(id);
+  return jeBal(j) ? 'out of balance' : jeNoop(j) ? 'unchanged' : !decided(id) ? 'missing note' : !j.lines.every(l => (l.account || '').trim()) ? 'missing account'
+    : !isoOk(j.date) ? 'Journal Date is not a valid date' : !/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}$/.test(j.period || '') ? 'Posting Period is not Mon YYYY'
+    : j.reversing === 'Y' && !(j.reversal_date || '').trim() ? 'reversal date missing' : j.reversing === 'Y' && !(isoOk(j.reversal_date) && j.reversal_date > j.date) ? 'Reversal Date is not a date after the Journal Date' : ''; };
+const jeReady = id => jeLive(id) && decided(id) && !jeWhy(id);
+const jeOpen = pg => $$('#p-' + pg + ' [data-jerow]').filter(r => jeEdited(r.dataset.jerow) && !(jeLive(r.dataset.jerow) && jeReady(r.dataset.jerow)));   // proposals begun and not ready
 function editJE(t){
   if (Shared.ro()) return;
-  const [id, i, f] = t.dataset.jef.split('|');
-  if (!S.je[id]) S.je[id] = JSON.parse(JSON.stringify(DATA.je[id].lines));
-  S.je[id][i][f] = f === 'debit' || f === 'credit' ? (Number(String(t.value).replace(/[^0-9.]/g, '')) || 0) : t.value.trim();
+  const [id, i, f] = (t.dataset.jeh || t.dataset.jef).split('|');
+  if (t.dataset.jeh){ const H = S.jh[id] || (S.jh[id] = {}), old = jeOf(id).memo; H[i] = t.value.trim();
+    if (i === 'memo'){ if (!S.je[id]) S.je[id] = JSON.parse(JSON.stringify(jeOf(id).lines)); S.je[id].forEach(l => { if (l.memo == null || l.memo === old) l.memo = H.memo; }); } }
+  else { if (!S.je[id]) S.je[id] = JSON.parse(JSON.stringify(DATA.je[id].lines));
+    S.je[id][i][f] = f === 'debit' || f === 'credit' ? (Number(String(t.value).replace(/[^0-9.]/g, '')) || 0) : t.value.trim(); }
   const box = t.closest('[data-je]'), v = box.dataset.when || 'modify', d = S.dec[id];
-  if (!d || d.v !== v){ const lb = t.closest('[data-item]').querySelector('[data-d]');
-    S.dec[id] = {v, at: new Date().toISOString(), by_uid: Shared.uid()}; logAdd({id, label: lb ? lb.dataset.label : id, v, note: S.notes[id] || ''}); }
+  if (!d || d.v !== v){ const it = t.closest('[data-item]'), lb = it && it.querySelector('[data-d]');
+    S.dec[id] = {v, at: new Date().toISOString(), by_uid: Shared.uid()}; logAdd({id, label: lb ? lb.dataset.label : box.dataset.label || id, v, note: S.notes[id] || ''}); }
   save(); refresh();
 }
 function paintJE(){
   const m2 = v => (v < 0 ? '($' : '$') + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + (v < 0 ? ')' : '');
   $$('[data-je]').forEach(box => { const id = box.dataset.je, d = S.dec[id], j = jeOf(id);
     if (box.dataset.when) box.hidden = !(d && d.v === box.dataset.when);
-    box.classList.toggle('edited', !!S.je[id]);
+    box.classList.toggle('edited', jeEdited(id));
+    const jr = box.closest('[data-jerow]'); if (jr && d) jr.hidden = false;
+    box.querySelectorAll('[data-jeh]').forEach(inp => { if (inp !== document.activeElement) inp.value = j[inp.dataset.jeh.split('|')[1]] || ''; });
+    const rd = box.querySelector('[data-jeh$="|reversal_date"]'); if (rd) rd.disabled = j.reversing !== 'Y';
     box.querySelectorAll('[data-jef]').forEach(inp => { if (inp === document.activeElement) return; const [, i, f] = inp.dataset.jef.split('|'), v = j.lines[i][f];
       inp.value = f === 'debit' || f === 'credit' ? (Number(v) ? Number(v).toFixed(2) : '') : (v || ''); });
     box.querySelectorAll('[data-jean]').forEach(s => { const i = s.dataset.jean.split('|')[1]; s.textContent = DATA.acct[(j.lines[i].account || '').trim()] || ''; });
     const b = jeBal(j), st = box.querySelector('[data-jebal]');
     st.innerHTML = b ? '<span class="unf">Out of balance by ' + m2(b) + '</span>' : jeNoop(j) ? 'No change yet' : 'Balanced';
-    box.querySelector('[data-jereset]').hidden = !S.je[id]; });
+    box.querySelector('[data-jereset]').hidden = !jeEdited(id); });
+  $$('[data-propose]').forEach(b => { const r = $('[data-jerow="' + b.dataset.propose + '"]'); b.setAttribute('aria-expanded', r && !r.hidden ? 'true' : 'false'); });
 }
 function exportCSV(){
-  const rows = [['External ID', 'Date', 'Account', 'Department', 'Debit', 'Credit', 'Memo']];
-  const held = Object.keys(DATA.je).filter(id => jeLive(id) && !jeReady(id)).length;
+  const rows = [['External ID', 'Subsidiary', 'Journal Date', 'Posting Period', 'Currency', 'Exchange Rate', 'Memo', 'Reversing Entry', 'Reversal Date', 'Account', 'Department', 'Debit', 'Credit', 'Line Memo']];
+  const held = Object.keys(DATA.je).filter(id => jeLive(id) && !jeReady(id)).map(id => jeOf(id).memo.slice(0, 60) + ': ' + jeWhy(id)).join('; ');
   Object.keys(DATA.je).forEach(id => { if (!jeReady(id)) return;
-    const j = jeOf(id); j.lines.forEach(l => rows.push([j.id, j.date, l.account, l.department || '', l.debit || '', l.credit || '', j.memo + (S.notes[id] ? ' | ' + S.notes[id] : '')])); });
-  if (rows.length === 1){ alertBox(held ? held + ' entries are out of balance, unchanged or missing a note.' : 'Approve an entry first: only approved entries go into the import.'); return; }
-  if (held) alertBox(held + ' entries left out: out of balance, unchanged or missing a note.');
+    const j = jeOf(id); j.lines.forEach(l => rows.push([j.id, j.subsidiary, j.date, j.period, j.currency, j.rate, j.memo + (S.notes[id] ? ' | ' + S.notes[id] : ''), j.reversing,
+      j.reversing === 'Y' ? j.reversal_date : '', l.account, l.department || '', l.debit || '', l.credit || '', l.memo || ''])); });
+  if (rows.length === 1){ alertBox(held ? 'Left out: ' + held + '.' : 'Approve an entry first: only approved entries go into the import.'); return; }
+  if (held) alertBox('Left out: ' + held + '.');
   download('serif-' + DATA.kind + '-netsuite-' + DATA.slug + '.csv', csv(rows));
 }
-function alertBox(msg){ const t = $('#tip'); t.innerHTML = esc(msg); t.style.display = 'block'; t.style.left = '40%'; t.style.top = '80px'; setTimeout(() => t.style.display = 'none', 2200); }
+function alertBox(msg){ const t = $('#tip'); t.innerHTML = esc(msg); t.style.display = 'block'; t.style.left = '40%'; t.style.top = '80px'; setTimeout(() => t.style.display = 'none', Math.max(2200, msg.length * 45)); }
 /* The close checklist: each page, what is open on it, and what that is worth.
    Open is a flag with no decision, or a line at or over the threshold with no
    commentary. */
@@ -1010,6 +1081,8 @@ function checklist(){
     /* A page's other comparisons (year on year, year to date) restate its lines; they count once, on the first. */
     pg.querySelectorAll('tr[data-var]').forEach(tr => { if (tr.closest('[data-alt]')) return; const a = Math.abs(Number(tr.dataset.var) || 0); if (a < thr) return;
       total++; const t = tr.querySelector('textarea[data-note]'); if (!t || !(S.notes[t.dataset.note] || '').trim()){ open++; value += a; } });
+    $$('#p-' + pid + ' [data-jerow]').filter(r => jeEdited(r.dataset.jerow)).forEach(r => { total++; });
+    jeOpen(pid).forEach(r => { open++; value += jeOf(r.dataset.jerow).lines.reduce((a, l) => a + (Number(l.debit) || 0), 0); });
     if (!total) return;
     rows.push('<tr class="xp' + (open ? ' open' : '') + '" data-go="' + pid + '"><td><b>' + esc(b.textContent.replace(/\d+$/, '').trim()) + '</b></td><td>' +
       (open ? '<span class="unf">' + open + ' open of ' + total + '</span>' : 'Done, ' + total + ' of ' + total) + '</td><td class="n2">' + (open ? money(value) : '') + '</td></tr>'); });
@@ -1035,6 +1108,96 @@ function marks(){
 # =====================================================================
 # P&L Flux
 # =====================================================================
+CODING_BUILT = {}
+
+
+def coding_corrections():
+    """What the GL Coding Review's decision record did to this period's P&L accounts: the net
+    of every booked Journal Entry (approved, or modified or recoded with a note, balanced and
+    changing something) by account, as the console's own rules read them. Open findings, and
+    decisions held for a note or a balanced entry, are listed by account and never applied.
+    Returns the corrections, the open lines, and the lines for the run log."""
+    global RAW_DRAFTS
+    keep, seen, kept_drafts, kept_skipped = RAW_DRAFTS, set(_SEEN), dict(DRAFTS), len(SKIPPED)
+    RAW_DRAFTS = CODING_DRAFTS
+    _SEEN.clear()
+    try:
+        coding()
+    finally:
+        RAW_DRAFTS = keep
+        _SEEN.clear()
+        _SEEN.update(seen)
+        DRAFTS.clear()
+        DRAFTS.update(kept_drafts)
+        del SKIPPED[kept_skipped:]
+    je, items = CODING_BUILT["je"], CODING_BUILT["items"]
+    known = {it[1]: it[3] for it in items}
+    dec, notes, edits, heads = (CODING_REC.get(k) or {} for k in ("dec", "notes", "je", "jh"))
+
+    def iso_ok(t):
+        try:
+            return bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", t or "")) and bool(datetime.strptime(t, "%Y-%m-%d"))
+        except ValueError:
+            return False
+
+    def amt(v, iid):
+        try:
+            return float(v or 0)
+        except (TypeError, ValueError):
+            sys.exit("--coding-record: Journal Entry %s has an amount that is not a number: %r" % (iid, v))
+    booked, held, missing, corr, opened = [], [], [], defaultdict(float), defaultdict(list)
+    for iid, d in dec.items():
+        if iid not in je and iid not in known:
+            missing.append(iid)
+            continue
+        if not isinstance(d, dict) or d.get("v") not in ("approve", "modify", "recode") or iid not in je:
+            continue
+        lines = edits[iid] if iid in edits else je[iid]["lines"]
+        head = dict(je[iid], **(heads.get(iid) or {}))        # the console's jeOf: the run's header, then the header fields edited
+        by, net = defaultdict(float), defaultdict(float)
+        for l in lines:
+            dr_cr = amt(l.get("debit"), iid) - amt(l.get("credit"), iid)
+            by[((l.get("account") or "").strip(), l.get("department") or "")] += dr_cr
+            net[(l.get("account") or "").strip()] += dr_cr
+        # the console's jeWhy, in its order; the note rule is decided()
+        why = ("out of balance" if round(sum(by.values()), 2) else "unchanged" if all(abs(v) < 0.005 for v in by.values())
+               else "no note" if d["v"] != "approve" and not str(notes.get(iid) or "").strip() else "an account missing" if not all(a for a, _ in by)
+               else "Journal Date is not a valid date" if not iso_ok(head.get("date")) else "Posting Period is not Mon YYYY" if not re.fullmatch(r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}", head.get("period") or "")
+               else "reversal date missing" if head.get("reversing") == "Y" and not (head.get("reversal_date") or "").strip()
+               else "Reversal Date is not a date after the Journal Date" if head.get("reversing") == "Y" and not (iso_ok(head.get("reversal_date")) and head["reversal_date"] > head["date"]) else "")
+        vendor = known.get(iid) or je[iid]["memo"]
+        if why:
+            held.append((iid, vendor, why))
+            for a, v in net.items():
+                if PNL(a) and round(v):
+                    opened[a].append((vendor, v))
+            continue
+        booked.append(iid)
+        for a, v in net.items():
+            if PNL(a):
+                corr[a] += v
+    for it in items:
+        if it[1] in dec:
+            continue
+        net = defaultdict(float)
+        for l in je[it[1]]["lines"] if it[1] in je else []:
+            net[l["account"]] += (l.get("debit") or 0) - (l.get("credit") or 0)
+        for a, v in net.items():
+            if PNL(a) and round(v):
+                opened[a].append((it[3], v))
+    notes_out = []
+    if CODING_REC.get("run_id") != GLR["manifest"]["run_id"]:
+        notes_out.append("The record was saved against coding run %s, not %s; entries match by what they are" % (CODING_REC.get("run_id"), GLR["manifest"]["run_id"]))
+    if missing:
+        drafted = [i for i in missing if i.startswith("DR-")]
+        notes_out.append("%s not in this run, not applied%s" % (count(len(missing), "decision"),
+                         (" (%d on Journal Entries Claude drafted: pass --coding-drafts)" % len(drafted)) if drafted and not CODING_DRAFTS else ""))
+    if held:
+        notes_out.append("%s held, not applied: %s" % (count(len(held), "decision"), "; ".join("%s (%s)" % (v, w) for _, v, w in held[:5]) + (" and %d more" % (len(held) - 5) if len(held) > 5 else "")))
+    return ({a: round(v, 2) for a, v in corr.items() if round(v)}, dict(opened), len(booked), notes_out,
+            sum(1 for it in items if it[1] not in dec))
+
+
 def flux():
     T = PLR["tables"][0]
     secs = T["sections"]
@@ -1132,35 +1295,63 @@ def flux():
                         '<span><i style="background:var(--color-mid-gray)"></i>Lowers the loss</span></div></div>' + exec_summary + CHECKLIST))
 
     # ----- Actual vs. Actual
+    corr, opened, n_booked, coding_notes, n_open = coding_corrections() if CODING_REC else ({}, {}, 0, [], 0)
+    placed = set()
+
     def var_table(kind):
         base, label = ("prior", PRIOR) if kind == "mom" else ("prior_year", PY)
+        adj = kind == "mom" and CODING_REC is not None
         out, fv, uf = [], 0.0, 0.0
         for s in secs:
-            live = [r for r in s["rows"] if round(r.get("actual") or 0) or round(r.get(base) or 0)]
+            live = [r for r in s["rows"] if round(r.get("actual") or 0) or round(r.get(base) or 0) or (adj and r["account_code"] in corr)]
             if not live:
                 continue
-            out.append('<tr class="grp"><td colspan="%d">' % (8 if kind == "mom" else 6) + e(s["label"].split(" - ", 1)[-1]) + "</td></tr>")
+            out.append('<tr class="grp"><td colspan="%d">' % ((10 if adj else 8) if kind == "mom" else 6) + e(s["label"].split(" - ", 1)[-1]) + "</td></tr>")
             for r in live:
-                v = (r.get(base) or 0) - (r.get("actual") or 0)       # favorable positive
+                v = vr = (r.get(base) or 0) - (r.get("actual") or 0)       # favorable positive
+                cv = corr.get(r["account_code"], 0.0) if adj else 0.0
+                if cv:
+                    v = vr - cv                                            # the movement after the booked corrections
+                    placed.add(r["account_code"])
                 avgs = "".join('<td class="n2">%s</td>' % money(trailing(r["account_code"], n)) for n in (3, 6)) if kind == "mom" else ""
                 fv += v if v > 0 else 0
                 uf += v if v < 0 else 0
                 fid = r.get("mom_finding") if kind == "mom" else None
                 vend = basis(fid) if fid else ""
-                line = (money(abs(v)) + (" favorable " if v > 0 else " unfavorable ") + ("MoM" if kind == "mom" else "YoY")
-                        + (" (" + format(abs(100 * v / r[base]), ".1f") + "%)" if r.get(base) else "") + "." + (" Largest vendors: " + e(vend) + "." if vend else ""))
+                line = (money(abs(v)) + (" favorable " if v > 0 else " unfavorable ") + ("MoM" if kind == "mom" else "YoY") + (" adjusted" if cv else "")
+                        + (" (" + format(abs(100 * v / r[base]), ".1f") + "%)" if r.get(base) else "") + "." + (" Largest vendors" + (" (before coding corrections)" if cv else "") + ": " + e(vend) + "." if vend else ""))
+                if cv:
+                    line += " Reported " + money(abs(vr)) + (" favorable" if vr > 0 else " unfavorable") + ", " + money(abs(cv)) + (" moved out" if cv < 0 else " moved in") + " by booked coding corrections."
+                ops = opened.get(r["account_code"]) if adj else None
+                if not round(v):
+                    line = "No change" + (" adjusted." if cv else ".") + line[line.index(" Reported"):] if cv else "No change."
+                if ops:
+                    line += "<div class=\"note\">Open coding findings, not applied: " + "; ".join(
+                        e(vn) + " " + money(abs(ov)) + (" out" if ov < 0 else " in") for vn, ov in ops[:3]) + (" and %d more" % (len(ops) - 3) if len(ops) > 3 else "") + ".</div>"
                 key = kind + ":" + r["account_code"]
+                pj = jr = ""
+                if kind == "mom" and round(v):
+                    pid = sid("PROP", key)
+                    usd = lambda x: ("($" if x < 0 else "$") + format(abs(x), ",.0f") + (")" if x < 0 else "")
+                    why = "P&L flux reclass, %s %s, %s: %s %s MoM" % (r["account_code"], leaf_of(r), PERIOD, usd(abs(v)), "favorable" if v > 0 else "unfavorable")
+                    je[pid] = {"id": "SERIF-" + SLUG + "-" + pid, "date": PERIOD_END, "memo": why, "proposal": True,
+                               "lines": je_lines([{"account": r["account_code"]}, {"account": ""}])}
+                    pj = '<button class="lk" data-propose="%s" aria-expanded="false" aria-controls="jr-%s">Propose entry</button>' % (pid, pid)
+                    jr = ('<tr class="jr" id="jr-%s" data-jerow="%s" hidden><td colspan="%d">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note"></textarea></td></tr>'
+                          % (pid, pid, 10 if adj else 8, je_editor(pid, je[pid]["lines"], label="Propose entry " + r["account_code"]), pid))
                 dn = txt((RAW_DRAFTS.get("commentary") or {}).get(r["account_code"])) if kind == "mom" else ""
                 if dn:
                     used_com.add(r["account_code"])
+                cols = ('<td class="n2">%s</td><td class="n2">%s</td>' % (fav(-cv) if cv else "", fav(v))) if adj else ""
                 out.append('<tr data-var="%s"><td><span class="code">%s</span>%s</td><td class="n2">%s</td><td class="n2">%s</td>'
-                           '<td class="n2">%s</td><td class="n2">%s</td>%s<td><div class="cm">%s</div>%s<textarea class="c" rows="1" data-note="%s" placeholder="Commentary"></textarea></td></tr>'
-                           % (round(v, 2), e(r["account_code"]), e(leaf_of(r)), money(r["actual"]), money(r.get(base)), fav(v), fav(v, pct(v, r.get(base))) if r.get(base) else "&ndash;",
-                              avgs, line if round(v) else "No change.", draft("com:" + key, dn, key) if dn else "", key))
+                           '<td class="n2">%s</td>%s<td class="n2">%s</td>%s<td><div class="cm">%s</div>%s<textarea class="c" rows="1" data-note="%s" placeholder="Commentary"></textarea>%s</td></tr>'
+                           % (round(v, 2), e(r["account_code"]), e(leaf_of(r)), money(r["actual"]), money(r.get(base)), fav(vr), cols, fav(v, pct(v, r.get(base))) if r.get(base) else "&ndash;",
+                              avgs, line, draft("com:" + key, dn, key) if dn else "", key, pj))
+                out.append(jr)
         head = ("<thead><tr><th>Account</th><th class=\"n2\">" + e(PERIOD) + "</th><th class=\"n2\">" + e(label) + "</th><th class=\"n2\">$ Var</th>"
-                "<th class=\"n2\">% Var</th>" + ('<th class="n2">3-mo avg</th><th class="n2">6-mo avg</th>' if kind == "mom" else "")
+                + ('<th class="n2">Corrections</th><th class="n2">Adj. $ Var</th>' if adj else "") + "<th class=\"n2\">" + ("Adj. % Var" if adj else "% Var") + "</th>" + ('<th class="n2">3-mo avg</th><th class="n2">6-mo avg</th>' if kind == "mom" else "")
                 + "<th style=\"width:%s\">Commentary</th></tr></thead>" % ("34%" if kind == "mom" else "42%"))
-        sm = ('<div class="sumline">Favorable: <b>' + money(fv) + "</b> Unfavorable: <b class=\"unf\">" + money(uf) + "</b> To review: <b data-ccount></b></div>")
+        sm = ('<div class="sumline">Favorable: <b>' + money(fv) + "</b> Unfavorable: <b class=\"unf\">" + money(uf) + "</b> To review: <b data-ccount></b>" + (" Corrections booked: <b>" + str(n_booked) + "</b> Journal Entries" if adj else "") + "</div>")
         return sm + '<div class="tw"><table>' + head + "<tbody>" + "".join(out) + "</tbody></table></div>"
     ch = opex["actual"] - opex["prior"]
     chy = opex["actual"] - opex["prior_year"]
@@ -1172,6 +1363,13 @@ def flux():
         + '<div class="card" data-tabbox><div class="tabs"><button class="on" data-tab="mom">MoM: ' + e(MON + " vs. " + PRIOR) + '</button><button data-tab="yoy">YoY: '
         + e(MON + " " + PERIOD[-2:] + " vs. " + PY) + '</button></div><div data-pane="mom">' + var_table("mom") + '</div><div data-pane="yoy" data-alt hidden>' + var_table("yoy") + "</div></div>"))
 
+    if CODING_REC:
+        lost = sorted(set(corr) - placed)
+        if lost:
+            coding_notes.append("No flux row for " + ", ".join(a + " " + acct_name(a) + " " + money(corr[a]) for a in lost))
+        print("Coding corrections: %d booked Journal Entries move %d accounts; %d open findings noted, not applied." % (n_booked, len(corr), n_open))
+        for x in coding_notes:
+            print("  " + x + ".")
     # ----- Actual vs. Budget
     bud_rows = [(s, r) for s, r in rows if r.get("budget") is not None]
     act_p = sum(r["actual"] or 0 for s, r in bud_rows)
@@ -1404,7 +1602,7 @@ def flux():
         acct = pl[0] if pl else x["lines"][0]
         vend = sorted({l.get("vendor") for l in x["lines"] if l.get("vendor")})
         hi = x["debits"] >= thr
-        je[aid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"])}
+        je[aid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"]), "reverses": x.get("reverses")}
         dr = "".join('<div class="ln"><span>%s %s%s</span><span>%s</span></div>' % (e(l["account"]), e(acct_name(l["account"])), (" / " + e(l["department"])) if l.get("department") else "", money(l["debit"], True)) for l in x["lines"] if l.get("debit"))
         cr = "".join('<div class="ln"><span>%s %s%s</span><span>%s</span></div>' % (e(l["account"]), e(acct_name(l["account"])), (" / " + e(l["department"])) if l.get("department") else "", money(l["credit"], True)) for l in x["lines"] if l.get("credit"))
         docs = sorted({d for l in x["lines"] for d in (l.get("documents") or [])})[:4]
@@ -1551,7 +1749,7 @@ def flux():
                 ("Close Workflow", ([("bs", "Balance Sheet Flux")] if bs["rows"] else []) + [("adj", "Adjustments"), ("sox", "SOX & GAAP")])]
     SKIPPED.extend("commentary for " + k for k in (RAW_DRAFTS.get("commentary") or {}) if k not in used_com)
     SKIPPED.extend("adjustment note for " + k for k in (RAW_DRAFTS.get("adjustments") or {}) if k not in used_adj)
-    data = {"kind": "flux", "run": M["run_id"], "slug": SLUG, "thr": thr, "je": je, "icons": {}, "drafts": DRAFTS}
+    data = {"kind": "flux", "run": M["run_id"], "slug": SLUG, "thr": thr, "je": je_finish(je), "icons": {}, "drafts": DRAFTS}
     js = r"""
 function refresh(){
   marks(); paintItems(); counts(); signs(); checklist();
@@ -1571,7 +1769,9 @@ function refresh(){
 }
 show('ov');
 """
-    pages.append(runlog(PLR, "flux"))
+    pages.append(runlog(PLR, "flux", read=[("Also read", "GL Coding Review run %s and its decision record %s, saved %s" % (
+        GLR["manifest"]["run_id"], hashlib.sha256(open(A.coding_record, "rb").read()).hexdigest()[:16], str(CODING_REC.get("saved_at") or "")[:16].replace("T", " ")))]
+        + [("Coding corrections", x) for x in coding_notes] if CODING_REC else ()))
     return shell("Serif P&L Flux - " + PERIOD, "P&L Flux", sections, pages, data, js)
 
 
@@ -1693,7 +1893,7 @@ def coding():
     dcards = []
     for x in drafted_entries():
         iid = sid("DR", x["memo"], x["debits"])
-        je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"])}
+        je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"]), "reverses": x.get("reverses")}
         items.append(("dept", iid, "Drafted by Claude", ", ".join(sorted({l["vendor"] for l in x["lines"] if l["vendor"]})) or x["memo"], x["memo"], x["debits"], "", ""))
         dcards.append(card(iid, x["memo"] or "Drafted Journal Entry", x["debits"], x["debits"] >= thr, "&ndash;", "&ndash;", None,
                            '<div><div class="l">Type</div><div class="x">Drafted by Claude</div></div>', e(x["support"]), "", FLAG_ACTS, "", je_editor(iid, je[iid]["lines"])))
@@ -1721,7 +1921,7 @@ def coding():
             drl = [l for l in x["lines"] if l.get("debit")]
             cur = "<br>".join(sorted({coding_(l["account"], l.get("department")) for l in crl}))
             rec = '<span class="arrow">&rarr;</span> ' + "<br>".join(sorted({coding_(l["account"], l.get("department")) for l in drl}))
-            je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"])}
+            je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"]), "reverses": x.get("reverses")}
             docs = sorted({d for l in x["lines"] for d in (l.get("documents") or [])})
             doc = line_doc(vname)
             if docs:
@@ -1882,7 +2082,8 @@ def coding():
                 ("Transparency", [("clear", "Reviewed & Cleared"), ("new", "New This Period")]),
                 ("Documentation", [("audit", "Audit Log"), ("sox", "SOX Documentation"), ("export", "Export")])]
     SKIPPED.extend("vendor note for " + k for k in (RAW_DRAFTS.get("vendors") or {}) if k not in used_ven)
-    data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "je": je, "icons": {}, "drafts": DRAFTS}
+    CODING_BUILT.update(je=je_finish(je), items=items)
+    data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "je": je_finish(je), "icons": {}, "drafts": DRAFTS}
     js = r"""
 function refresh(){
   marks(); paintItems(); counts(); signs(); checklist();
@@ -1898,7 +2099,7 @@ function refresh(){
   const ex = $('[data-exportrows]'); if (ex){ const r = [];
     Object.keys(DATA.je).forEach(id => { if (!jeLive(id)) return; const j = jeOf(id), ok = jeReady(id);
       j.lines.forEach((l, i) => r.push('<tr><td>' + (i ? '' : named(j.memo)) + '</td><td><span class="mono">' + esc(l.account) + '</span><small>' + esc(DATA.acct[(l.account || '').trim()] || '') + '</small></td><td>' + esc(l.department || '') + '</td><td class="n2">' + (Number(l.debit) ? money(l.debit) : '') +
-        '</td><td class="n2">' + (Number(l.credit) ? money(l.credit) : '') + '</td><td>' + (i ? '' : ok ? 'Ready' : '<span class="unf">' + (jeBal(j) ? 'Out of balance' : jeNoop(j) ? 'No change' : !decided(id) ? 'Add a note' : 'Missing account') + '</span>') + '</td></tr>')); });
+        '</td><td class="n2">' + (Number(l.credit) ? money(l.credit) : '') + '</td><td>' + (i ? '' : ok ? 'Ready' : '<span class="unf">' + jeWhy(id).replace(/^./, c => c.toUpperCase()) + '</span>') + '</td></tr>')); });
     ex.innerHTML = r.length ? r.join('') : '<tr><td colspan="6" class="note">No approved entries yet.</td></tr>'; }
 }
 show('ov');

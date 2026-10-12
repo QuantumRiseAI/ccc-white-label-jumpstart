@@ -192,7 +192,8 @@ section opens its pages beside its title.
   and why. A confirmed vendor folds to its name; its name opens it again.
 * **Documentation**: the **Audit Log** (who decided what and when), **SOX Documentation**
   (sources, the GL tie-out, the policies applied and the sign-off), and **Export**, the
-  NetSuite CSV.
+  NetSuite CSV (header fields: Subsidiary, Journal Date, Posting Period, Currency, Exchange Rate,
+  Memo, Reversing Entry, Reversal Date; line fields: Account, Department, Debit, Credit, Line Memo).
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
   supplied, what each check found, the estimated cost of a run, the inputs and the build
   record. Settings has the threshold, the decision record (save and load) and **Bring in the

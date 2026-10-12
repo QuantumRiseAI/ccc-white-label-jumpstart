@@ -55,6 +55,13 @@ python3 build_pages.py --only flux --flux-run out/sep2026/run.json \
   --out out/sep2026
 ```
 
+To carry the GL Coding Review's booked corrections into Actual vs. Actual (MoM), add the coding
+run and its decision record to the build:
+`--coding-run <coding run.json> --coding-record <coding decision record .json>`. Each account
+shows the correction, the adjusted movement, and flags on the adjusted figure. Open coding
+findings are noted on the affected row, never applied. A coding `drafts.json` goes in with
+`--coding-drafts`, so decisions on Journal Entries Claude drafted there apply too.
+
 In the Claude Project, Claude then writes `drafts.json` and builds again with
 `--drafts drafts.json`, which puts its drafts into the console beside the items they belong
 to. The build checks each draft against the run and lists any it leaves out. The format is in
@@ -384,7 +391,7 @@ The engine reports every variance at or above **$2,500**, below which nothing is
 **Run log**, at the right of the bar, holds:
 - **Exports this month:** each export the month needs and the file supplied for it.
 - **What each check found:** every check, what it found and whether it ran.
-- **Estimated cost per close run:** one run through the API on Claude Sonnet at medium
+- **Estimated cost per close run:** one run through the API on Claude Sonnet 5.5 at medium
   effort, at list price. A run in the Claude Project is covered by the Claude seat.
 - **Inputs** and the **Build record:** the files, their fingerprints and the versions that
   made the console.

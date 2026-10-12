@@ -65,6 +65,13 @@ python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite
   --income-statement netsuite_income_statement_by_month_*.xls --out out/sep2026
 ```
 
+When the reviewer attaches the GL Coding Review's run (`run.json`, from that Project) and its decision
+record, add `--coding-run <that run.json> --coding-record <that record>` (and `--coding-drafts <its drafts.json>`
+when it has drafted Journal Entries) to the build (and to the
+build with `--drafts`). Actual vs. Actual (MoM) then shows each account's booked correction (a
+Journal Entry approved, or modified or recoded with a note), the adjusted movement, and flags on the
+adjusted figure. Open coding findings are listed on the affected row and never applied. Say in the chat that the flux carries the corrections.
+
 The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.0.0.html`. Publish it as
 [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML yourself:
 if it needs a change, change the script and build again.
@@ -206,7 +213,11 @@ opens its pages beside its title.
     revisions, to acknowledge or mark No Action; Section C lists vendors **billed twice after a
     gap**: two or more bills this month, none last month, billed in at least two of the four
     months before, and at least 1.5 times the usual month and at or over the threshold, which
-    may be a missed accrual coming back. The NetSuite CSV downloads here;
+    may be a missed accrual coming back. The NetSuite CSV downloads here, with Subsidiary, Journal
+    Date, Posting Period, Currency, Exchange Rate, Memo, Reversing Entry, Reversal Date and a Line
+    Memo on each line. Journal Date, Posting Period, Memo, Reversing Entry, Reversal Date and Line
+    Memo are editable on the entry; Subsidiary, Currency and Exchange Rate are shown, not
+    editable. The Journal Date defaults to the last day of the close month;
   * **SOX & GAAP**: the tie-outs of the ledger to the Income Statement and Balance Sheet, the
     Flagship related-party schedule (Flagship-named vendors and journals, three months), the
     GAAP checklist, the source data and the sign-off.
@@ -348,6 +359,13 @@ covers it.
 
 The entry joins Adjustments, Section A, as `SERIF-DRAFT-1` and on, marked "Drafted by Claude".
 Once the reviewer approves it, it is in the NetSuite CSV.
+
+The reviewer can also propose an entry from a variance. **Propose entry** on a row of Actual vs.
+Actual (MoM) opens a two-line Journal Entry: the row's account and an offset line to fill, with
+the memo prefilled from the account, the period and the move. It is a suggestion: entering
+an amount or editing any field approves it as Modified once the reviewer adds a note, and only
+then is it in the NetSuite CSV. **Reset** on the entry removes the proposal. Nothing is
+created or posted in NetSuite.
 
 ### 4. Forecast Revisions
 

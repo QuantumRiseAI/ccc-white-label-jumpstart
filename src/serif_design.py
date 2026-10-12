@@ -94,11 +94,11 @@ def esc(value):
 # and the run itself. A run is agentic: Claude reads the instructions, runs the
 # scripts, reads the findings, writes the summary and builds the console, one model
 # turn per step.
-COST_PRICES = [{"model": "Claude Sonnet at medium effort", "input": 3.00, "cached": 0.30,
-                "output": 15.00}]
+COST_PRICES = [{"model": "Claude Sonnet 5.5 at medium effort", "input": 2.00, "cached": 0.20,
+                "output": 10.00}]
 COST_THINKING_TOKENS = 1_500
 COST_SYSTEM_TOKENS = 20_000
-COST_SCRIPT_TOKENS = 2_000
+COST_SCRIPT_TOKENS = 500
 COST_READ_CHUNK = 10
 COST_DRAFT_TOKENS = 150
 COST_SUMMARY_TOKENS = 3_000

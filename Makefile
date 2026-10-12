@@ -12,6 +12,7 @@ build:    ## a close month from inputs/$(PERIOD)/, run as the Projects run it
 test:     ## the console tests, accepted exceptions, every account number named, and no table scrolling sideways
 	node tests/test_console.js
 	python3 tests/test_exceptions.py
+	node tests/test_flux_coding.js
 	node tests/audit_account_names.js
 	node tests/audit_table_width.js 1280
 
