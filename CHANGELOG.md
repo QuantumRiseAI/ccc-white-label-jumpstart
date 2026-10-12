@@ -34,6 +34,14 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: coding corrections in the P&L flux (SERIF-44)
+
+- **P&L Flux with the GL Coding Review**: `build_pages.py --only flux` takes the coding run
+  (`--coding-run`) and the coding decision record (`--coding-record`). Actual vs. Actual (MoM)
+  shows each account's booked correction, the adjusted movement, and flags on the adjusted
+  figure; open coding findings are noted on the affected row and never applied. Without the
+  inputs, nothing changes.
+
 ## Unreleased: executive summary, payroll commentary, Project files (7 Oct)
 
 - **Executive Summary** (P&L Flux, Executive Overview): Claude drafts it into `drafts.json`
