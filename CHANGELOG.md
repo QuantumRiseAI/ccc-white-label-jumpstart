@@ -1,9 +1,5 @@
 # Changelog
 
-## Unreleased: Run log cost estimate
-
-- The cost estimate assumes 500 tokens of output per script run (was 2,000); the three scripts print at most about 300 tokens each. Aug 2026: coding about $0.93 (847K tokens), flux about $1.62 (1.77M tokens).
-
 Three things version independently. A reader comparing two outputs needs all three
 to know why a number moved.
 
@@ -37,6 +33,10 @@ serif-pl-flux-aug2026-v1.8.2.html
   the one an accountant cares about: a ruleset bump invalidates a prior sign-off.
 
 ---
+
+## Unreleased: Run log cost estimate
+
+- The cost estimate prices Claude Sonnet 5.5 ($2 input, $0.20 cached, $10 output per million; was the Sonnet 4.6 $3 / $0.30 / $15) and assumes 500 tokens of output per script run (was 2,000); the scripts print at most about 300 tokens each. Aug 2026: coding about $0.62 (847K tokens), flux about $1.08 (1.77M tokens).
 
 ## Unreleased: executive summary, payroll commentary, Project files (7 Oct)
 
