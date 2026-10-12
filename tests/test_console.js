@@ -105,6 +105,11 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       await p.click('[data-item="' + r + '"] [data-v="confirm"]');
       ok(await p.locator('[data-item="' + r + '"] > .ib').isVisible() && !(await p.evaluate(r => !!S.dec[r], r)), 'gl: undoing the confirm leaves it open');
     }
+    if (k === 'gl'){
+      const txt = await p.evaluate(() => { const c = [...document.querySelectorAll('#p-dept [data-item^="D-"]')].find(i => /Coupa PO/.test(i.textContent) && /DraI/.test(i.textContent)); return c ? c.querySelector('.ih b').textContent + ' | ' + c.textContent : ''; });
+      ok(/^New England BioLabs Inc \|/.test(txt) && /6501100/.test(txt) && /6410000/.test(txt), 'gl: an item on an account other than its usual one shows its supplier and both accounts (DraI)');
+      ok(/under \$2,500/.test(await p.locator('#p-dept > .note, #p-dept p.note').first().innerText()), 'gl: item drift under the threshold is a count and a total');
+    }
     if (k === 'pl'){
       ok(await p.locator('#p-ava [data-pane="mom"] th', {hasText: '3-mo avg'}).count() === 1, 'pl: MoM carries trailing averages');
       ok(await p.locator('#p-dept .ch', {hasText: 'Credits in Expense Accounts'}).count() === 1 && await p.locator('[data-note^="cr:"]').count() > 0, 'pl: credits in expense accounts listed');
