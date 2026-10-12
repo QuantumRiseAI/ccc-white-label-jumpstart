@@ -149,6 +149,7 @@ def named(text):
 
 
 en = lambda s: named(e(s))
+
 # A flux row's name: the engine's leaf, or the chart's name where the leaf is only the number.
 leaf_of = lambda r: (r.get("account_leaf") if r.get("account_leaf") not in (None, "", r.get("account_code")) else acct_name(r["account_code"])) or ""
 acct_month = defaultdict(lambda: defaultdict(float))    # P&L account -> period -> net
@@ -1697,16 +1698,24 @@ def coding():
         dcards.append(card(iid, x["memo"] or "Drafted Journal Entry", x["debits"], x["debits"] >= thr, "&ndash;", "&ndash;", None,
                            '<div><div class="l">Type</div><div class="x">Drafted by Claude</div></div>', e(x["support"]), "", FLAG_ACTS, "", je_editor(iid, je[iid]["lines"])))
     ents = {x["finding_id"]: x for x in V.get("entries") or []}
-    dfind = sorted([f for f in GLR["findings"] if f["rule_id"] in ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")], key=lambda f: -(f.get("amount_at_risk") or 0))
-    excepted = [f for f in GLR["findings"] if f.get("excepted") and f["rule_id"] in ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")]
+    drift = [f for f in GLR["findings"] if f["rule_id"] == "T4.ITEM_ACCOUNT_DRIFT"]
+    COVER = ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")
+    excepted = [f for f in GLR["findings"] if f.get("excepted") and f["rule_id"] in COVER]
     exc_amt = sum(f.get("amount_at_risk") or 0 for f in excepted)
     exc_run = (GLR["manifest"].get("exceptions") or {})
+    # Item drift under the review threshold is a count and a total, not cards.
+    small = [f for f in drift if (f.get("amount_at_risk") or 0) < thr and f not in excepted]
+    dfind = sorted([f for f in GLR["findings"] if f["rule_id"] in ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")]
+                   + [f for f in drift if f not in small], key=lambda f: -(f.get("amount_at_risk") or 0))
     for f in dfind:
         if f in excepted:
             continue
-        iid = sid("D", f["rule_id"], f.get("title"))
+        sc = (f.get("evidence") or {}).get("supporting_counts") or {}
+        isdrift = f["rule_id"] == "T4.ITEM_ACCOUNT_DRIFT"
+        iid = (sid("D", f["rule_id"], " ".join(sc["item"].split()).casefold(), sc["po_number"], sc["po_line"]) if isdrift
+               else sid("D", f["rule_id"], f.get("title")))
         x = ents.get(f["finding_id"])
-        vname = (f.get("transaction") or {}).get("vendor_or_name") or f["title"].split(":")[0].split(" coded to ")[0]
+        vname = sc["supplier"] if isdrift else (f.get("transaction") or {}).get("vendor_or_name") or f["title"].split(":")[0].split(" coded to ")[0]
         if x:
             crl = [l for l in x["lines"] if l.get("credit")]
             drl = [l for l in x["lines"] if l.get("debit")]
@@ -1720,6 +1729,9 @@ def coding():
         else:
             ev = f.get("evidence") or {}
             cur, rec, doc = en(ev.get("observed") or ""), '<span class="arrow">&rarr;</span> ' + en(ev.get("expected") or ""), line_doc(vname)
+            if isdrift:
+                cur, rec = coding_(sc["account"]), '<span class="arrow">&rarr;</span> ' + coding_(sc["usual_account"])
+                doc = {"type": "Coupa PO", "document": sc["po_number"], "text": "line %s, %s: %s" % (sc["po_line"], sc["order_date"], sc["item"])}
         typ = "Department" if f["rule_id"].startswith("T1") else "Account vs. Coupa"
         items.append(("dept", iid, typ, vname, (doc or {}).get("text") or "", f.get("amount_at_risk") or 0, "", ""))
         dcards.append(card(iid, vname, f.get("amount_at_risk") or 0, (f.get("amount_at_risk") or 0) >= thr, cur, rec, doc,
@@ -1836,7 +1848,9 @@ def coding():
                            e(f["title"]), e(f["finding_id"]), e(f["excepted"]["vendor"]), money(f.get("amount_at_risk") or 0, True),
                            e(f["excepted"]["reason"]), e(f["excepted"]["approved_by"] + (", " + f["excepted"]["approved_on"] if f["excepted"].get("approved_on") else "")))
                                for f in excepted)))
-    pages.append(page("dept", '<h3>Dept &amp; Entity Flags <span class="note">%d items &middot; %s total</span></h3>' % (len(dcards), money(sum(i[5] for i in items if i[0] == "dept"), True)) + "".join(dcards) + exc_html))
+    pages.append(page("dept", '<h3>Dept &amp; Entity Flags <span class="note">%d items &middot; %s total</span></h3>' % (len(dcards), money(sum(i[5] for i in items if i[0] == "dept"), True))
+                      + ('<p class="note">%s on an account other than the item\'s usual one, under %s: %s in all, not listed.</p>' % (count(len(small), "Coupa PO line"), money(thr), money(sum(f["amount_at_risk"] for f in small), True)) if small else "")
+                      + "".join(dcards) + exc_html))
     pages.append(page("clear", '<h3>Reviewed &amp; Cleared <span class="note">%d vendors &middot; %s</span></h3><div class="legend">No check flagged these vendors. '
                       'Confirm each one, or recode it if the coding is wrong. Start with those at $2,500 or more.</div>' % (len(clear), money(sum(r["amount"] for r in clear), True)) + "".join(ccards)))
     pages.append(page("new", '<h3>New This Period <span class="note">%d vendors &middot; first appearance in the ledger</span></h3><div class="legend">'

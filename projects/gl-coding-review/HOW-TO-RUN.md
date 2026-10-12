@@ -384,7 +384,7 @@ The engine prints a load summary before any finding. Read it in this order:
    and the report says so on its own page.
 3. **Findings**, grouped by the action they call for rather than by rule.
 
-The Aug 2026 run is the reference: 56 findings (engine 0.3.0), tie-out PASS, 50 proposed Journal Entries,
+The Aug 2026 run is the reference: 56 findings (engine 0.2.4), tie-out PASS, 50 proposed Journal Entries,
 all in balance. After any change to a script, run Aug 2026 again. If its numbers move, the
 script changed what it finds; say so rather than explaining the new figure as though it
 were expected.

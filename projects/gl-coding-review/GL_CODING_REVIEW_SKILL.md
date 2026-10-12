@@ -15,12 +15,20 @@ Engine findings, in `findings`:
 | `T0.ABERRANT_POSTING_LAG` | Run log | A line dated three or more months before its period, or after it |
 | `T1.DEPT_INCONSISTENCY` | Dept & Entity, "Department" | A department other than the vendor's usual one in earlier months |
 | `T4.PO_ACCOUNT_MISMATCH` | Dept & Entity, "Account vs. Coupa" | An account other than the one the vendor's Coupa POs were approved against |
+| `T4.ITEM_ACCOUNT_DRIFT` | Dept & Entity, "Account vs. Coupa" | A Coupa PO line in the close month on an account other than the one the same item had on earlier lines of the year (a tie in that history sets no expectation). Lines under the review threshold are a count and a total. Not run when the Coupa export has no Item column |
 | `T3.IRC_274A_ENTERTAINMENT` | Run log | Entertainment, 0% deductible |
 | `T3.IRC_274N_MEALS` | Run log | Meals, 50% deductible |
 | `T3.IRC_274B_GIFTS` | Run log | Gifts, $25 per recipient |
 
 A `T1` or `T4` finding with an `excepted` block is an accepted exception: a reviewer approved it
 (`approved_by`, `reason`). Report it as excepted and counted, never as open and never as clean.
+
+Duplicate vendor records: the engine reads a vendor name as one supplier. `VENDOR_PAIRS` in
+the engine's policy module lists each pair a reviewer has decided: "confirmed" pairs are read
+as one supplier before any check runs, "apart" pairs are never merged (Amazon Web Services
+and Amazon Capital Services), "proposed" pairs are not applied (Thermo Fisher Scientific and
+Fisher Scientific; neither the GL nor Coupa has a Thermo Fisher Scientific record). `vendor_pairs`
+in `run.json` lists them. Names are never merged by similarity.
 
 Checks shown on the run log are counted there, not laid out as cards; report them when
 asked. Measures, in `metrics`, on no page: posting lag, missing project code, memo format, vendor

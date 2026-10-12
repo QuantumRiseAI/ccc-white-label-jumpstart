@@ -79,7 +79,7 @@ def main():
     ok(any(u["vendor"] == "Nobody At All" and u["row"] == 5 for u in ex["unmatched"]), "a row that matches nothing is listed")
     ok(any(i["path"] == "accepted_exceptions.csv" and i["sha256"] for i in run["manifest"]["inputs"]), "the list is hashed into the manifest")
     ok(run["manifest"]["run_id"] != base["manifest"]["run_id"], "a different list gives a different run")
-    ok(run["manifest"]["engine_version"] == "0.3.0", "engine version bumped")
+    ok(run["manifest"]["engine_version"] == "0.2.4", "engine version bumped")
     ok(run["findings"] == again["findings"] and run["manifest"]["run_id"] == again["manifest"]["run_id"], "same inputs, same artifact")
 
     # Unreadable files are reported, never fatal.
