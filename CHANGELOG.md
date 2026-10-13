@@ -25,14 +25,45 @@ serif-pl-flux-aug2026-v1.8.2.html
 ## Bumping a version
 
 * **Console**, any change a reviewer would notice: a view, the decision vocabulary,
-  the layout. If the decision vocabulary changes, bump `STORE_VERSION` in the JS too,
-  or decisions recorded under the old verbs are restored against actions that no
-  longer exist.
+  the layout. Decisions are stored by verb (`approve`, `netsuite` and so on), in the
+  browser under the run and in shared mode in the Artifact's database, and nothing checks
+  a verb when it restores a review, loads a record or brings in an earlier run. A new verb
+  needs no reset: give it a `LABEL` in the console and, if it is a correction, a place in
+  the flux hand-off (`coding_corrections`). Never rename or drop a verb; keep the stored
+  value and change the button's words, as Follow up kept `question`.
 * **Engine**, a change to how a run artifact is produced.
 * **Ruleset**, a change to what the rules test or the thresholds they apply. This is
   the one an accountant cares about: a ruleset bump invalidates a prior sign-off.
 
 ---
+
+## Unreleased: Edited in NetSuite (SERIF-143)
+
+- **GL Coding Review**: **Edited in NetSuite** sits beside Approve Recode on CapEx, Prepaid and
+  Dept & Entity flags, and beside Recode on the booked balance-sheet lines and the vendors on
+  Reviewed & Cleared and New This Period: the fix was made on the bill or Journal Entry itself
+  while the period was open, not booked as a reclass. It counts as decided, needs no note (one
+  can be added), and is left out of the NetSuite CSV, which holds only the reclasses to book;
+  the export says how many were left out for this. An entry Claude drafted has no one transaction
+  to edit, so it has no Edited in NetSuite. Editing the entry of an item edited in NetSuite keeps
+  the decision and records what was changed. Stored as `netsuite`.
+- **Export** counts the agreed fixes by path (reclasses, how many ready for the import, and edited
+  in NetSuite) and lists each item edited in NetSuite with its reference ID, document, amount, note
+  and who decided it.
+- **Work paper, HTML** on Export: every decision with its reference ID, page, amount, path,
+  document, External ID, the change, the note, who and when; the reclasses in the import, line by
+  line; the sign-off. With the decision record, it ties a change seen in the GL or in NetSuite's
+  system notes to its decision.
+- **Decision record** gains `fixes`: for each agreed fix, the path (Reclass or Edited in NetSuite),
+  the reference ID, the document, the External ID of a reclass and whether it is in the import. It
+  is written from the decisions and not read back, so the format stays 3.
+- **P&L Flux with the GL Coding Review**: an item edited in NetSuite is applied like an approved
+  recode, by its entry, when the flux reads the coding run's own GL export, which predates the edit;
+  on another export, which may already hold the edit, it is not applied and the run log says so.
+  The MoM row, its summary line and the run log name what was edited in NetSuite apart from what
+  was booked.
+- **Versioning rule**: `STORE_VERSION` is gone from the code; the rule above now says how a new
+  decision verb is added.
 
 ## Unreleased: finding reference IDs (SERIF-145)
 
@@ -49,7 +80,7 @@ serif-pl-flux-aug2026-v1.8.2.html
   P&L Flux. The
   build's own memos had no `| Mon'YY`; they now end with the close month. NetSuite takes up to 999
   characters in a Memo; the build cuts a long description to keep every Memo and Line Memo within
-  it. A reviewer's note added to the CSV Memo is not cut. Aug 2026: 105 cards, CAPEX 3,
+  it. In the CSV, a Memo or Line Memo a reviewer's note or edit takes past 999 is cut to fit, ending `...`. Aug 2026: 105 cards, CAPEX 3,
   PREPAID 1, PPD 7, DEPT 53, CLEAR 24, NEW 17; the longest Memo is 118 characters.
 
 ## Unreleased: accepted exceptions (SERIF-64)

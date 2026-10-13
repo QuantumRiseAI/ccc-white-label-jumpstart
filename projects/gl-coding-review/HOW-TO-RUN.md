@@ -334,6 +334,11 @@ from the vendor's usual expense account and department.
 * **A vendor** on Reviewed & Cleared or New This Period is **confirmed**, or **recoded**: the
   Journal Entry opens, filled in with its coding, to edit, with a note. A confirmed vendor
   folds to its name; click the name to open it again.
+* **Edited in NetSuite**, beside Approve Recode and Recode, records a fix made on the bill or
+  Journal Entry itself while the period is open, instead of a reclass. It settles the item,
+  needs no note, and stays out of the CSV. The card's document is recorded with it; add a note
+  for anything else, and edit the entry if the change differs from the one proposed. A Journal
+  Entry Claude drafted is approved or not; it has no one transaction to edit.
 
 Reviewed & Cleared holds the vendors no check flagged. Each card says which checks it passed:
 coded as in the two months before, account matching its Coupa PO, not a prepaid or capital
@@ -347,7 +352,10 @@ recommended decision. Only the current month gets an entry.
 ### Export
 
 **Export to NetSuite, CSV** on Documentation > Export holds every entry approved, modified or
-recoded with a note, as edited. Header columns: External ID, Subsidiary (Serif Biomedicines, Inc.),
+recoded with a note, as edited: the reclasses still to book. Items marked Edited in NetSuite are
+not in it; Export lists them, with the count of each path, and **Work paper, HTML** saves every
+decision with its reference ID, path and document, the reclasses in the import, and the
+sign-off, for the close file. Header columns: External ID, Subsidiary (Serif Biomedicines, Inc.),
 Journal Date, Posting Period (the close month), Currency (USD), Exchange Rate (1), Memo (with the
 note), Reversing Entry (Y/N) and Reversal Date. Line columns: Account, Department, Debit, Credit and
 Line Memo. Journal Date, Posting Period, Memo, Reversing Entry, Reversal Date and Line Memo are

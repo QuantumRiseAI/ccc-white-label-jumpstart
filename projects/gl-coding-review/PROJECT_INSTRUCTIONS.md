@@ -205,7 +205,12 @@ Journal Entry starts with the same ID, so the entry in NetSuite ties back to the
 when you name a card to the reviewer. Each card shows its document with NetSuite and Coupa links, the vendor's last
 three months by account and department with the line descriptions, and its lines. A flag's
 Journal Entry is filled in and editable: approve it, reject it, or edit it, which marks it
-Modified and needs a note.
+Modified and needs a note. **Edited in NetSuite**, beside Approve Recode and Recode, records a fix
+made on the bill or Journal Entry itself while the period is open: it settles the item, needs no
+note, and stays out of the CSV, which holds only the reclasses to book. A Journal Entry you drafted
+has no Edited in NetSuite. Export lists the items edited in NetSuite and saves the **Work paper,
+HTML**; the decision record's `fixes` gives each agreed fix's path (Reclass or Edited in NetSuite),
+reference ID, document and, for a reclass, External ID.
 
 The threshold is in dollars only and defaults to **$2,500**. An item at or over it is marked
 Review.
@@ -426,7 +431,8 @@ NetSuite."
 
 1. The import comes from the console: **Export to NetSuite, CSV** on Documentation > Export. It
    holds every entry approved, modified or recoded with a note, as edited, and leaves out any
-   that is out of balance or unchanged. Never write the import yourself.
+   that is out of balance or unchanged, and every item marked Edited in NetSuite. Never write
+   the import yourself.
 2. If an entry the reviewer wants is not in the console, draft it (What You Write, 4) and build
    the console again.
 3. When the reviewer attaches the exported file, check it with code: each External ID
@@ -443,8 +449,8 @@ latest run and the record:
 3. What is decided, by outcome, and what is left over the threshold, with its value. Without
    the record, give the run's figures and say decisions are not counted.
 4. Questions still waiting on an owner, by department, from the notes.
-5. Journal Entries approved and recodes, and whether the NetSuite CSV has been downloaded and
-   uploaded.
+5. Journal Entries approved and recodes, the fixes edited in NetSuite (not in the CSV), and
+   whether the NetSuite CSV has been downloaded and uploaded.
 6. Every check that did not run, and what it needs.
 7. Where the record is: the decision record, saved from Settings, to keep with the close file
    and attach to the next run.
@@ -508,7 +514,8 @@ this bill recoded?"
 1. Ask for the decision records of the closes in question, if they are not attached.
 2. With code, find the document number or External ID in the records and the runs: the
    item and its page, the decision, the note, the entry as approved, and who decided it and
-   when, from `log`, where the record holds it.
+   when, from `log`, where the record holds it. `fixes` names the path: a reclass (its
+   External ID) or an edit made in NetSuite (the document edited).
 3. Name what raised it: the check, and the line or variance behind it.
 4. If no record holds it, say so: no support in the records attached. Never infer a reason.
 5. With the NetSuite connector you may read the document as NetSuite holds it now. Say that
