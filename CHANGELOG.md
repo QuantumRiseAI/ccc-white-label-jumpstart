@@ -34,6 +34,24 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: finding reference IDs (SERIF-145)
+
+- **GL Coding Review**: each card's header starts with a reference ID, numbered by screen within
+  the close: CAPEX, FA (booked to fixed assets), PREPAID, PPD (booked to prepaid), DEPT, DRAFT
+  (Claude's drafted entries), CLEAR (Reviewed & Cleared) and NEW (New This Period), for example
+  DEPT-01. Within a screen the largest amount is 01, and a tie goes by item id, so a rebuild of
+  the same data numbers every card the same; a drafted entry takes a DRAFT number and moves no
+  other. The IDs are per close; permanent IDs across closes stay on the roadmap (SERIF-128,
+  SERIF-130). The page data carries them as `ref`, item id to ID.
+- **Memo**: each proposed Journal Entry's Memo follows the Data Entry Policy with the card's ID in
+  front, `DEPT-01 | Reclass VWR International LLC from 6607000 to 6410000 | Aug'26`, in the entry
+  editor, the Export page, the NetSuite CSV (Memo and Line Memo) and the entries handed to the
+  P&L Flux. The
+  build's own memos had no `| Mon'YY`; they now end with the close month. NetSuite takes up to 999
+  characters in a Memo; the build cuts a long description to keep every Memo and Line Memo within
+  it. A reviewer's note added to the CSV Memo is not cut. Aug 2026: 105 cards, CAPEX 3,
+  PREPAID 1, PPD 7, DEPT 53, CLEAR 24, NEW 17; the longest Memo is 118 characters.
+
 ## Unreleased: accepted exceptions (SERIF-64)
 
 - **Accepted exceptions** (GL Coding Review): a reviewer-maintained `templates/accepted_exceptions.csv`

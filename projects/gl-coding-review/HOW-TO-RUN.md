@@ -310,6 +310,14 @@ document with its NetSuite and Coupa links, the vendor's last three months by ac
 department with the line descriptions, and its lines. Every account number shows its name. An
 item at or over the threshold is marked Review.
 
+Each card's header starts with its reference ID, numbered by screen within the close, largest
+amount first: CAPEX-01, FA-01 (booked to fixed assets), PREPAID-01, PPD-01 (booked to prepaid),
+DEPT-01, DRAFT-01 (a Journal Entry Claude drafted), CLEAR-01 and NEW-01. A rebuild of the same
+data gives the same IDs; they are not kept from one close to the next. The card's Journal Entry
+Memo follows the Data Entry Policy with the ID in front, `DEPT-01 | Reclass ... | Aug'26`, so the
+entry in the CSV and in NetSuite ties back to the card. NetSuite takes up to 999 characters in a
+Memo; the build keeps every Memo and Line Memo within it.
+
 ### CapEx and Prepaid, Both Directions
 
 Each page starts with the expense lines that may be capital or prepaid, then lists this
