@@ -76,7 +76,9 @@ record, add `--coding-run <that run.json> --coding-record <that record>` (and `-
 when it has drafted Journal Entries) to the build (and to the
 build with `--drafts`). Actual vs. Actual (MoM) then shows each account's booked correction (a
 Journal Entry approved, or modified or recoded with a note), the adjusted movement, and flags on the
-adjusted figure. Open coding findings are listed on the affected row and never applied. Say in the chat that the flux carries the corrections.
+adjusted figure. A fix marked Edited in NetSuite is applied too, and named apart, when this flux reads
+the coding run's own GL export; on a later export, which may already hold the edit, it is not applied
+and the run log says so. Open coding findings are listed on the affected row and never applied. Say in the chat that the flux carries the corrections.
 
 The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.0.0.html`. Publish it as
 [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML yourself:

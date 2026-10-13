@@ -310,6 +310,22 @@ def je_finish(je):
             l["memo"] = j["memo"] + ((" | Original date " + was) if was and was != PERIOD_END else "")
     return je
 
+
+# The GL Coding Review's reference IDs: one prefix per screen, by the prefix of the item id.
+REF_SCREENS = {"C": "CAPEX", "CB": "FA", "P": "PREPAID", "PB": "PPD", "D": "DEPT", "DR": "DRAFT", "R": "CLEAR", "N": "NEW"}
+MEMO_MAX = 999   # NetSuite's limit on a Journal Entry Memo, body and line
+
+
+def ref_memo(ref, memo):
+    """An entry's Memo per the Data Entry Policy, `Specific description | Mon'YY`, with the
+    reference ID in front. The description is cut so the Line Memo, which adds the original
+    date, stays within NetSuite's limit."""
+    m = " ".join(str(memo or "").split())
+    end = re.search(r" \| [A-Z][a-z]{2}'\d{2}$", m)
+    head, desc_, tail = (ref + " | ") if ref else "", m[:end.start()] if end else m, end.group(0) if end else " | %s'%s" % (MON, PERIOD[-2:])
+    room = MEMO_MAX - len(" | Original date 2026-08-31") - len(head) - len(tail)
+    return head + (desc_ if len(desc_) <= room else desc_[:room - 3].rstrip() + "...") + tail
+
 # ---------- the design ----------
 CSS = DS.FONT_CSS + DS.TOKENS + r"""
 *{box-sizing:border-box}
@@ -435,6 +451,7 @@ input.f{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);pa
 .item.foldable:not(.folded) > .ih::after{transform:rotate(-135deg);margin-bottom:-.2em}
 .item .ih{display:flex;align-items:center;gap:var(--spacing-xs);padding:.8em var(--spacing-sm);border-bottom:1px solid var(--color-hairline);flex-wrap:wrap}
 .item .ih b{font-weight:600}
+.item .ih .ref{font-weight:600;color:var(--color-fg-secondary);letter-spacing:.02em}
 .item .ib{padding:var(--spacing-xs) var(--spacing-sm) var(--spacing-sm)}
 .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.8em var(--spacing-sm);margin-bottom:.8em}
 .kv .l{font-size:var(--text--2);text-transform:uppercase;letter-spacing:.04em;color:var(--color-fg-secondary)}
@@ -647,6 +664,7 @@ const KEY = 'serif-console::' + DATA.kind + '::' + DATA.run;
    commentary and notes, entry edits, the GAAP checklist, sign-off and the audit
    log. The threshold is this browser's setting. */
 const STORES = ['dec', 'notes', 'je', 'jh', 'ck', 'sign', 'log'];
+const refOf = id => (DATA.ref || {})[id] || '';
 let S = {dec: {}, notes: {}, sign: {}, ck: {}, je: {}, jh: {}, log: {}, thr: DATA.thr};
 try { S = Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
 if (Array.isArray(S.log)){ const o = {}; S.log.forEach((l, i) => { o[String(l.at).replace(/[^0-9]/g, '') + i] = l; }); S.log = o; }
@@ -849,7 +867,21 @@ function recordOf(){
   const rec = {kind: 'serif-decision-record', format: 3, console: DATA.version, console_kind: DATA.kind,
                run_id: DATA.run, period: DATA.period, saved_at: new Date().toISOString(), saved_by: Shared.on() ? Shared.name(Shared.uid()) : ''};
   STORES.forEach(n => { rec[n] = S[n]; });
+  rec.fixes = fixesOf();
   return rec;
+}
+/* Every agreed fix and the path it took: a reclass booked through the NetSuite CSV,
+   or the original bill or Journal Entry edited in NetSuite, which stays out of the CSV.
+   With the reference ID and the document, a change seen in the GL or in NetSuite's
+   system notes ties back to its decision here. */
+function fixesOf(){
+  const out = {};
+  Object.keys(S.dec).forEach(id => { const d = S.dec[id], ns = !!d && d.v === 'netsuite';
+    if (!d || (!ns && ['approve', 'modify', 'recode'].indexOf(d.v) < 0) || !(DATA.je[id] || $('[data-item="' + id + '"]'))) return;
+    out[id] = {ref: refOf(id), path: ns ? 'Edited in NetSuite' : 'Reclass', decision: LABEL[d.v], document: (DATA.docs || {})[id] || '',
+               external_id: !ns && DATA.je[id] ? DATA.je[id].id : '', in_import: !ns && jeReady(id), held: ns || jeReady(id) ? '' : DATA.je[id] ? jeWhy(id) : 'no entry',
+               note: S.notes[id] || '', at: d.at || '', by: d.by_uid ? Shared.name(d.by_uid) : ''}; });
+  return out;
 }
 function saveRecord(){
   download('serif-' + DATA.kind + '-decision-record-' + DATA.slug + '-' + new Date().toISOString().slice(0, 16).replace(/[^0-9]/g, '') + '.json',
@@ -962,7 +994,7 @@ document.addEventListener('mousemove', ev => { const t = ev.target.closest('[dat
   tip.style.left = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8) + 'px';
   tip.style.top = Math.min(ev.clientY + 14, innerHeight - tip.offsetHeight - 8) + 'px'; });
 /* decisions */
-const LABEL = {used:'Draft used', approve:'Approved', reject:'Rejected', modify:'Modified', confirm:'Confirmed', recode:'Recode', ack:'Acknowledged & flagged', none:'No action', signed:'Signed', cleared:'Cleared'};
+const LABEL = {used:'Draft used', approve:'Approved', reject:'Rejected', modify:'Modified', confirm:'Confirmed', recode:'Recode', netsuite:'Edited in NetSuite', ack:'Acknowledged & flagged', none:'No action', signed:'Signed', cleared:'Cleared'};
 function decide(id, v, label){
   if (blocked()) return;
   const cur = S.dec[id];
@@ -979,11 +1011,11 @@ function paintItems(){
     if (!fold) el.classList.remove('unfold');
     el.classList.toggle('folded', fold && !el.classList.contains('unfold'));
     el.classList.toggle('foldable', fold);
-    const st = el.querySelector('.stp'); if (st){ st.textContent = d ? LABEL[d.v] + ((['modify','recode'].indexOf(d.v) > -1 && !(S.notes[id]||'').trim()) ? ', add a note' : '')
+    const st = el.querySelector('.stp'); if (st){ st.textContent = d ? (LABEL[d.v] || d.v) + ((['modify','recode'].indexOf(d.v) > -1 && !(S.notes[id]||'').trim()) ? ', add a note' : '')
       + (d.by_uid ? ' · ' + Shared.name(d.by_uid) : '') : 'Pending';
       st.className = 'stp' + (d ? (d.v === 'reject' || d.v === 'none' ? ' rej' : ' done') : ''); }
     el.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('on', !!d && d.v === b.dataset.v));
-    const nt = el.querySelector('textarea[data-note]'); if (nt){ nt.hidden = !(d && ['modify','recode','reject','none'].indexOf(d.v) > -1) && !(S.notes[id]||'').trim();
+    const nt = el.querySelector('textarea[data-note]'); if (nt){ nt.hidden = !(d && ['modify','recode','netsuite','reject','none'].indexOf(d.v) > -1) && !(S.notes[id]||'').trim();
       if (document.activeElement !== nt) nt.value = S.notes[id] || ''; } });
   $$('textarea.c[data-note]').forEach(t => { if (!t.closest('[data-item]') && document.activeElement !== t) t.value = S.notes[t.dataset.note] || ''; });
   paintJE();
@@ -1024,6 +1056,7 @@ const jeNoop = j => { const m = {}; j.lines.forEach(l => { const k = (l.account 
   return Object.values(m).every(v => Math.abs(v) < 0.005); };
 const jeEdited = id => !!(S.je[id] || S.jh[id]);
 const jeLive = id => { const d = S.dec[id]; return !!d && ['approve', 'modify', 'recode'].indexOf(d.v) > -1 && !!DATA.je[id] && (!DATA.je[id].proposal || jeEdited(id)); };
+const nsIds = () => $$('[data-item]').map(x => x.dataset.item).filter(id => (S.dec[id] || {}).v === 'netsuite');   // fixed in NetSuite: resolved, never in the import
 const isoOk = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '') && !isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0, 10) === s;
 /* why an entry cannot go into the import yet, or '' */
 const jeWhy = id => { const j = jeOf(id);
@@ -1040,14 +1073,15 @@ function editJE(t){
   else { if (!S.je[id]) S.je[id] = JSON.parse(JSON.stringify(DATA.je[id].lines));
     S.je[id][i][f] = f === 'debit' || f === 'credit' ? (Number(String(t.value).replace(/[^0-9.]/g, '')) || 0) : t.value.trim(); }
   const box = t.closest('[data-je]'), v = box.dataset.when || 'modify', d = S.dec[id];
-  if (!d || d.v !== v){ const it = t.closest('[data-item]'), lb = it && it.querySelector('[data-d]');
+  /* an item edited in NetSuite stays so: its entry then shows what was changed there */
+  if (!d || (d.v !== v && d.v !== 'netsuite')){ const it = t.closest('[data-item]'), lb = it && it.querySelector('[data-d]');
     S.dec[id] = {v, at: new Date().toISOString(), by_uid: Shared.uid()}; logAdd({id, label: lb ? lb.dataset.label : box.dataset.label || id, v, note: S.notes[id] || ''}); }
   save(); refresh();
 }
 function paintJE(){
   const m2 = v => (v < 0 ? '($' : '$') + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + (v < 0 ? ')' : '');
   $$('[data-je]').forEach(box => { const id = box.dataset.je, d = S.dec[id], j = jeOf(id);
-    if (box.dataset.when) box.hidden = !(d && d.v === box.dataset.when);
+    if (box.dataset.when) box.hidden = !(d && (d.v === box.dataset.when || d.v === 'netsuite'));
     box.classList.toggle('edited', jeEdited(id));
     const jr = box.closest('[data-jerow]'); if (jr && d) jr.hidden = false;
     box.querySelectorAll('[data-jeh]').forEach(inp => { if (inp !== document.activeElement) inp.value = j[inp.dataset.jeh.split('|')[1]] || ''; });
@@ -1060,14 +1094,18 @@ function paintJE(){
     box.querySelector('[data-jereset]').hidden = !jeEdited(id); });
   $$('[data-propose]').forEach(b => { const r = $('[data-jerow="' + b.dataset.propose + '"]'); b.setAttribute('aria-expanded', r && !r.hidden ? 'true' : 'false'); });
 }
+/* NetSuite rejects a Memo over 999 characters; a reviewer's note or edit can take one past it */
+const memoCut = m => m.length > 999 ? m.slice(0, 996).trimEnd() + '...' : m;
 function exportCSV(){
   const rows = [['External ID', 'Subsidiary', 'Journal Date', 'Posting Period', 'Currency', 'Exchange Rate', 'Memo', 'Reversing Entry', 'Reversal Date', 'Account', 'Department', 'Debit', 'Credit', 'Line Memo']];
   const held = Object.keys(DATA.je).filter(id => jeLive(id) && !jeReady(id)).map(id => jeOf(id).memo.slice(0, 60) + ': ' + jeWhy(id)).join('; ');
   Object.keys(DATA.je).forEach(id => { if (!jeReady(id)) return;
-    const j = jeOf(id); j.lines.forEach(l => rows.push([j.id, j.subsidiary, j.date, j.period, j.currency, j.rate, j.memo + (S.notes[id] ? ' | ' + S.notes[id] : ''), j.reversing,
-      j.reversing === 'Y' ? j.reversal_date : '', l.account, l.department || '', l.debit || '', l.credit || '', l.memo || ''])); });
-  if (rows.length === 1){ alertBox(held ? 'Left out: ' + held + '.' : 'Approve an entry first: only approved entries go into the import.'); return; }
-  if (held) alertBox('Left out: ' + held + '.');
+    const j = jeOf(id); j.lines.forEach(l => rows.push([j.id, j.subsidiary, j.date, j.period, j.currency, j.rate, memoCut(j.memo + (S.notes[id] ? ' | ' + S.notes[id] : '')), j.reversing,
+      j.reversing === 'Y' ? j.reversal_date : '', l.account, l.department || '', l.debit || '', l.credit || '', memoCut(l.memo || '')])); });
+  const ns = nsIds().length, edited = ns ? plural(ns, 'item') + ' edited in NetSuite, not in the import: the CSV holds only the reclasses to book' : '';
+  const said = [held ? 'Left out: ' + held : '', edited].filter(Boolean).join('. ');
+  if (rows.length === 1){ alertBox(said ? said + '.' : 'Approve an entry first: only approved entries go into the import.'); return; }
+  if (said) alertBox(said + '.');
   download('serif-' + DATA.kind + '-netsuite-' + DATA.slug + '.csv', csv(rows));
 }
 function alertBox(msg){ const t = $('#tip'); t.innerHTML = esc(msg); t.style.display = 'block'; t.style.left = '40%'; t.style.top = '80px'; setTimeout(() => t.style.display = 'none', Math.max(2200, msg.length * 45)); }
@@ -1116,9 +1154,10 @@ CODING_BUILT = {}
 def coding_corrections():
     """What the GL Coding Review's decision record did to this period's P&L accounts: the net
     of every booked Journal Entry (approved, or modified or recoded with a note, balanced and
-    changing something) by account, as the console's own rules read them. Open findings, and
-    decisions held for a note or a balanced entry, are listed by account and never applied.
-    Returns the corrections, the open lines, and the lines for the run log."""
+    changing something) by account, as the console's own rules read them, and of every item
+    edited in NetSuite, by its entry. Open findings, and decisions held for a note or a
+    balanced entry, are listed by account and never applied. Returns the corrections, the part
+    of them edited in NetSuite, the open lines, the counts, and the lines for the run log."""
     global RAW_DRAFTS
     keep, seen, kept_drafts, kept_skipped = RAW_DRAFTS, set(_SEEN), dict(DRAFTS), len(SKIPPED)
     RAW_DRAFTS = CODING_DRAFTS
@@ -1147,13 +1186,21 @@ def coding_corrections():
             return float(v or 0)
         except (TypeError, ValueError):
             sys.exit("--coding-record: Journal Entry %s has an amount that is not a number: %r" % (iid, v))
+    # An item edited in NetSuite is a correction made on the bill or Journal Entry itself. Its
+    # entry says what changed. It is applied only when this flux reads the GL export the coding
+    # run read, which predates the edit; a later export may already hold it, counted twice.
+    gl_sha = lambda r: {i.get("sha256") for i in r["manifest"].get("inputs") or []
+                        if "netsuite_gl" in (i.get("roles") or []) or os.path.basename(str(i.get("path") or "")).startswith("netsuite_gl")}
+    same_gl = bool(gl_sha(PLR)) and gl_sha(PLR) == gl_sha(GLR)
     booked, held, missing, corr, opened = [], [], [], defaultdict(float), defaultdict(list)
+    edited, ns_corr, ns_blank, ns_later = [], defaultdict(float), [], []
     for iid, d in dec.items():
         if iid not in je and iid not in known:
             missing.append(iid)
             continue
-        if not isinstance(d, dict) or d.get("v") not in ("approve", "modify", "recode") or iid not in je:
+        if not isinstance(d, dict) or d.get("v") not in ("approve", "modify", "recode", "netsuite") or iid not in je:
             continue
+        ns = d["v"] == "netsuite"
         lines = edits[iid] if iid in edits else je[iid]["lines"]
         head = dict(je[iid], **(heads.get(iid) or {}))        # the console's jeOf: the run's header, then the header fields edited
         by, net = defaultdict(float), defaultdict(float)
@@ -1163,21 +1210,29 @@ def coding_corrections():
             net[(l.get("account") or "").strip()] += dr_cr
         # the console's jeWhy, in its order; the note rule is decided()
         why = ("out of balance" if round(sum(by.values()), 2) else "unchanged" if all(abs(v) < 0.005 for v in by.values())
-               else "no note" if d["v"] != "approve" and not str(notes.get(iid) or "").strip() else "an account missing" if not all(a for a, _ in by)
-               else "Journal Date is not a valid date" if not iso_ok(head.get("date")) else "Posting Period is not Mon YYYY" if not re.fullmatch(r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}", head.get("period") or "")
+               else "no note" if d["v"] in ("modify", "recode") and not str(notes.get(iid) or "").strip() else "an account missing" if not all(a for a, _ in by)
+               else "" if ns else "Journal Date is not a valid date" if not iso_ok(head.get("date")) else "Posting Period is not Mon YYYY" if not re.fullmatch(r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}", head.get("period") or "")
                else "reversal date missing" if head.get("reversing") == "Y" and not (head.get("reversal_date") or "").strip()
                else "Reversal Date is not a date after the Journal Date" if head.get("reversing") == "Y" and not (iso_ok(head.get("reversal_date")) and head["reversal_date"] > head["date"]) else "")
         vendor = known.get(iid) or je[iid]["memo"]
+        if ns and why == "unchanged":                         # resolved, with nothing recorded to apply
+            ns_blank.append(vendor)
+            continue
         if why:
             held.append((iid, vendor, why))
             for a, v in net.items():
                 if PNL(a) and round(v):
                     opened[a].append((vendor, v))
             continue
-        booked.append(iid)
+        if ns and not same_gl:
+            ns_later.append(vendor)
+            continue
+        (edited if ns else booked).append(iid)
         for a, v in net.items():
             if PNL(a):
                 corr[a] += v
+                if ns:
+                    ns_corr[a] += v
     for it in items:
         if it[1] in dec:
             continue
@@ -1196,7 +1251,15 @@ def coding_corrections():
                          (" (%d on Journal Entries Claude drafted: pass --coding-drafts)" % len(drafted)) if drafted and not CODING_DRAFTS else ""))
     if held:
         notes_out.append("%s held, not applied: %s" % (count(len(held), "decision"), "; ".join("%s (%s)" % (v, w) for _, v, w in held[:5]) + (" and %d more" % (len(held) - 5) if len(held) > 5 else "")))
-    return ({a: round(v, 2) for a, v in corr.items() if round(v)}, dict(opened), len(booked), notes_out,
+    few = lambda vs: "; ".join(vs[:5]) + (" and %d more" % (len(vs) - 5) if len(vs) > 5 else "")
+    if edited:
+        notes_out.append("%s edited in NetSuite, applied: this flux reads the coding run's GL export, from before the edits" % count(len(edited), "item"))
+    if ns_later:
+        notes_out.append("%s edited in NetSuite, not applied: this flux reads a GL export other than the coding run's, which may already hold the edit: %s"
+                         % (count(len(ns_later), "item"), few(ns_later)))
+    if ns_blank:
+        notes_out.append("%s edited in NetSuite with no change on the entry, nothing to apply: %s" % (count(len(ns_blank), "item"), few(ns_blank)))
+    return ({a: round(v, 2) for a, v in corr.items() if round(v)}, {a: round(v, 2) for a, v in ns_corr.items() if round(v)}, dict(opened), len(booked), len(edited), notes_out,
             sum(1 for it in items if it[1] not in dec))
 
 
@@ -1297,7 +1360,7 @@ def flux():
                         '<span><i style="background:var(--color-mid-gray)"></i>Lowers the loss</span></div></div>' + exec_summary + CHECKLIST))
 
     # ----- Actual vs. Actual
-    corr, opened, n_booked, coding_notes, n_open = coding_corrections() if CODING_REC else ({}, {}, 0, [], 0)
+    corr, ns_corr, opened, n_booked, n_edited, coding_notes, n_open = coding_corrections() if CODING_REC else ({}, {}, {}, 0, 0, [], 0)
     placed = set()
 
     def var_table(kind):
@@ -1323,7 +1386,10 @@ def flux():
                 line = (money(abs(v)) + (" favorable " if v > 0 else " unfavorable ") + ("MoM" if kind == "mom" else "YoY") + (" adjusted" if cv else "")
                         + (" (" + format(abs(100 * v / r[base]), ".1f") + "%)" if r.get(base) else "") + "." + (" Largest vendors" + (" (before coding corrections)" if cv else "") + ": " + e(vend) + "." if vend else ""))
                 if cv:
-                    line += " Reported " + money(abs(vr)) + (" favorable" if vr > 0 else " unfavorable") + ", " + money(abs(cv)) + (" moved out" if cv < 0 else " moved in") + " by booked coding corrections."
+                    nv = ns_corr.get(r["account_code"], 0.0)
+                    how = ("by booked coding corrections" if not round(nv) else "by coding corrections edited in NetSuite" if not round(cv - nv)
+                           else "by coding corrections (%s booked, %s edited in NetSuite)" % (money(abs(cv - nv)), money(abs(nv))))
+                    line += " Reported " + money(abs(vr)) + (" favorable" if vr > 0 else " unfavorable") + ", " + money(abs(cv)) + (" moved out" if cv < 0 else " moved in") + " " + how + "."
                 ops = opened.get(r["account_code"]) if adj else None
                 if not round(v):
                     line = "No change" + (" adjusted." if cv else ".") + line[line.index(" Reported"):] if cv else "No change."
@@ -1353,7 +1419,8 @@ def flux():
         head = ("<thead><tr><th>Account</th><th class=\"n2\">" + e(PERIOD) + "</th><th class=\"n2\">" + e(label) + "</th><th class=\"n2\">$ Var</th>"
                 + ('<th class="n2">Corrections</th><th class="n2">Adj. $ Var</th>' if adj else "") + "<th class=\"n2\">" + ("Adj. % Var" if adj else "% Var") + "</th>" + ('<th class="n2">3-mo avg</th><th class="n2">6-mo avg</th>' if kind == "mom" else "")
                 + "<th style=\"width:%s\">Commentary</th></tr></thead>" % ("34%" if kind == "mom" else "42%"))
-        sm = ('<div class="sumline">Favorable: <b>' + money(fv) + "</b> Unfavorable: <b class=\"unf\">" + money(uf) + "</b> To review: <b data-ccount></b>" + (" Corrections booked: <b>" + str(n_booked) + "</b> Journal Entries" if adj else "") + "</div>")
+        sm = ('<div class="sumline">Favorable: <b>' + money(fv) + "</b> Unfavorable: <b class=\"unf\">" + money(uf) + "</b> To review: <b data-ccount></b>" + (" Corrections booked: <b>" + str(n_booked) + "</b> Journal Entries" if adj else "")
+              + (" Edited in NetSuite: <b>" + str(n_edited) + "</b>" if adj and n_edited else "") + "</div>")
         return sm + '<div class="tw"><table>' + head + "<tbody>" + "".join(out) + "</tbody></table></div>"
     ch = opex["actual"] - opex["prior"]
     chy = opex["actual"] - opex["prior_year"]
@@ -1369,7 +1436,8 @@ def flux():
         lost = sorted(set(corr) - placed)
         if lost:
             coding_notes.append("No flux row for " + ", ".join(a + " " + acct_name(a) + " " + money(corr[a]) for a in lost))
-        print("Coding corrections: %d booked Journal Entries move %d accounts; %d open findings noted, not applied." % (n_booked, len(corr), n_open))
+        print("Coding corrections: %d booked Journal Entries%s move %d accounts; %d open findings noted, not applied."
+              % (n_booked, " and %s edited in NetSuite" % count(n_edited, "item") if n_edited else "", len(corr), n_open))
         for x in coding_notes:
             print("  " + x + ".")
     # ----- Actual vs. Budget
@@ -1813,25 +1881,37 @@ def coding():
     def acts(iid, label, actions):
         return "".join('<button class="pill" data-d="%s" data-v="%s" data-label="%s">%s</button>' % (iid, v, e(label), lab) for v, lab in actions)
 
-    used_ven = set()
+    used_ven, amts = set(), {}   # amts: each card's amount, for its reference ID
+    nsdoc = {}   # item -> the document the fix changes, recorded with an Edited in NetSuite decision
+
+    def doc_of(vname, d):
+        i = next((i for r in vrows if r["vendor"] == vname for i in (r.get("detail") or {}).get("items") or [] if i["document"] == d), None)
+        return (i["type"] + " " + d) if i else d
 
     def card(iid, vendor, amount, hi, cur, rec, doc, extra, why, pol, actions, lines="", more="", flag=True):
         dl = doc_links(doc["document"]) if doc else ""
+        if doc:
+            nsdoc.setdefault(iid, doc["type"] + " " + doc["document"])
         dv = (RAW_DRAFTS.get("vendors") or {}).get(vendor) or {}
         if flag and dv.get("recommend") in ("clear", "question", "entry"):
             used_ven.add(vendor)
             v_ = {"clear": "reject", "entry": "approve"}.get(dv["recommend"])
             more = draft("ven:" + iid, txt(dv.get("note")), iid, iid if v_ else None, v_,
                          {"reject": "Coding stands: reject the recode.", "approve": "Approve the recode."}.get(v_, "Ask the owner.")) + more
-        return ('<div class="item%s" data-item="%s" data-amt="%s"%s><div class="ih"><b>%s</b><span class="stp">Pending</span><span class="mono">%s</span>%s</div><div class="ib"><div class="kv">'
+        amts[iid] = amount or 0
+        return ('<div class="item%s" data-item="%s" data-amt="%s"%s><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span>%s</div><div class="ib"><div class="kv">'
                 '<div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Recommended</div><div class="x">%s</div></div>'
                 '<div><div class="l">Document / item</div><div class="x">%s%s</div></div>%s</div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
-                % (" hi" if hi else "", iid, round(amount or 0, 2), " data-flag" if flag else "", e(vendor), money(amount, True), '<span class="tag hi">Review</span>' if hi else "", cur, rec,
+                % (" hi" if hi else "", iid, round(amount or 0, 2), " data-flag" if flag else "", iid, e(vendor), money(amount, True), '<span class="tag hi">Review</span>' if hi else "", cur, rec,
                    (e(doc["type"] + " " + doc["document"]) + "<small>" + e(doc["text"]) + "</small>") if doc else "&ndash;", dl, extra,
                    ('<div class="why">' + why + "</div>") if why else "", ('<div class="pol">' + e(pol) + "</div>") if pol else "", more, lines,
                    acts(iid, vendor, actions), iid))
     coding_ = lambda a, d=None: "%s<small>%s%s</small>" % (e(a), e(acct_name(a)), (" / " + e(d)) if d else "")
-    FLAG_ACTS = (("approve", "Approve Recode"), ("reject", "Reject"), ("modify", "Modify"))
+    # A fix to an existing transaction is booked as a reclass (the CSV) or made by editing
+    # the bill or Journal Entry in NetSuite while the period is open. An entry Claude
+    # drafted has no one transaction to edit, so it is approved or not.
+    FLAG_ACTS = (("approve", "Approve Recode"), ("netsuite", "Edited in NetSuite"), ("reject", "Reject"), ("modify", "Modify"))
+    DRAFT_ACTS = (("approve", "Approve Recode"), ("reject", "Reject"), ("modify", "Modify"))
 
     # CapEx and Prepaid flags: expense that may belong on the balance sheet. These
     # are the flux engine's prepaid and capital screens, which serif_views.py runs
@@ -1886,7 +1966,7 @@ def coding():
             doc = {"type": l["txn_type"], "document": l["document_number"], "text": desc(l), "date": l["date"]}
             out.append(card(iid, v, amt, amt >= thr, coding_(l["account_code"], l["department"]), "&ndash;", doc,
                             '<div><div class="l">Department</div><div class="x">' + e(l["department"] or "&ndash;") + "</div></div>", "", "",
-                            (("confirm", "Confirm, Stays on Balance Sheet"), ("recode", "Recode to Expense")), "",
+                            (("confirm", "Confirm, Stays on Balance Sheet"), ("recode", "Recode to Expense"), ("netsuite", "Edited in NetSuite")), "",
                             je_editor(iid, je[iid]["lines"], "recode") + history(v), flag=False))
         return out
     cap_booked, pre_booked = booked(("15",), "CB"), booked(("13",), "PB")
@@ -1898,7 +1978,7 @@ def coding():
         je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"]), "reverses": x.get("reverses")}
         items.append(("dept", iid, "Drafted by Claude", ", ".join(sorted({l["vendor"] for l in x["lines"] if l["vendor"]})) or x["memo"], x["memo"], x["debits"], "", ""))
         dcards.append(card(iid, x["memo"] or "Drafted Journal Entry", x["debits"], x["debits"] >= thr, "&ndash;", "&ndash;", None,
-                           '<div><div class="l">Type</div><div class="x">Drafted by Claude</div></div>', e(x["support"]), "", FLAG_ACTS, "", je_editor(iid, je[iid]["lines"])))
+                           '<div><div class="l">Type</div><div class="x">Drafted by Claude</div></div>', e(x["support"]), "", DRAFT_ACTS, "", je_editor(iid, je[iid]["lines"])))
     ents = {x["finding_id"]: x for x in V.get("entries") or []}
     drift = [f for f in GLR["findings"] if f["rule_id"] == "T4.ITEM_ACCOUNT_DRIFT"]
     COVER = ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")
@@ -1934,6 +2014,8 @@ def coding():
             if isdrift:
                 cur, rec = coding_(sc["account"]), '<span class="arrow">&rarr;</span> ' + coding_(sc["usual_account"])
                 doc = {"type": "Coupa PO", "document": sc["po_number"], "text": "line %s, %s: %s" % (sc["po_line"], sc["order_date"], sc["item"])}
+        if x and docs:
+            nsdoc[iid] = ", ".join(doc_of(vname, d) for d in docs)
         typ = "Department" if f["rule_id"].startswith("T1") else "Account vs. Coupa"
         items.append(("dept", iid, typ, vname, (doc or {}).get("text") or "", f.get("amount_at_risk") or 0, "", ""))
         dcards.append(card(iid, vname, f.get("amount_at_risk") or 0, (f.get("amount_at_risk") or 0) >= thr, cur, rec, doc,
@@ -1956,13 +2038,16 @@ def coding():
             dh = draft("ven:" + iid, txt(dv.get("note")), iid, iid if v_ else None, v_,
                        {"confirm": "Confirm.", "recode": "Recode."}.get(v_, "Ask the owner."))
         doc = line_doc(r["vendor"])
+        if doc:
+            nsdoc[iid] = doc["type"] + " " + doc["document"]
         cur = "<br>".join(coding_(c["account"], c.get("department")) for c in (r.get("by_coding") or []) if round(c.get("current") or 0)) or coding_(a)
         je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": (doc or {}).get("date") or "", "memo": "Recode %s from %s %s" % (r["vendor"], a, dept),
                    "lines": je_lines([{"account": a, "department": dept, "debit": camt}, {"account": a, "department": dept, "credit": camt}]), "when": "recode"}
-        return ('<div class="item" data-item="%s" data-amt="%s"><div class="ih"><b>%s</b><span class="stp">Pending</span><span class="mono">%s</span><span class="tag%s">%s</span></div>'
+        amts[iid] = r["amount"] or 0
+        return ('<div class="item" data-item="%s" data-amt="%s"><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span><span class="tag%s">%s</span></div>'
                 '<div class="ib"><div class="kv"><div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Document / item</div><div class="x">%s%s</div></div>'
                 '<div><div class="l">%s</div><div class="x">%s</div></div></div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
-                % (iid, round(r["amount"] or 0, 2), e(r["vendor"]), money(r["amount"], True), " hi" if tag == "Review" else (" plain" if not tag else ""), tag, cur,
+                % (iid, round(r["amount"] or 0, 2), iid, e(r["vendor"]), money(r["amount"], True), " hi" if tag == "Review" else (" plain" if not tag else ""), tag, cur,
                    (e(doc["type"] + " " + doc["document"]) + "<small>" + e(doc["text"]) + "</small>") if doc else "&ndash;", doc_links(doc["document"]) if doc else "",
                    "Lines this month", str(((r.get("detail") or {}).get("count") or 0)), (why if checks else '<div class="why">' + why + "</div>") if why else "",
                    dh + history(r["vendor"]), je_editor(iid, je[iid]["lines"], "recode"), lines_html(r["vendor"]), acts(iid, r["vendor"], actions), iid))
@@ -1999,14 +2084,15 @@ def coding():
             '<span class="%s">%s%s</span>' % (k, "&#10003; " if k == "ok" else "&ndash; ", e(t)) for k, t in out) + "</div>")
 
     def clear_card(r):
-        return vcard(sid("R", r["vendor"]), r, "$2,500 or more" if r["amount"] >= thr else "", passed(r), (("confirm", "Confirm, No Recode"), ("recode", "Recode This Line")), checks=True)
+        return vcard(sid("R", r["vendor"]), r, "$2,500 or more" if r["amount"] >= thr else "", passed(r),
+                     (("confirm", "Confirm, No Recode"), ("recode", "Recode This Line"), ("netsuite", "Edited in NetSuite")), checks=True)
     ccards = by_dept(clear, clear_card)
     news = sorted([r for r in vrows if any(f.get("id") == "new" for f in r.get("flags") or []) and round(r.get("amount") or 0)], key=lambda r: -r["amount"])
     def new_card(r):
         fl = next(f for f in r["flags"] if f.get("id") == "new")
         return vcard(sid("N", r["vendor"]), r, "Review" if r["amount"] >= thr else "Routine",
                      "<b>Assessment:</b> " + en(fl.get("why") or "") + ((" <b>Action:</b> " + en(fl.get("do"))) if fl.get("do") else ""),
-                     (("confirm", "Confirm Vendor &amp; Coding"), ("recode", "Recode This Line")))
+                     (("confirm", "Confirm Vendor &amp; Coding"), ("recode", "Recode This Line"), ("netsuite", "Edited in NetSuite")))
     ncards = by_dept(news, new_card)
 
     flagged = [i for i in items]
@@ -2077,15 +2163,28 @@ def coding():
                       + '<div class="card"><div class="ch">GL Tie-Out</div><div class="tw"><table><tbody>' + tie_rows + "</tbody></table></div></div>"
                       + '<div class="card"><div class="ch">Policy Application Summary</div><div class="tw"><table><tbody>' + pol_rows + "</tbody></table></div></div>"
                       + '<div class="card"><div class="ch">Management Review &amp; Sign-Off</div><div class="pad">' + sign + "</div></div>"))
-    pages.append(page("export", '<div class="card"><div class="ch">Export to NetSuite<button class="pill solid r" data-export>Export to NetSuite, CSV</button></div>'
-                      '<div class="tw"><table><thead><tr><th>Memo</th><th>Account</th><th>Department</th><th class="n2">Debit</th><th class="n2">Credit</th><th>Status</th></tr></thead><tbody data-exportrows></tbody></table></div></div>'))
+    pages.append(page("export", '<div class="card"><div class="ch">Export to NetSuite<button class="pill r" data-wpsave>Work paper, HTML</button><button class="pill solid" data-export>Export to NetSuite, CSV</button></div>'
+                      '<div class="sumline" data-fixsum></div>'
+                      '<div class="tw"><table><thead><tr><th>Memo</th><th>Account</th><th>Department</th><th class="n2">Debit</th><th class="n2">Credit</th><th>Status</th></tr></thead><tbody data-exportrows></tbody></table></div></div>'
+                      '<div class="card"><div class="ch">Edited in NetSuite<span class="r note">Fixed on the bill or Journal Entry itself; resolved, and not in the CSV</span></div>'
+                      '<div class="tw"><table><thead><tr><th>Ref ID</th><th>Item</th><th>Document</th><th class="n2">Amount</th><th>Note</th><th>Decided</th></tr></thead><tbody data-nsrows></tbody></table></div></div>'))
     sections = [("Overview", [("ov", "Overview")]),
                 ("Review", [("capex", "CapEx Flags"), ("prepaid", "Prepaid Flags"), ("dept", "Dept & Entity")]),
                 ("Transparency", [("clear", "Reviewed & Cleared"), ("new", "New This Period")]),
                 ("Documentation", [("audit", "Audit Log"), ("sox", "SOX Documentation"), ("export", "Export")])]
     SKIPPED.extend("vendor note for " + k for k in (RAW_DRAFTS.get("vendors") or {}) if k not in used_ven)
+    # Reference IDs: numbered by screen within the close, largest first, then by item id, so a
+    # rebuild of the same data numbers them the same. Each entry's Memo starts with its card's.
+    ref, n = {}, defaultdict(int)
+    for iid in sorted(amts, key=lambda i: (-abs(round(amts[i], 2)), i)):
+        k = REF_SCREENS[iid.split("-")[0]]
+        n[k] += 1
+        ref[iid] = "%s-%02d" % (k, n[k])
+    for iid, j in je.items():
+        j["memo"] = ref_memo(ref.get(iid), j["memo"])
+    pages = [re.sub(r"\{ref:([\w-]+)\}", lambda m: '<span class="ref mono">%s</span>' % ref[m.group(1)] if m.group(1) in ref else m.group(0), x) for x in pages]
     CODING_BUILT.update(je=je_finish(je), items=items)
-    data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "je": je_finish(je), "icons": {}, "drafts": DRAFTS}
+    data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "je": je_finish(je), "ref": ref, "icons": {}, "drafts": DRAFTS}
     js = r"""
 function refresh(){
   marks(); paintItems(); counts(); signs(); checklist();
@@ -2094,8 +2193,15 @@ function refresh(){
   $$('[data-resolved]').forEach(x => x.textContent = done.length + ' / ' + ids.length);
   const pc = ids.length ? Math.round(100 * done.length / ids.length) : 0;
   $$('[data-progpct]').forEach(x => x.textContent = pc + '%'); $$('[data-progbar]').forEach(x => x.style.width = pc + '%');
-  $$('[data-chips]').forEach(x => x.innerHTML = '<span>Pending: ' + (ids.length - done.length) + '</span><span>Approved: ' + v('approve') + '</span><span>Rejected: ' + v('reject') + '</span><span>Modified: ' + v('modify') + '</span>');
+  $$('[data-chips]').forEach(x => x.innerHTML = '<span>Pending: ' + (ids.length - done.length) + '</span><span>Approved: ' + v('approve') + '</span><span>Edited in NetSuite: ' + v('netsuite') + '</span><span>Rejected: ' + v('reject') + '</span><span>Modified: ' + v('modify') + '</span>');
   $$('[data-sti]').forEach(x => { const d = S.dec[x.dataset.sti]; x.textContent = d ? LABEL[d.v] : 'Pending'; });
+  const F = Object.values(fixesOf()), rc = F.filter(f => f.path === 'Reclass'), N = nsIds();
+  $$('[data-fixsum]').forEach(x => x.innerHTML = '<span>Agreed fixes: <b>' + F.length + '</b></span><span>Reclasses: <b>' + rc.length + '</b>, ' + rc.filter(f => f.in_import).length +
+    ' ready for the import</span><span>Edited in NetSuite: <b>' + N.length + '</b>, not in the import</span>');
+  const nr = $('[data-nsrows]'); if (nr) nr.innerHTML = N.length ? N.map(id => { const x = $('[data-item="' + id + '"]'), d = S.dec[id];
+    return '<tr><td class="mono">' + esc(refOf(id)) + '</td><td>' + esc(x.querySelector('.ih b').textContent) + '</td><td>' + esc((DATA.docs || {})[id] || '') + '</td><td class="n2">' + money(Number(x.dataset.amt)) +
+      '</td><td>' + esc(S.notes[id] || '') + '</td><td>' + esc((d.by_uid ? Shared.name(d.by_uid) + ', ' : '') + String(d.at || '').slice(0, 10)) + '</td></tr>'; }).join('')
+    : '<tr><td colspan="6" class="note">Nothing marked Edited in NetSuite.</td></tr>';
   const a = $('[data-audit]'), L = logList(); if (a) a.innerHTML = L.length ? L.map(l => '<tr><td class="mono">' + esc(String(l.at).slice(0, 16).replace('T', ' ')) + '</td><td>' + esc(l.label) +
     '</td><td>' + esc(LABEL[l.v] || 'Cleared') + '</td><td>' + esc(l.by_uid ? Shared.name(l.by_uid) : '') + '</td><td>' + esc(l.note || '') + '</td></tr>').join('') : '<tr><td colspan="5" class="note">No decisions recorded yet.</td></tr>';
   const ex = $('[data-exportrows]'); if (ex){ const r = [];
@@ -2104,10 +2210,44 @@ function refresh(){
         '</td><td class="n2">' + (Number(l.credit) ? money(l.credit) : '') + '</td><td>' + (i ? '' : ok ? 'Ready' : '<span class="unf">' + jeWhy(id).replace(/^./, c => c.toUpperCase()) + '</span>') + '</td></tr>')); });
     ex.innerHTML = r.length ? r.join('') : '<tr><td colspan="6" class="note">No approved entries yet.</td></tr>'; }
 }
+/* The work paper: every decision, with its reference ID, the path an agreed fix took and
+   the document it changed; the reclasses in the import; the sign-off. One page for the
+   close file, to read beside the GL and NetSuite's system notes. */
+function workPaper(){
+  const F = fixesOf(), td = (v, c) => '<td' + (c ? ' class="' + c + '"' : '') + '>' + esc(v) + '</td>';
+  const usd = v => (Number(v) || 0).toLocaleString('en-US', {style: 'currency', currency: 'USD'});
+  const pageOf = x => { const p = x.closest('.page'), b = p && $('.tb.pg[data-p="' + p.id.slice(2) + '"]'); return b ? b.textContent.replace(/\d+$/, '').trim() : ''; };
+  const change = id => { if (!DATA.je[id]) return ''; const j = jeOf(id); if (jeNoop(j)) return '';
+    const side = k => Array.from(new Set(j.lines.filter(l => Number(l[k])).map(l => (l.account || '') + (l.department ? ' / ' + l.department : '')))).join(', ');
+    return side('credit') + ' → ' + side('debit'); };
+  const items = $$('[data-item]'), open = items.filter(x => !decided(x.dataset.item)), fx = Object.values(F), rc = fx.filter(f => f.path === 'Reclass');
+  const dec = items.filter(x => S.dec[x.dataset.item]).map(x => { const id = x.dataset.item, d = S.dec[id], f = F[id] || {};
+    return '<tr>' + td(refOf(id), 'm') + td(pageOf(x)) + td(x.querySelector('.ih b').textContent) + td(usd(x.dataset.amt), 'n') + td(LABEL[d.v] || d.v)
+      + td(f.path ? f.path + (f.in_import ? ', in the import' : f.held ? ', held: ' + f.held : '') : '') + td((DATA.docs || {})[id] || '') + td(f.external_id || '', 'm') + td(change(id))
+      + td(S.notes[id] || '') + td(d.by_uid ? Shared.name(d.by_uid) : '') + td(String(d.at || '').slice(0, 16).replace('T', ' '), 'm') + '</tr>'; });
+  const lines = [];
+  Object.keys(DATA.je).filter(jeReady).forEach(id => { const j = jeOf(id);
+    j.lines.forEach((l, i) => lines.push('<tr>' + td(i ? '' : refOf(id), 'm') + td(i ? '' : j.id, 'm') + td(i ? '' : j.memo) + td(l.account, 'm') + td(l.department || '')
+      + td(Number(l.debit) ? usd(l.debit) : '', 'n') + td(Number(l.credit) ? usd(l.credit) : '', 'n') + '</tr>')); });
+  const signs = Object.keys(S.sign).map(r => { const s = S.sign[r], lb = $('[data-sname="' + r + '"]'); return '<tr>' + td(lb ? lb.closest('.sign').querySelector('b').textContent : r) + td(s.name) + td(s.date) + '</tr>'; });
+  const table = (head, rows, none) => '<table><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + (rows.join('') || '<tr><td colspan="' + head.length + '">' + none + '</td></tr>') + '</tbody></table>';
+  const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>GL Coding Review work paper, ' + esc(DATA.period) + '</title><style>'
+    + 'body{font:13px/1.4 system-ui,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0 0 4px}h2{font-size:14px;margin:22px 0 6px}p{margin:2px 0;color:#444}'
+    + 'table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:3px 6px;text-align:left;vertical-align:top}th{background:#f2f2f2}.n{text-align:right;white-space:nowrap}.m{font-family:ui-monospace,monospace;white-space:nowrap}</style></head><body>'
+    + '<h1>Serif Biomedicines, Inc. &middot; GL Coding Review work paper &middot; ' + esc(DATA.period) + '</h1>'
+    + '<p>Run ' + esc(DATA.run) + ', console ' + esc(DATA.version) + '. Saved ' + esc(new Date().toISOString().slice(0, 16).replace('T', ' ')) + ' UTC' + (Shared.on() ? ' by ' + esc(Shared.name(Shared.uid())) : '') + '.</p>'
+    + '<p>' + items.length + ' items, ' + (items.length - open.length) + ' decided, ' + open.length + ' open. Agreed fixes: ' + fx.length + '; ' + rc.length + ' booked as reclasses (' + rc.filter(f => f.in_import).length
+    + ' in the import), ' + (fx.length - rc.length) + ' edited in NetSuite, not in the import.</p>'
+    + '<h2>Decisions</h2>' + table(['Ref ID', 'Page', 'Item', 'Amount', 'Decision', 'Path', 'Document', 'External ID', 'Change', 'Note', 'Decided by', 'When (UTC)'], dec, 'No decisions recorded.')
+    + '<h2>Reclasses in the NetSuite import</h2>' + table(['Ref ID', 'External ID', 'Memo', 'Account', 'Department', 'Debit', 'Credit'], lines, 'None ready.')
+    + '<h2>Sign-off</h2>' + table(['Role', 'Name', 'Date'], signs, 'Not signed.') + '</body></html>';
+  download('serif-' + DATA.kind + '-work-paper-' + DATA.slug + '.html', html, 'text/html');
+}
+document.addEventListener('click', ev => { if (ev.target.closest('[data-wpsave]')) workPaper(); });
 show('ov');
 """
     pages.append(runlog(GLR, "coding"))
-    return shell("Serif GL Coding Review - " + PERIOD, "GL Coding Review", sections, pages, data, js)
+    return shell("Serif GL Coding Review - " + PERIOD, "GL Coding Review", sections, pages, dict(data, docs=nsdoc), js)
 
 
 if __name__ == "__main__":
