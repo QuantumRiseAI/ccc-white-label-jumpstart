@@ -37,6 +37,22 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: the ledger tied to the Income Statement by account (SERIF-146)
+
+- **Both Projects** tie the ledger to NetSuite's Income Statement by month report, account by
+  account, before anything is built: the close month for the GL Coding Review, the month and the
+  month before for the P&L Flux. Accounts under the Income and Other Income headings are compared
+  with their sign turned; an account on either side that differs by a cent or more fails.
+  `python3 serif_sources.py tie` runs it first, prints each account that differs with both figures
+  and the difference, and exits 2. Both Projects' instructions now run it before the scripts and
+  stop on a failure.
+- **The build** (`build_pages.py`) checks the same tie and stops on a failure without writing a
+  console; `--allow-tie-differences` builds anyway, with the differences listed at the top of the
+  first page. The result leads the first page of both consoles (Overview, Executive Overview), and
+  is a row of the SOX tie-outs. The GL Coding Review build now takes `--income-statement`; without
+  it, the first page says the ledger was not tied. Aug 2026: 88 accounts tie, Aug and Jul.
+- New `tests/test_tie.py` in `make test`.
+
 ## Unreleased: Edited in NetSuite (SERIF-143)
 
 - **GL Coding Review**: **Edited in NetSuite** sits beside Approve Recode on CapEx, Prepaid and

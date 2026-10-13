@@ -55,9 +55,9 @@ That split is deliberate. A variance an LLM computes will not reproduce next mon
   register are still pending, so proposals cannot be checked against what is already
   carried.
 * **Payroll cutoff accrual.** Needs the payroll register.
-* **Derived-to-reported tie-out.** The engine checks debits equal credits on the GL
-  detail. It does not yet reconcile derived activity to the reported income statement , 
-  that cross-check is the stronger validation and is worth adding.
+* **Derived-to-reported tie-out.** Done (SERIF-146): the ledger is tied to the Income
+  Statement by month report, account by account, for the month and the month before, before
+  the console is built.
 
 ## Accounting Review Still Outstanding
 

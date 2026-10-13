@@ -15,7 +15,18 @@ wrong: stop and run the script.
 Every input is an export exactly as its system writes it. Nothing is sliced, converted
 or summarized first: the scripts read the exports and take the months they need in memory.
 
-From this folder, for a close of Sep 2026:
+From this folder, for a close of Sep 2026, first tie the month's ledger to NetSuite's Income
+Statement, account by account:
+
+```sh
+python3 serif_sources.py tie --period "Sep 2026" \
+  --gl netsuite_gl_*.xls* \
+  --income-statement netsuite_income_statement_by_month_*.xls
+```
+
+It prints that every account ties, or each account that does not, with both figures and the
+difference, and exits 2. A failed tie stops the review there: export the GL and the Income
+Statement again. Then:
 
 ```sh
 python3 serif_uc1_engine.py --period "Sep 2026" \
@@ -43,8 +54,13 @@ rolling forecast workbook whose prior cut is the plan; `--plan-vintage` names th
 
 ```sh
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
-  --gl netsuite_gl_*.xls* --out out/sep2026
+  --gl netsuite_gl_*.xls* --income-statement netsuite_income_statement_by_month_*.xls \
+  --out out/sep2026
 ```
+
+The build ties the ledger to the Income Statement as the first command does, and stops when an
+account does not tie; `--allow-tie-differences` builds anyway, with the differences at the top
+of the Overview. Without `--income-statement` the Overview says the ledger was not tied.
 
 In the Claude Project, Claude then writes `drafts.json` and builds again with
 `--drafts drafts.json`, which puts its drafts into the console beside the items they belong
@@ -85,7 +101,7 @@ If Python is missing, ask Claude to install it. On Windows that is usually
 
 ## Each Month
 
-Serif sends three exports, uploaded as they are:
+Serif sends four exports, uploaded as they are:
 
 1. The NetSuite Custom General Ledger saved search, exported as `.xls` (an `.xlsx` saved
    from it also reads), named `netsuite_gl_<range>.xls`. Columns are found by name, so a
@@ -96,6 +112,7 @@ Serif sends three exports, uploaded as they are:
    reads, but it carries no supplier or account, so the checks that join Coupa to the
    ledger find nothing on it.
 3. The newest UKG roster, as `.csv`.
+4. The NetSuite Income Statement by month report, through the month, as `.xls`.
 
 The plan workbook stays in the Project until Serif sets a new plan. Open the close's chat,
 below, and ask: `Run the GL coding review for Sep 2026.`
@@ -300,7 +317,8 @@ The bar holds four section titles; clicking one opens its pages beside it, each 
 left on it. Run log and Settings are the icons at the right.
 
 * **Overview**: total period spend, the flags and their value as a share of spend, clean
-  vendors, how many flags are resolved, and the close checklist: each page, what is open on it
+  vendors, how many flags are resolved, the tie to NetSuite's Income Statement (every account,
+  or the ones that differ), and the close checklist: each page, what is open on it
   and what that is worth. A line of the checklist opens its page.
 * **Review**: CapEx Flags, Prepaid Flags, and Dept & Entity.
 * **Transparency**: Reviewed & Cleared, and New This Period.

@@ -25,6 +25,7 @@ name, or missing, and ask for any that are missing before you run anything.
 |---|---|
 | NetSuite Custom General Ledger saved search, `.xls` (or saved as `.xlsx`), named `netsuite_gl_<range>.xls` | One or more exports that together hold the month, the two months before it and the same month last year. Any date ranges, as long as no month is in two. |
 | Coupa PO line report, `.csv`: the export with all available columns, or the Coupa Data Pull (PO Lines) report | The export for the month's calendar year. The scripts list any column the report lacks or leaves empty under `coupa_coverage.columns_absent` in `run.json` |
+| NetSuite Income Statement by month report, `.xls`, named `netsuite_income_statement_by_month_<range>.xls` | Through the month. The ledger is tied to it by account before the review is built |
 | Rolling forecast workbook, `.xlsx` | The plan: `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
 | UKG roster, `.csv` | The newest roster |
 | NetSuite link IDs, `.csv`, named `netsuite_link_ids_<month>.csv` | Optional, for links. The connector's result for `netsuite_link_ids.sql`; see NetSuite Link IDs |
@@ -49,6 +50,9 @@ Put the Project's files and the month's exports in one folder, and run from ther
 `--period` and the output folder change from month to month:
 
 ```sh
+python3 serif_sources.py tie --period "Sep 2026" --gl netsuite_gl_*.xls* \
+  --income-statement netsuite_income_statement_by_month_*.xls
+
 python3 serif_uc1_engine.py --period "Sep 2026" --gl netsuite_gl_*.xls* \
   --coupa coupa_po_lines_2026.csv --pending . --out out
 
@@ -58,8 +62,17 @@ python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_*.xls* \
   --netsuite-ids netsuite_link_ids_sep2026.csv --keep-names
 
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
-  --gl netsuite_gl_*.xls* --out out/sep2026
+  --gl netsuite_gl_*.xls* --income-statement netsuite_income_statement_by_month_*.xls \
+  --out out/sep2026
 ```
+
+The first command ties the month's ledger to NetSuite's Income Statement, account by account.
+If it says the ledger does not tie, stop there: tell the reviewer which accounts differ and by
+how much, and ask for the GL and the Income Statement exported again from NetSuite. Review
+nothing on a ledger that does not tie. The build checks the same tie and stops too; only when
+the reviewer asks to go ahead anyway, add `--allow-tie-differences` to the build, and the
+differences lead the Overview. The tie's result is the first thing you say in the chat, and it
+shows at the top of the Overview.
 
 The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v2.0.0.html`. Publish it
 as [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML
@@ -183,7 +196,8 @@ The console is laid out as the controller's August GL review. The bar holds four
 section opens its pages beside its title.
 
 * **Overview**: total period spend, the flags and what they are worth, clean vendors, what is
-  resolved, and the close checklist: each page, what is open on it and what that is worth.
+  resolved, the tie to NetSuite's Income Statement (every account, or the ones that differ),
+  and the close checklist: each page, what is open on it and what that is worth.
 * **Review**:
   * **CapEx Flags** and **Prepaid Flags**, both directions: expense lines that may be capital
     or prepaid, each with its proposed Journal Entry; then this month's bills posted to
@@ -197,7 +211,7 @@ section opens its pages beside its title.
   matching its Coupa PO, not prepaid or capital, coded as planned), and which could not apply
   and why. A confirmed vendor folds to its name; its name opens it again.
 * **Documentation**: the **Audit Log** (who decided what and when), **SOX Documentation**
-  (sources, the GL tie-out, the policies applied and the sign-off), and **Export**, the
+  (sources, the GL tie-out and the Income Statement tie, the policies applied and the sign-off), and **Export**, the
   NetSuite CSV (header fields: Subsidiary, Journal Date, Posting Period, Currency, Exchange Rate,
   Memo, Reversing Entry, Reversal Date; line fields: Account, Department, Debit, Credit, Line Memo).
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
@@ -231,7 +245,8 @@ After the three scripts run, write `drafts.json` and build the console again wit
 
 ```sh
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
-  --gl netsuite_gl_*.xls* --out out/sep2026 --drafts drafts.json
+  --gl netsuite_gl_*.xls* --income-statement netsuite_income_statement_by_month_*.xls \
+  --out out/sep2026 --drafts drafts.json
 ```
 
 The build checks every draft against the run. A vendor with no card in the console, or a
@@ -625,8 +640,9 @@ runs in a Project.
 | `serif_uc2_flux.py` | The flux engine, used here for its prepaid and capital rules |
 | `build_pages.py` | Builds the console |
 | `serif_design.py`, `serif_fonts.py` | Serif's design tokens, logo and typefaces, and the run log |
-| `serif_sources.py` | Reads the NetSuite and forecast exports for the schedules |
+| `serif_sources.py` | Reads the NetSuite and forecast exports for the schedules, and ties the ledger to the Income Statement (`tie`) |
 | `netsuite_gl_<range>.xls` | NetSuite Custom General Ledger exports |
+| `netsuite_income_statement_by_month_<range>.xls` | The Income Statement by month, which the ledger is tied to by account |
 | `netsuite_link_ids_<month>.csv`, `netsuite_link_ids.sql` | The month's NetSuite link IDs, and the query that pulls them |
 | `coupa_po_lines_<year>.csv` | Coupa PO line export for the calendar year |
 | `serif_rolling_forecast_2026-08.xlsx` | The rolling forecast workbook whose prior cut is the plan |
