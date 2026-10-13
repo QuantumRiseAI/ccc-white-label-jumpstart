@@ -565,10 +565,7 @@ def load_coupa(path, inputs):
     """Coupa PO line export -> {period, supplier, requester, dept_code, account, amount}."""
     if not path:
         return []
-    rows = read_csv(path)
-    if rows and "PO Number (Header)" not in rows[0]:
-        sys.exit(os.path.basename(path) + " is not the Coupa PO line export: it has no "
-                 "'PO Number (Header)' column. Export it from Coupa with all available columns.")
+    rows = sources.coupa_rows(path)[0]
     inputs.add("coupa", path, len(rows))
     out = []
     for row in rows:

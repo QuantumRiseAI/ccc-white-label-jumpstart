@@ -15,7 +15,7 @@ I="$B/inputs/$SLUG"
 [ -d "$I" ] || { echo "No exports in inputs/$SLUG/"; exit 1; }
 python3 "$B/tools/package.py"
 
-GL=$(ls "$I"/netsuite_gl_detail_*.xls)
+GL=$(ls "$I"/netsuite_gl_detail_*.xls*)
 CO=$(ls "$I"/coupa_po_lines_*.csv)
 FC=$(ls "$I"/serif_rolling_forecast_*.xlsx | head -1)
 RO=$(ls "$I"/ukg_full_roster_*.csv)

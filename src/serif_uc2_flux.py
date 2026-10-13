@@ -1282,6 +1282,8 @@ def main(argv=None):
         coupa_rows = [r for r in sources.read_coupa(args.coupa) if r["period"] == period]
         coupa_coverage = {
             "supplied": True, "lines": len(coupa_rows),
+            # Columns this pull lacks or leaves empty: what reads them finds nothing.
+            "columns_absent": sources.coupa_rows(args.coupa)[1],
             "join_key": "supplier_name",
             "join_caveat": ("Coupa carries no NetSuite PO reference, so accrual proposals "
                             "are supplier-level. Never assert a line-level match."),

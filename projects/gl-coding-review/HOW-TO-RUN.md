@@ -19,7 +19,7 @@ From this folder, for a close of Sep 2026:
 
 ```sh
 python3 serif_uc1_engine.py --period "Sep 2026" \
-  --gl      netsuite_gl_*.xls \
+  --gl      netsuite_gl_*.xls* \
   --coupa   coupa_po_lines_2026.csv \
   --pending . \
   --out     out
@@ -31,7 +31,7 @@ month in two exports is refused.
 
 ```sh
 python3 serif_views.py out/sep2026/run.json \
-  --gl     netsuite_gl_*.xls \
+  --gl     netsuite_gl_*.xls* \
   --plan   serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
   --coupa  coupa_po_lines_2026.csv \
   --roster ukg_full_roster_hrbp_<date>.csv \
@@ -43,7 +43,7 @@ rolling forecast workbook whose prior cut is the plan; `--plan-vintage` names th
 
 ```sh
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
-  --gl netsuite_gl_*.xls --out out/sep2026
+  --gl netsuite_gl_*.xls* --out out/sep2026
 ```
 
 In the Claude Project, Claude then writes `drafts.json` and builds again with
@@ -87,11 +87,14 @@ If Python is missing, ask Claude to install it. On Windows that is usually
 
 Serif sends three exports, uploaded as they are:
 
-1. The NetSuite Custom General Ledger saved search, exported as `.xls`, named
-   `netsuite_gl_<range>.xls`. Exporting a month at a time keeps each file small: the
+1. The NetSuite Custom General Ledger saved search, exported as `.xls` (an `.xlsx` saved
+   from it also reads), named `netsuite_gl_<range>.xls`. Columns are found by name, so a
+   search with columns added or moved reads the same. Exporting a month at a time keeps each file small: the
    month's own export is then the only new one.
 2. The Coupa PO line report with all available columns, for the calendar year, as `.csv`.
-   First column `PO Number (Header)`.
+   First column `PO Number (Header)`. The shorter Coupa Data Pull (PO Lines) report also
+   reads, but it carries no supplier or account, so the checks that join Coupa to the
+   ledger find nothing on it.
 3. The newest UKG roster, as `.csv`.
 
 The plan workbook stays in the Project until Serif sets a new plan. Open the close's chat,
