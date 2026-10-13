@@ -199,7 +199,10 @@ section opens its pages beside its title.
   record. Settings has the threshold, the decision record (save and load) and **Bring in the
   earlier run's decisions**.
 
-Every flag and vendor card shows its document with NetSuite and Coupa links, the vendor's last
+Every flag and vendor card starts with its reference ID, numbered by screen within the close
+(CAPEX-01, FA-01, PREPAID-01, PPD-01, DEPT-01, DRAFT-01, CLEAR-01, NEW-01), and the Memo of its
+Journal Entry starts with the same ID, so the entry in NetSuite ties back to the card. Use the ID
+when you name a card to the reviewer. Each card shows its document with NetSuite and Coupa links, the vendor's last
 three months by account and department with the line descriptions, and its lines. A flag's
 Journal Entry is filled in and editable: approve it, reject it, or edit it, which marks it
 Modified and needs a note.
@@ -301,7 +304,8 @@ Draft an entry where the coding is wrong and no proposed entry in `views.entries
   department. The entry balances.
 * Each line carries the account code and name, department, vendor and document numbers.
 * Memo, per the Data Entry Policy: `Specific description | Mon'YY`, for example
-  `Long column holder recoded to lab supplies | Aug'26`.
+  `Long column holder recoded to lab supplies | Aug'26`. Leave out the reference ID: the build
+  puts the card's in front, `DRAFT-01 | Long column holder recoded to lab supplies | Aug'26`.
 * Prepaid and capital flags move the bill to the balance sheet. The accounts are in
   [`GL_CODING_REVIEW_SKILL.md`](GL_CODING_REVIEW_SKILL.md).
 * Check that debits equal credits before you write the entry.

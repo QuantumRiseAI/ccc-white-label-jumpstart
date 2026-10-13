@@ -93,6 +93,10 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     let csvText = ''; if (dl){ const f = await dl.path(); csvText = fs.readFileSync(f, 'utf8'); }
     ok(/Finance/.test(csvText) && /Department per budget owner/.test(csvText), k + ': the CSV carries the edit and the note');
     if (k === 'gl'){
+      const [ref, ext] = await p.evaluate(id => [refOf(id), DATA.je[id].id], id), rows = csvText.split('\n').filter(r => r.startsWith(ext + ','));
+      ok(/^PREPAID-\d{2}$/.test(ref) && rows.length > 1 && rows.every(r => r.includes(',' + ref + ' | ') || r.includes(',"' + ref + ' | ')), 'gl: the CSV Memo starts with the finding\'s reference ID (' + ref + ')');
+    }
+    if (k === 'gl'){
       const r = await p.evaluate(() => document.querySelector('#p-clear [data-item]').dataset.item);
       await p.evaluate(() => show('clear'));
       await p.click('[data-item="' + r + '"] [data-v="confirm"]');
@@ -111,6 +115,35 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(/under \$2,500/.test(await p.locator('#p-dept > .note, #p-dept p.note').first().innerText()), 'gl: item drift under the threshold is a count and a total');
       ok(await p.evaluate(() => { const back = Object.values(DATA.je).filter(j => j.lines.some(l => / \| Original date \d{4}-\d{2}-\d{2}$/.test(l.memo || '')));
         return back.length > 0 && back.every(j => j.date === '2026-08-31' && j.period === 'Aug 2026'); }), 'gl: entries are dated in the close month and the Line Memo keeps the original date');
+      // reference IDs: one per card, by screen, numbered largest first; each entry's Memo starts with its card's
+      const refs = await p.evaluate(() => [...document.querySelectorAll('[data-item]')].map(x => ({id: x.dataset.item, amt: Math.abs(Number(x.dataset.amt)),
+        shown: (x.querySelector(':scope > .ih > .ref') || {}).textContent || '', ref: refOf(x.dataset.item)})));
+      ok(refs.length > 0 && refs.length === await p.evaluate(() => Object.keys(DATA.ref).length) && refs.every(r => r.shown && r.shown === r.ref), 'gl: every card shows its reference ID in its header (' + refs.length + ')');
+      ok(refs.every(r => /^(CAPEX|FA|PREPAID|PPD|DEPT|DRAFT|CLEAR|NEW)-\d{2,}$/.test(r.ref)) && new Set(refs.map(r => r.ref)).size === refs.length, 'gl: reference IDs are PREFIX-NN and unique');
+      ok(['CAPEX', 'PREPAID', 'DEPT'].every(s => refs.some(r => r.ref === s + '-01')) && refs.some(r => r.ref.startsWith('PREPAID-') && r.id.startsWith('P-')) && refs.some(r => r.ref.startsWith('DEPT-') && r.id.startsWith('D-')), 'gl: CapEx, Prepaid and Dept & Entity cards are numbered by screen');
+      ok(Object.values(refs.reduce((m, r) => { const [s, n] = r.ref.split('-'); (m[s] = m[s] || [])[Number(n) - 1] = r; return m; }, {}))
+        .every(xs => Array.from(xs).every((r, i) => r && (!i || xs[i - 1].amt >= r.amt))), 'gl: within a screen, numbered from 01 with no gaps, largest amount first');
+      ok(await p.evaluate(() => Object.keys(DATA.je).every(id => refOf(id) && DATA.je[id].memo.startsWith(refOf(id) + ' | ') && / \| Aug'26$/.test(DATA.je[id].memo)
+        && DATA.je[id].memo.length <= 999 && DATA.je[id].lines.every(l => l.memo.startsWith(refOf(id) + ' | ') && l.memo.length <= 999))), 'gl: each entry\'s Memo and Line Memo is REF | description | Aug\'26, within NetSuite\'s 999 characters');
+      ok(await p.evaluate(() => { const m = $('#p-dept [data-jeh$="|memo"]'), id = m.dataset.jeh.split('|')[0];
+        return /^DEPT-\d{2}$/.test(refOf(id)) && m.value === DATA.je[id].memo && m.value.startsWith(refOf(id) + ' | '); }), 'gl: the entry editor\'s Memo carries the reference ID');
+      // a rebuild of the same run numbers every card the same; a drafted entry adds a DRAFT ID and moves none
+      const DG = B + 'out/dist/gl-coding-review/', run = B + 'out/aug2026/gl-coding-review/run.json';
+      if (fs.existsSync(DG + 'build_pages.py') && fs.existsSync(run) && fs.existsSync(B + 'inputs/aug2026')){
+        const cp = require('child_process'), tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'serif-refs-'));
+        const GL = fs.readdirSync(B + 'inputs/aug2026').filter(f => /^netsuite_gl_detail_.*\.xls$/.test(f)).map(f => B + 'inputs/aug2026/' + f);
+        const drafts = path.join(tmp, 'drafts.json');
+        fs.writeFileSync(drafts, JSON.stringify({entries: [{memo: "Test reclass | Aug'26", reason: 'Test', lines: [
+          {account: '6410000', department: 'Platform', vendor: 'Test', debit: 1000}, {account: '6607000', department: 'Platform', vendor: 'Test', credit: 1000}]}]}));
+        const refsOf = (name, extra) => { const out = path.join(tmp, name);
+          const r = cp.spawnSync('python3', ['build_pages.py', '--only', 'coding', '--coding-run', run, '--gl', ...GL, '--out', out, ...extra], {cwd: DG, encoding: 'utf8'});
+          if (r.status) return null; const h = fs.readFileSync(path.join(out, fs.readdirSync(out).find(f => /^serif-gl-coding-review-.*\.html$/.test(f))), 'utf8');
+          return JSON.parse(h.match(/window\.DATA=(.*?);<\/script>/s)[1]).ref; };
+        const mine = await p.evaluate(() => DATA.ref), again = refsOf('again', []), withDraft = refsOf('draft', ['--drafts', drafts]);
+        ok(again && JSON.stringify(again) === JSON.stringify(mine), 'gl: a rebuild of the same data gives the same reference IDs');
+        ok(withDraft && Object.keys(mine).every(i => withDraft[i] === mine[i]) && Object.keys(withDraft).filter(i => !(i in mine)).map(i => withDraft[i]).join() === 'DRAFT-01',
+          'gl: a drafted entry is DRAFT-01 and moves no other reference ID');
+      } else console.log('  SKIP gl: reference IDs across builds (needs out/dist, out/aug2026 and inputs/aug2026: run tools/build.sh first)');
     }
     if (k === 'pl'){
       // a variance row proposes an entry: the row's account, an offset to fill, the memo from the review; it joins the same CSV

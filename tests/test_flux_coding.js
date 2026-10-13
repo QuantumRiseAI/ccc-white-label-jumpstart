@@ -29,8 +29,8 @@ const num = s => Number(String(s).replace(/[^0-9.\-]/g, '')) * (/\(/.test(s) ? -
     const find = from => p.evaluate(from => Object.keys(DATA.je).filter(id => document.querySelector('[data-item="' + id + '"][data-flag]') && new RegExp('from ' + from + ' to 6410000').test(DATA.je[id].memo))
       .sort((a, c) => DATA.je[c].lines[0].debit - DATA.je[a].lines[0].debit), from);
     const fac = await find('6607000'), syn = await find('6501100');
-    const draftId = await p.evaluate(() => Object.keys(DATA.je).find(id => DATA.je[id].memo === 'Test reclass'));
-    ok(!!draftId, 'the drafted entry is a card in the coding console');
+    const draftId = await p.evaluate(() => Object.keys(DATA.je).find(id => /^DRAFT-\d{2}$/.test(refOf(id)) && DATA.je[id].memo === refOf(id) + " | Test reclass | Aug'26"));
+    ok(!!draftId, 'the drafted entry is a card in the coding console, its Memo led by its reference ID');
     const approve = [fac[0], fac[1], syn[0], draftId], reject = syn[1], heldId = syn[2];
     await p.evaluate(() => show('dept'));
     for (const id of approve) await p.click('[data-item="' + id + '"] [data-v="approve"]');

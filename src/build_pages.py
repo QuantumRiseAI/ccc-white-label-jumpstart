@@ -310,6 +310,22 @@ def je_finish(je):
             l["memo"] = j["memo"] + ((" | Original date " + was) if was and was != PERIOD_END else "")
     return je
 
+
+# The GL Coding Review's reference IDs: one prefix per screen, by the prefix of the item id.
+REF_SCREENS = {"C": "CAPEX", "CB": "FA", "P": "PREPAID", "PB": "PPD", "D": "DEPT", "DR": "DRAFT", "R": "CLEAR", "N": "NEW"}
+MEMO_MAX = 999   # NetSuite's limit on a Journal Entry Memo, body and line
+
+
+def ref_memo(ref, memo):
+    """An entry's Memo per the Data Entry Policy, `Specific description | Mon'YY`, with the
+    reference ID in front. The description is cut so the Line Memo, which adds the original
+    date, stays within NetSuite's limit."""
+    m = " ".join(str(memo or "").split())
+    end = re.search(r" \| [A-Z][a-z]{2}'\d{2}$", m)
+    head, desc_, tail = (ref + " | ") if ref else "", m[:end.start()] if end else m, end.group(0) if end else " | %s'%s" % (MON, PERIOD[-2:])
+    room = MEMO_MAX - len(" | Original date 2026-08-31") - len(head) - len(tail)
+    return head + (desc_ if len(desc_) <= room else desc_[:room - 3].rstrip() + "...") + tail
+
 # ---------- the design ----------
 CSS = DS.FONT_CSS + DS.TOKENS + r"""
 *{box-sizing:border-box}
@@ -435,6 +451,7 @@ input.f{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);pa
 .item.foldable:not(.folded) > .ih::after{transform:rotate(-135deg);margin-bottom:-.2em}
 .item .ih{display:flex;align-items:center;gap:var(--spacing-xs);padding:.8em var(--spacing-sm);border-bottom:1px solid var(--color-hairline);flex-wrap:wrap}
 .item .ih b{font-weight:600}
+.item .ih .ref{font-weight:600;color:var(--color-fg-secondary);letter-spacing:.02em}
 .item .ib{padding:var(--spacing-xs) var(--spacing-sm) var(--spacing-sm)}
 .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.8em var(--spacing-sm);margin-bottom:.8em}
 .kv .l{font-size:var(--text--2);text-transform:uppercase;letter-spacing:.04em;color:var(--color-fg-secondary)}
@@ -647,6 +664,7 @@ const KEY = 'serif-console::' + DATA.kind + '::' + DATA.run;
    commentary and notes, entry edits, the GAAP checklist, sign-off and the audit
    log. The threshold is this browser's setting. */
 const STORES = ['dec', 'notes', 'je', 'jh', 'ck', 'sign', 'log'];
+const refOf = id => (DATA.ref || {})[id] || '';
 let S = {dec: {}, notes: {}, sign: {}, ck: {}, je: {}, jh: {}, log: {}, thr: DATA.thr};
 try { S = Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
 if (Array.isArray(S.log)){ const o = {}; S.log.forEach((l, i) => { o[String(l.at).replace(/[^0-9]/g, '') + i] = l; }); S.log = o; }
@@ -1813,7 +1831,7 @@ def coding():
     def acts(iid, label, actions):
         return "".join('<button class="pill" data-d="%s" data-v="%s" data-label="%s">%s</button>' % (iid, v, e(label), lab) for v, lab in actions)
 
-    used_ven = set()
+    used_ven, amts = set(), {}   # amts: each card's amount, for its reference ID
 
     def card(iid, vendor, amount, hi, cur, rec, doc, extra, why, pol, actions, lines="", more="", flag=True):
         dl = doc_links(doc["document"]) if doc else ""
@@ -1823,10 +1841,11 @@ def coding():
             v_ = {"clear": "reject", "entry": "approve"}.get(dv["recommend"])
             more = draft("ven:" + iid, txt(dv.get("note")), iid, iid if v_ else None, v_,
                          {"reject": "Coding stands: reject the recode.", "approve": "Approve the recode."}.get(v_, "Ask the owner.")) + more
-        return ('<div class="item%s" data-item="%s" data-amt="%s"%s><div class="ih"><b>%s</b><span class="stp">Pending</span><span class="mono">%s</span>%s</div><div class="ib"><div class="kv">'
+        amts[iid] = amount or 0
+        return ('<div class="item%s" data-item="%s" data-amt="%s"%s><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span>%s</div><div class="ib"><div class="kv">'
                 '<div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Recommended</div><div class="x">%s</div></div>'
                 '<div><div class="l">Document / item</div><div class="x">%s%s</div></div>%s</div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
-                % (" hi" if hi else "", iid, round(amount or 0, 2), " data-flag" if flag else "", e(vendor), money(amount, True), '<span class="tag hi">Review</span>' if hi else "", cur, rec,
+                % (" hi" if hi else "", iid, round(amount or 0, 2), " data-flag" if flag else "", iid, e(vendor), money(amount, True), '<span class="tag hi">Review</span>' if hi else "", cur, rec,
                    (e(doc["type"] + " " + doc["document"]) + "<small>" + e(doc["text"]) + "</small>") if doc else "&ndash;", dl, extra,
                    ('<div class="why">' + why + "</div>") if why else "", ('<div class="pol">' + e(pol) + "</div>") if pol else "", more, lines,
                    acts(iid, vendor, actions), iid))
@@ -1959,10 +1978,11 @@ def coding():
         cur = "<br>".join(coding_(c["account"], c.get("department")) for c in (r.get("by_coding") or []) if round(c.get("current") or 0)) or coding_(a)
         je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": (doc or {}).get("date") or "", "memo": "Recode %s from %s %s" % (r["vendor"], a, dept),
                    "lines": je_lines([{"account": a, "department": dept, "debit": camt}, {"account": a, "department": dept, "credit": camt}]), "when": "recode"}
-        return ('<div class="item" data-item="%s" data-amt="%s"><div class="ih"><b>%s</b><span class="stp">Pending</span><span class="mono">%s</span><span class="tag%s">%s</span></div>'
+        amts[iid] = r["amount"] or 0
+        return ('<div class="item" data-item="%s" data-amt="%s"><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span><span class="tag%s">%s</span></div>'
                 '<div class="ib"><div class="kv"><div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Document / item</div><div class="x">%s%s</div></div>'
                 '<div><div class="l">%s</div><div class="x">%s</div></div></div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
-                % (iid, round(r["amount"] or 0, 2), e(r["vendor"]), money(r["amount"], True), " hi" if tag == "Review" else (" plain" if not tag else ""), tag, cur,
+                % (iid, round(r["amount"] or 0, 2), iid, e(r["vendor"]), money(r["amount"], True), " hi" if tag == "Review" else (" plain" if not tag else ""), tag, cur,
                    (e(doc["type"] + " " + doc["document"]) + "<small>" + e(doc["text"]) + "</small>") if doc else "&ndash;", doc_links(doc["document"]) if doc else "",
                    "Lines this month", str(((r.get("detail") or {}).get("count") or 0)), (why if checks else '<div class="why">' + why + "</div>") if why else "",
                    dh + history(r["vendor"]), je_editor(iid, je[iid]["lines"], "recode"), lines_html(r["vendor"]), acts(iid, r["vendor"], actions), iid))
@@ -2084,8 +2104,18 @@ def coding():
                 ("Transparency", [("clear", "Reviewed & Cleared"), ("new", "New This Period")]),
                 ("Documentation", [("audit", "Audit Log"), ("sox", "SOX Documentation"), ("export", "Export")])]
     SKIPPED.extend("vendor note for " + k for k in (RAW_DRAFTS.get("vendors") or {}) if k not in used_ven)
+    # Reference IDs: numbered by screen within the close, largest first, then by item id, so a
+    # rebuild of the same data numbers them the same. Each entry's Memo starts with its card's.
+    ref, n = {}, defaultdict(int)
+    for iid in sorted(amts, key=lambda i: (-abs(round(amts[i], 2)), i)):
+        k = REF_SCREENS[iid.split("-")[0]]
+        n[k] += 1
+        ref[iid] = "%s-%02d" % (k, n[k])
+    for iid, j in je.items():
+        j["memo"] = ref_memo(ref.get(iid), j["memo"])
+    pages = [re.sub(r"\{ref:([\w-]+)\}", lambda m: '<span class="ref mono">%s</span>' % ref[m.group(1)] if m.group(1) in ref else m.group(0), x) for x in pages]
     CODING_BUILT.update(je=je_finish(je), items=items)
-    data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "je": je_finish(je), "icons": {}, "drafts": DRAFTS}
+    data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "je": je_finish(je), "ref": ref, "icons": {}, "drafts": DRAFTS}
     js = r"""
 function refresh(){
   marks(); paintItems(); counts(); signs(); checklist();
