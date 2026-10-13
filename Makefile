@@ -9,9 +9,10 @@ package:  ## the two Claude Project upload folders, in out/dist/
 build:    ## a close month from inputs/$(PERIOD)/, run as the Projects run it
 	bash tools/build.sh $(PERIOD)
 
-test:     ## the console tests, accepted exceptions, every account number named, and no table scrolling sideways
+test:     ## the console tests, accepted exceptions, the export readers, every account number named, and no table scrolling sideways
 	node tests/test_console.js
 	python3 tests/test_exceptions.py
+	python3 tests/test_readers.py
 	node tests/test_flux_coding.js
 	node tests/audit_account_names.js
 	node tests/audit_table_width.js 1280

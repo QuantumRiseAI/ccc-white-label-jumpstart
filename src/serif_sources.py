@@ -2,9 +2,11 @@
 """Read Serif's system exports exactly as the systems produce them.
 
     netsuite GL    the Custom General Ledger saved search, exported as .xls
-                   (SpreadsheetML). One export or several; each month is read from
-                   the one export that holds it.
-    coupa          the PO line export with all available columns, as a .csv
+                   (SpreadsheetML) or saved as .xlsx, columns found by name. One
+                   export or several; each month is read from the one export that
+                   holds it.
+    coupa          a PO line report as a .csv: the export with all available
+                   columns, or the Coupa Data Pull (PO Lines) report
     forecast       the rolling forecast workbook, as an .xlsx
     balance sheet  the NetSuite Balance Sheet report, monthly columns, exported as .xls
                    (SpreadsheetML)
@@ -60,25 +62,44 @@ def slug(period: str) -> str:
 
 # ── NetSuite Custom General Ledger ──────────────────────────────────────────
 #
-# Rows 0-5 are report headers; row 6 is the column header; data starts at row 7.
-# The export carries TWO columns named "ProjectID: Name" and the second holds the
-# values, so columns are read by position, never by header name. Amounts arrive as
-# separate Debit and Credit strings; `amount` is Debit - Credit.
+# A few report-title rows, then the column header (its first cell is "Account"),
+# then the data. NetSuite writes .xls (SpreadsheetML); an export opened and saved in
+# Excel arrives as .xlsx. Both are read, and columns are found by header name, so a
+# saved search with columns added or moved reads the same. Amounts arrive as
+# separate Debit and Credit; `amount` is Debit - Credit.
 #
-# Columns after Memo are read by header name. The saved search can add
-# "Internal ID" (the NetSuite record a line belongs to), the bill's Coupa
-# Transaction URL (custbody_coupa_transaction_url) and the line's Coupa PO number
-# (custcol_coupa_po_num, eg FL087030260-1). A Coupa invoice address in any cell is
-# carried as the line's link.
+# The export can carry TWO columns named "ProjectID: Name", and which one holds
+# the project differs between saved searches. A line's project is the first of
+# them naming a real project, else the first non-blank one.
+#
+# Optional columns, read when present: "Internal ID" (the NetSuite record a line
+# belongs to), the bill's Coupa Transaction URL, and the line's Coupa PO number
+# (custcol_coupa_po_num or "PO Number", eg FL087030260-1). A Coupa invoice address
+# in any cell is carried as the line's link.
 
+COUPA_INVOICE = "https://" + COUPA_HOST + "/invoices/"
 SS = "{urn:schemas-microsoft-com:office:spreadsheet}"
-GL_HEADER_ROW = 6
-GL_COLS = {
-    "account_path": 0, "txn_type": 1, "date": 2, "document_number": 3, "name": 4,
-    "debit": 5, "credit": 6, "balance": 7, "account_name": 8, "period": 9,
-    "department": 10, "program": 11, "project_unused": 12, "project": 13,
-    "subsidiary": 14, "description": 15, "memo": 16,
+
+# Field -> header names it is exported under, first match wins. Lower case.
+GL_HEADERS = {
+    "account_path": ("account",),
+    "txn_type": ("type", "transaction type"),
+    "date": ("date",),
+    "document_number": ("document number",),
+    "name": ("name",),
+    "debit": ("debit", "amount (debit)"),
+    "credit": ("credit", "amount (credit)"),
+    "period": ("accounting period: name", "accounting period", "period"),
+    "department": ("department: name", "department"),
+    "program": ("program: name", "program"),
+    "subsidiary": ("subsidiary: name", "subsidiary"),
+    "description": ("description",),
+    "memo": ("memo",),
 }
+GL_REQUIRED = ("account_path", "txn_type", "date", "document_number", "name", "debit",
+               "credit", "period", "department")
+PROJECT_HEADERS = ("projectid: name", "project: name", "projectid", "project")
+NO_PROJECT = re.compile(r"^(|00 non-specific|non-specific|- no .* -)$", re.I)
 
 
 def _float(value):
@@ -95,63 +116,108 @@ def split_account(path: str) -> tuple[str, str]:
     return (match.group(1), match.group(2).strip()) if match else ("", leaf.strip())
 
 
-def _gl_rows(path: str, header=None):
-    """Yield each data row's cell values, streaming, so a large export fits in memory.
-    The column header row is copied into `header` when one is passed."""
-    index = 0
+def _gl_sheet_rows(path: str):
+    """Every row's cell values, as text, from either export format."""
+    if zipfile.is_zipfile(path):
+        zf = zipfile.ZipFile(path)
+        part = next(iter(_sheet_map(zf).values()), "xl/worksheets/sheet1.xml")
+        grid = _read_grid(zf, part, _shared_strings(zf))
+        for number in sorted(grid):
+            cells = grid[number]
+            yield [cells.get(i, "") for i in range(max(cells) + 1)] if cells else []
+        return
     try:
         for _, elem in ET.iterparse(path, events=("end",)):
             if elem.tag != SS + "Row":
                 continue
-            values = []
+            values, col = [], 0
             for cell in elem.findall(SS + "Cell"):
+                # A cell may skip ahead with ss:Index (1-based) past empty cells.
+                index = cell.get(SS + "Index")
+                if index:
+                    values.extend([""] * (int(index) - 1 - col))
+                    col = int(index) - 1
                 data = cell.find(SS + "Data")
                 values.append("".join(data.itertext()).strip() if data is not None else "")
-            if index == GL_HEADER_ROW and (not values or values[0] != "Account"):
-                raise SystemExit(
-                    f"{os.path.basename(path)}: row {GL_HEADER_ROW} is {values[:3]}, not the "
-                    "Custom General Ledger header. Export the saved search again as .xls, "
-                    "unchanged.")
-            if index == GL_HEADER_ROW and header is not None:
-                header[:] = values
-            if index > GL_HEADER_ROW and len(values) >= len(GL_COLS):
-                yield values
-            index += 1
+                col += 1
+            yield values
             elem.clear()
     except ET.ParseError as error:
-        raise SystemExit(f"{os.path.basename(path)} is not a NetSuite .xls export: {error}")
+        raise SystemExit(f"{os.path.basename(path)} is not a NetSuite .xls or .xlsx export: {error}")
 
 
-COUPA_INVOICE = "https://" + COUPA_HOST + "/invoices/"
+def _gl_rows(path: str, header=None):
+    """Yield each data row's cell values, streaming an .xls so a large export fits in
+    memory. The column header row is copied into `header` when one is passed."""
+    seen = None
+    for index, values in enumerate(_gl_sheet_rows(path)):
+        if seen is None:
+            if values and values[0].strip().lower() == "account":
+                seen = values
+                if header is not None:
+                    header[:] = values
+            elif index >= 30:
+                break
+            continue
+        if any(values):
+            yield values
+    if seen is None:
+        raise SystemExit(
+            f"{os.path.basename(path)} has no column header starting with 'Account' in its "
+            "first 30 rows: it is not the NetSuite Custom General Ledger export.")
 
 
-def _extra_cols(header):
-    """-> (Internal ID column, Coupa PO column), or None for one the export lacks."""
-    def find(test):
-        return next((i for i, h in enumerate(header) if i >= len(GL_COLS) and test(h.strip().lower())), None)
-    return (find(lambda h: h == "internal id"),
-            find(lambda h: "coupa" in h and re.search(r"\bpo\b", h) is not None))
+def _gl_columns(path, header) -> dict:
+    """Field -> column index, from the header names. Missing required columns stop the
+    run with their names, rather than reading another column in their place."""
+    names = [h.strip().lower() for h in header]
+    cols = {}
+    for field, options in GL_HEADERS.items():
+        cols[field] = next((names.index(o) for o in options if o in names), None)
+    missing = [GL_HEADERS[f][0] for f in GL_REQUIRED if cols[f] is None]
+    if missing:
+        raise SystemExit(
+            f"{os.path.basename(path)} has no column for: {', '.join(missing)}. "
+            f"Its columns are: {', '.join(h for h in header if h)}.")
+    cols["projects"] = [i for i, h in enumerate(names) if h in PROJECT_HEADERS]
+    cols["internal_id"] = next((i for i, h in enumerate(names) if h == "internal id"), None)
+    cols["coupa_po"] = [i for i, h in enumerate(names)
+                        if ("coupa" in h and re.search(r"\bpo\b", h)) or h == "po number"]
+    cols["date_serial"] = zipfile.is_zipfile(path)
+    return cols
 
 
-def _gl_line(values, internal_id_col=None, po_col=None):
-    get = lambda key: values[GL_COLS[key]]
+def _gl_date(value: str, serial: bool) -> str:
+    if serial and re.fullmatch(r"\d+(\.\d+)?", value or ""):
+        return (EXCEL_EPOCH + dt.timedelta(days=int(float(value)))).isoformat()
+    return (value or "")[:10]
+
+
+def _gl_line(values, cols):
+    get = lambda key: (values[cols[key]] if cols[key] is not None and cols[key] < len(values)
+                       else "").strip()
     code, leaf = split_account(get("account_path"))
     debit, credit = _float(get("debit")), _float(get("credit"))
+    projects = [values[i].strip() for i in cols["projects"] if i < len(values)]
+    po = next((m.group(1) for i in cols["coupa_po"] if i < len(values)
+               for m in [re.match(r"(FL\d{9})", values[i].strip())] if m), "")
     return {
-        "period": get("period"), "date": get("date")[:10], "txn_type": get("txn_type"),
+        "period": get("period"), "date": _gl_date(get("date"), cols["date_serial"]),
+        "txn_type": get("txn_type"),
         "document_number": get("document_number"), "vendor_or_name": get("name"),
         "account_path": get("account_path"), "account_code": code, "account_leaf": leaf,
         "amount": round(debit - credit, 2), "debit": debit, "credit": credit,
-        "department": get("department"), "project": get("project"),
+        "department": get("department"),
+        "project": next((p for p in projects if not NO_PROJECT.match(p)),
+                        next((p for p in projects if p), "")),
         "program": get("program"), "subsidiary": get("subsidiary"),
         "description": get("description"), "memo": get("memo"),
-        "internal_id": (values[internal_id_col].strip()
-                        if internal_id_col is not None and internal_id_col < len(values) else ""),
+        "internal_id": (values[cols["internal_id"]].strip()
+                        if cols["internal_id"] is not None and cols["internal_id"] < len(values)
+                        else ""),
         "coupa_url": next((v.strip() for v in values if v.strip().startswith(COUPA_INVOICE)), ""),
         # 'FL087030260-1' is PO FL087030260, line 1; 'No PO' is none.
-        "coupa_po": (re.match(r"(FL\d{9})", values[po_col].strip()).group(1)
-                     if po_col is not None and po_col < len(values)
-                     and re.match(r"FL\d{9}", values[po_col].strip()) else ""),
+        "coupa_po": po,
     }
 
 
@@ -172,8 +238,8 @@ def read_gl(paths) -> tuple[dict, list[dict]]:
         cols = None
         for values in _gl_rows(path, header):
             if cols is None:
-                cols = _extra_cols(header)
-            line = _gl_line(values, *cols)
+                cols = _gl_columns(path, header)
+            line = _gl_line(values, cols)
             if line["period"]:
                 mine[line["period"]].append(line)
         for period, lines in mine.items():
@@ -285,17 +351,68 @@ def _coupa_line(row):
     }
 
 
-def read_coupa(path) -> list[dict]:
-    """Every PO line in the export, with the period taken from its order date."""
+# Coupa reports differ by who builds them. The full PO line export ("all available
+# columns") and the shorter "Coupa Data Pull (PO Lines)" report name the same
+# fields differently. Each is read under the full export's names; a field neither
+# carries reads empty, and is listed so a check that needs it says it could not run.
+COUPA_NAMES = {
+    "PO Number (Header)": ("PO Number",),
+    "Order Date (Header)": ("Order Date",),
+    "Requested By (Header)": ("Requestor", "Requested By", "Requester"),
+    "Line Total": ("Order Line Amount", "Amt", "Line Amount"),
+    "Price": ("Unit Price",),
+    "UOM": ("U/M", "Unit of Measure"),
+    "Item": ("Item Name", "Description"),
+}
+# The fields the scripts read. Absent or empty in a pull, they are reported.
+COUPA_USED = ("PO Number (Header)", "Order Date (Header)", "Supplier", "Account", "Line",
+              "Line Total", "Item", "Qty", "Received", "Approved Invoiced", "Line Status",
+              "Order Status (Header)", "Commodity", "Requested By (Header)", "PO ID")
+_coupa_cache: dict = {}
+
+
+def coupa_rows(path) -> tuple[list[dict], list[str]]:
+    """-> (rows keyed by the full export's column names, the used fields this pull lacks
+    or leaves empty). Stops when the file has no PO number or order date column."""
     if not os.path.exists(path):
         raise SystemExit(f"Not found: {path}")
+    stamp = (os.path.abspath(path), os.path.getmtime(path))
+    if stamp in _coupa_cache:
+        return _coupa_cache[stamp]
+    csv.field_size_limit(10_000_000)
     with open(path, encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
-        if "PO Number (Header)" not in (reader.fieldnames or []):
+        fields = [(f or "").strip() for f in (reader.fieldnames or [])]
+        raw = list(reader)
+    rename = {}
+    for name, others in COUPA_NAMES.items():
+        if name not in fields:
+            found = next((o for o in others if o in fields), None)
+            if found:
+                rename[name] = found
+    for need in ("PO Number (Header)", "Order Date (Header)"):
+        if need not in fields and need not in rename:
             raise SystemExit(
-                f"{os.path.basename(path)} is not the Coupa PO line export: it has no "
-                "'PO Number (Header)' column. Export it from Coupa with all available columns.")
-        return [_coupa_line(row) for row in reader]
+                f"{os.path.basename(path)} is not a Coupa PO line report: it has no "
+                f"'{need}' column (or {', '.join(repr(o) for o in COUPA_NAMES[need])}). "
+                f"Its columns are: {', '.join(f for f in fields if f)}.")
+    rows = []
+    for r in raw:
+        row = {(k or "").strip(): v for k, v in r.items()}
+        for name, found in rename.items():
+            row[name] = row.get(found, "")
+        # A report's closing totals row carries amounts but no PO number.
+        if (row.get("PO Number (Header)") or "").strip():
+            rows.append(row)
+    absent = [f for f in COUPA_USED
+              if not any((row.get(f) or "").strip() for row in rows)]
+    _coupa_cache[stamp] = (rows, absent)
+    return rows, absent
+
+
+def read_coupa(path) -> list[dict]:
+    """Every PO line in the report, with the period taken from its order date."""
+    return [_coupa_line(row) for row in coupa_rows(path)[0]]
 
 
 # ── Rolling forecast workbook ───────────────────────────────────────────────

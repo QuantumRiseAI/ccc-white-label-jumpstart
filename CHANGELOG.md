@@ -83,6 +83,22 @@ serif-pl-flux-aug2026-v1.8.2.html
   it. In the CSV, a Memo or Line Memo a reviewer's note or edit takes past 999 is cut to fit, ending `...`. Aug 2026: 105 cards, CAPEX 3,
   PREPAID 1, PPD 7, DEPT 53, CLEAR 24, NEW 17; the longest Memo is 118 characters.
 
+## Unreleased: the readers take differently built exports
+
+- **GL**: columns are found by header name, not position, so a Custom General Ledger
+  saved search with columns added or moved reads the same, and an export saved as `.xlsx`
+  reads as well as NetSuite's `.xls`. A missing required column stops the run and names
+  it. Of the two "ProjectID: Name" columns, a line's project is the one naming a real
+  project. A "PO Number" column, when filled, gives the line's Coupa PO. The coding engine
+  reads the GL through `serif_sources.py`, the same reader as the consoles (engine 0.2.5).
+  Aug 2026 reads unchanged; the Sep 2026 `.xlsx` (Jan to Sep 2026) matches the Aug export
+  on every month both hold.
+- **Coupa**: the Coupa Data Pull (PO Lines) report reads beside the export with all
+  available columns, its columns named under the export's names. Columns a report lacks
+  or leaves empty are listed in `coupa_coverage.columns_absent`, and both Projects tell
+  the reviewer which checks they feed before anything else. A report's totals row is
+  not read as a PO line.
+
 ## Unreleased: accepted exceptions (SERIF-64)
 
 - **Accepted exceptions** (GL Coding Review): a reviewer-maintained `templates/accepted_exceptions.csv`
