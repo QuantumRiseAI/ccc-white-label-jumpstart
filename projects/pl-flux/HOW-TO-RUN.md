@@ -58,8 +58,10 @@ python3 build_pages.py --only flux --flux-run out/sep2026/run.json \
 To carry the GL Coding Review's booked corrections into Actual vs. Actual (MoM), add the coding
 run and its decision record to the build:
 `--coding-run <coding run.json> --coding-record <coding decision record .json>`. Each account
-shows the correction, the adjusted movement, and flags on the adjusted figure. Open coding
-findings are noted on the affected row, never applied. A coding `drafts.json` goes in with
+shows the correction, the adjusted movement, and flags on the adjusted figure. A fix marked
+Edited in NetSuite counts as a correction, named apart, when the flux reads the coding run's own
+GL export; on a later export, which may already hold the edit, it is left out and the run log
+says so. Open coding findings are noted on the affected row, never applied. A coding `drafts.json` goes in with
 `--coding-drafts`, so decisions on Journal Entries Claude drafted there apply too.
 
 In the Claude Project, Claude then writes `drafts.json` and builds again with

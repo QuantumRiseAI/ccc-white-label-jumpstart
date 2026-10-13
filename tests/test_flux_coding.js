@@ -1,7 +1,7 @@
 // The P&L Flux with the GL Coding Review's decision record: the record is made in the built GL
 // console (approve three recodes, reject one, modify one with no note, approve a Journal Entry
-// Claude drafted), the flux is built with it, and the MoM table carries the corrections, flags
-// on the adjusted figure, and notes the open and held findings.
+// Claude drafted, mark one Edited in NetSuite), the flux is built with it, and the MoM table
+// carries the corrections, flags on the adjusted figure, and notes the open and held findings.
 // Run after `make build PERIOD=aug2026`:   node tests/test_flux_coding.js   (or: make test)
 let chromium; try { ({ chromium } = require('playwright')); }
 catch (e) { ({ chromium } = require(process.env.PLAYWRIGHT || '/Users/anniebritton/.npm/_npx/520e866687cefe78/node_modules/playwright')); }
@@ -36,15 +36,19 @@ const num = s => Number(String(s).replace(/[^0-9.\-]/g, '')) * (/\(/.test(s) ? -
     for (const id of approve) await p.click('[data-item="' + id + '"] [data-v="approve"]');
     await p.click('[data-item="' + reject + '"] [data-v="reject"]');
     await p.click('[data-item="' + heldId + '"] [data-v="modify"]');          // no note: not decided
+    const nsId = await p.evaluate(() => Object.keys(DATA.je).find(id => document.querySelector('[data-item="' + id + '"][data-flag]') && /from 6607000 to 6810000/.test(DATA.je[id].memo)));   // fixed on the bill in NetSuite
+    await p.click('[data-item="' + nsId + '"] [data-v="netsuite"]');
+    const nsAmt = await p.evaluate(id => DATA.je[id].lines.filter(l => l.account === '6607000').reduce((a, l) => a + l.credit - l.debit, 0), nsId);
     await p.evaluate(() => show('settings'));
     const [d] = await Promise.all([p.waitForEvent('download'), p.click('[data-recsave]')]);
     const rec = path.join(tmp, 'coding-record.json'); await d.saveAs(rec);
     const recJ = JSON.parse(fs.readFileSync(rec, 'utf8'));
     ok(recJ.console_kind === 'coding' && recJ.dec[heldId].v === 'modify', 'coding decision record saved from the GL console');
+    ok(recJ.dec[nsId].v === 'netsuite' && nsAmt > 0, 'an item edited in NetSuite is in the record');
 
     let n = 0;
-    const build = (extra, name) => { const out = path.join(tmp, name || 'b' + (n++));
-      const r = cp.spawnSync('python3', ['build_pages.py', '--only', 'flux', '--flux-run', O + 'pl-flux/run.json', '--gl', ...GL, '--income-statement', IS[0], '--out', out, ...extra], {cwd: D, encoding: 'utf8'});
+    const build = (extra, name, fluxRun) => { const out = path.join(tmp, name || 'b' + (n++));
+      const r = cp.spawnSync('python3', ['build_pages.py', '--only', 'flux', '--flux-run', fluxRun || O + 'pl-flux/run.json', '--gl', ...GL, '--income-statement', IS[0], '--out', out, ...extra], {cwd: D, encoding: 'utf8'});
       return {out: path.join(out, 'serif-pl-flux-aug2026-v2.0.0.html'), r}; };
     const CODING = ['--coding-run', O + 'gl-coding-review/run.json'];
     const w = build([...CODING, '--coding-record', rec, '--coding-drafts', drafts]);
@@ -64,6 +68,16 @@ const num = s => Number(String(s).replace(/[^0-9.\-]/g, '')) * (/\(/.test(s) ? -
     ok(Math.abs(num(f.cells[3]) + num(f.cells[4]) - num(f.cells[5])) < 1.5, 'Facility Repairs: adjusted move is the reported move plus the correction');
     ok(Math.abs(f.v - num(f.cells[5])) < 1.5, 'Facility Repairs: the flag runs on the adjusted figure');
     ok(/Largest vendors \(before coding corrections\)/.test(f.cm), 'Largest vendors says it is before corrections');
+    // edited in NetSuite: applied like an approved recode on the coding run's own GL export, and said so
+    ok(/4 booked Journal Entries and 1 item edited in NetSuite/.test(w.r.stdout) && /1 item edited in NetSuite, applied/.test(w.r.stdout), 'the item edited in NetSuite is applied, counted apart from the booked entries');
+    ok(/by coding corrections \(\$[\d,]+ booked, \$[\d,]+ edited in NetSuite\)/.test(f.cm) && /Edited in NetSuite:\s*1/.test(await q.locator('#p-ava [data-pane="mom"] .sumline').innerText()), 'the row and the summary name the correction edited in NetSuite');
+    const later = JSON.parse(fs.readFileSync(O + 'pl-flux/run.json', 'utf8'));
+    later.manifest.inputs.forEach(i => { if ((i.roles || []).includes('netsuite_gl')) i.sha256 = '0'.repeat(64); });
+    const laterP = path.join(tmp, 'flux-later-gl.json'); fs.writeFileSync(laterP, JSON.stringify(later));
+    const wl = build([...CODING, '--coding-record', rec, '--coding-drafts', drafts], null, laterP);
+    const fl = await row(await open(wl.out), '6607000');
+    ok(/1 item edited in NetSuite, not applied: this flux reads a GL export other than the coding run's/.test(wl.r.stdout) && Math.abs(num(f.cells[4]) - num(fl.cells[4]) - nsAmt) < 1.5,
+       'on another GL export, which may already hold the edit, the item edited in NetSuite is not applied');
     ok(Math.abs(s.v - num(s.cells[5])) < 1.5 && num(s.cells[5]) > 0, 'Synthesis Costs: adjusted move is a fall, flagged on the adjusted figure');
     ok(/Open coding findings, not applied/.test(s.note), 'open findings are noted on the affected row');
     const heldVendor = await p.evaluate(id => document.querySelector('[data-item="' + id + '"] .ih b').textContent, heldId);

@@ -1,5 +1,6 @@
 // Tests for the 2.0.0 consoles: standalone state, the decision record, the run log,
-// editable entries and the NetSuite CSV, then shared mode on a mocked Artifact db:
+// editable entries and the NetSuite CSV, an item edited in NetSuite (out of the CSV, in the
+// record and the work paper), then shared mode on a mocked Artifact db:
 // two reviewers, attribution, a conflict, a read-only viewer, downloads, and a rerun
 // bringing in the earlier run's decisions. Needs Playwright with Chromium.
 //   node tests/test_console.js [folder holding the two aug2026 v2.0.0 consoles]   (or: make test)
@@ -92,6 +93,35 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     const [dl] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
     let csvText = ''; if (dl){ const f = await dl.path(); csvText = fs.readFileSync(f, 'utf8'); }
     ok(/Finance/.test(csvText) && /Department per budget owner/.test(csvText), k + ': the CSV carries the edit and the note');
+    let ns = null;
+    if (k === 'gl'){
+      // Edited in NetSuite: the fix was made on the bill itself. Decided, out of the CSV, in the record and the work paper
+      ns = await p.evaluate(() => { const n = $$('#p-dept [data-flag]').map(x => x.dataset.item).find(i => DATA.je[i] && DATA.docs[i] && $('[data-item="' + i + '"] [data-v="netsuite"]'));
+        if (!refOf(n)) DATA.ref = Object.assign({}, DATA.ref, {[n]: 'TEST-01'});
+        return {id: n, doc: DATA.docs[n], ref: refOf(n), ext: DATA.je[n].id}; });
+      ok(!!ns.id && !!ns.doc, 'gl: a Dept & Entity flag offers Edited in NetSuite and knows its document (' + ns.doc + ')');
+      ok(await p.evaluate(() => !$$('[data-item^="DR-"] [data-v="netsuite"]').length && $$('#p-clear [data-v="netsuite"]').length > 0 && $$('#p-prepaid [data-v="netsuite"]').length > 0),
+         'gl: Edited in NetSuite is offered beside each fix to a transaction, not on an entry Claude drafted');
+      await p.evaluate(() => show('dept'));
+      await p.click('[data-item="' + ns.id + '"] [data-v="netsuite"]');
+      ok(await p.evaluate(n => S.dec[n].v === 'netsuite' && decided(n) && !jeLive(n) && /Edited in NetSuite/.test($('[data-item="' + n + '"] .stp').textContent)
+         && !$('[data-note="' + n + '"]').hidden, ns.id), 'gl: Edited in NetSuite counts as decided, no note required, the note offered');
+      await p.fill('[data-jef="' + ns.id + '|0|department"]', 'Finance');
+      ok(await p.evaluate(n => S.dec[n].v === 'netsuite', ns.id), 'gl: editing its entry records what changed and keeps it Edited in NetSuite');
+      const [d3] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
+      const csv3 = d3 ? fs.readFileSync(await d3.path(), 'utf8') : '';
+      ok(!!csv3 && csv3.includes(await p.evaluate(id => DATA.je[id].id, id)) && !csv3.includes(ns.ext), 'gl: an item edited in NetSuite is absent from the CSV; the reclass is in it');
+      ok(/1 item edited in NetSuite, not in the import/.test(await p.evaluate(() => $('#tip').textContent)), 'gl: the export says what was edited in NetSuite and left out');
+      await p.evaluate(() => show('export'));
+      ok(/Edited in NetSuite: 1/.test(await p.textContent('[data-fixsum]')) && (await p.textContent('[data-nsrows]')).includes(ns.doc) && (await p.textContent('[data-nsrows]')).includes(ns.ref),
+         'gl: Export counts the paths and lists the item edited in NetSuite with its document and reference ID');
+      const [wp] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('[data-wpsave]')]);
+      const wpText = wp ? fs.readFileSync(await wp.path(), 'utf8') : '';
+      const wpRow = (wpText.split('<tr>').find(r => r.includes('>' + ns.ref + '<')) || '');
+      ok(/Edited in NetSuite/.test(wpRow) && wpRow.includes(ns.doc.replace(/&/g, '&amp;')) && /Finance/.test(wpRow) && !wpText.split('Reclasses in the NetSuite import')[1].includes(ns.ext),
+         'gl: the work paper carries it with its path, document, reference ID and change, and not among the reclasses');
+      ok(/Reclass, in the import/.test(wpText) && wpText.split('Reclasses in the NetSuite import')[1].includes(await p.evaluate(id => DATA.je[id].id, id)), 'gl: the work paper lists the reclass in the import');
+    }
     if (k === 'gl'){
       const r = await p.evaluate(() => document.querySelector('#p-clear [data-item]').dataset.item);
       await p.evaluate(() => show('clear'));
@@ -167,6 +197,12 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     if (rd) fs.copyFileSync(await rd.path(), recPath);
     const rec = rd ? JSON.parse(fs.readFileSync(recPath, 'utf8')) : {};
     ok(rec.kind === 'serif-decision-record' && rec.dec && rec.dec[id], k + ': record saved with the decision');
+    if (ns){
+      const f = (rec.fixes || {})[ns.id] || {};
+      ok(rec.dec[ns.id].v === 'netsuite' && f.path === 'Edited in NetSuite' && f.document === ns.doc && f.ref === ns.ref && !f.in_import && !f.external_id,
+         'gl: the record carries the path, the document and the reference ID of the item edited in NetSuite');
+      ok(((rec.fixes || {})[id] || {}).path === 'Reclass' && rec.fixes[id].in_import && !!rec.fixes[id].external_id, 'gl: and the reclass path, with its External ID');
+    }
     await ctx.close();
     const c2 = await b.newContext(); const q = await c2.newPage();
     q.on('pageerror', e => errs.push(k + ' load: ' + e.message));
@@ -176,6 +212,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     ok(await q.locator('#ask').isVisible(), k + ': loading asks first, on the page');
     await q.click('[data-askok]'); await q.waitForTimeout(200);
     ok(await q.evaluate(id => (S.dec[id] || {}).v === 'modify' && (S.je[id] || [])[0].department === 'Finance', id), k + ': record loads the decision and the edit');
+    if (ns) ok(await q.evaluate(n => (S.dec[n] || {}).v === 'netsuite' && decided(n), ns.id), 'gl: the record loads Edited in NetSuite');
     await c2.close();
   }
 
@@ -213,6 +250,12 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     ok(await A.evaluate(id => (S.dec[id] || {}).v === 'reject', ids[1]), 'A sees B\'s decision');
     const stp = await A.evaluate(id => document.querySelector('[data-item="' + id + '"] .stp').textContent, ids[1]);
     ok(/Bob Checker/.test(stp), 'decision named by who made it: ' + stp);
+    const nsId = k === 'gl' ? await A.evaluate(() => $('#p-dept [data-flag] [data-v="netsuite"]').closest('[data-item]').dataset.item) : null;
+    if (nsId){
+      await A.evaluate(id => decide(id, 'netsuite', 'n'), nsId); await sleep(1500);
+      ok(await Bp.evaluate(id => (S.dec[id] || {}).v === 'netsuite' && decided(id) && /^Edited in NetSuite · Alice Reviewer/.test($('[data-item="' + id + '"] .stp').textContent), nsId),
+         'B sees A\'s Edited in NetSuite, named');
+    }
     ok(!JSON.stringify(Array.from(store.values())).includes('Alice Reviewer'), 'no name written to the shared review');
     // conflict: both change the same item at once; one stands and the other is told
     await Promise.all([A.evaluate(id => decide(id, 'approve', 'c'), ids[2]), Bp.evaluate(id => decide(id, 'reject', 'c'), ids[2])]);
@@ -244,6 +287,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     await R.evaluate(() => { show('settings'); carryRun(); }); await sleep(800);
     await R.click('[data-askok]'); await sleep(300);
     ok(await R.evaluate(id => (S.dec[id] || {}).v === 'approve', ids[0]), 'earlier decisions brought in');
+    if (nsId) ok(await R.evaluate(id => (S.dec[id] || {}).v === 'netsuite', nsId), 'an earlier Edited in NetSuite is brought in');
     for (const p of pages) await p.context().close();
   }
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''));
