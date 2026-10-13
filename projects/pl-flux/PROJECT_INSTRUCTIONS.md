@@ -26,8 +26,8 @@ name, or missing, and ask for any that are missing before you run anything.
 
 | Export | What the month needs |
 |---|---|
-| NetSuite Custom General Ledger saved search, `.xls`, named `netsuite_gl_<range>.xls` | One or more exports that together hold the month, the six months before it and the same month last year. Any date ranges, as long as no month is in two. |
-| Coupa PO line report with all available columns, `.csv` | The export for the month's calendar year |
+| NetSuite Custom General Ledger saved search, `.xls` (or saved as `.xlsx`), named `netsuite_gl_<range>.xls` | One or more exports that together hold the month, the six months before it and the same month last year. Any date ranges, as long as no month is in two. |
+| Coupa PO line report, `.csv`: the export with all available columns, or the Coupa Data Pull (PO Lines) report | The export for the month's calendar year. The scripts list any column the report lacks or leaves empty under `coupa_coverage.columns_absent` in `run.json` |
 | Rolling forecast workbook, `.xlsx`, the month's cut | The workbook FP&A saved after the month closed, such as `serif_rolling_forecast_2026-09.xlsx`, for Forecast vs. Actual |
 | Rolling forecast workbook, `.xlsx`, the plan | `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
 | NetSuite Balance Sheet report, monthly columns, `.xls` | For Balance Sheet Flux and the tie-outs |
@@ -40,6 +40,12 @@ which; ask the reviewer for that export. If there is no cut for the month, leave
 `--forecast` and report that Forecast vs. Actual did not run. Never build a file for the
 scripts to read.
 
+If `coupa_coverage.columns_absent` in `run.json` lists columns, tell the reviewer before
+anything else: name them and the checks they feed (Supplier and Account: every check that
+joins Coupa to the ledger; Received, Approved Invoiced and the statuses: open commitments
+and the accrual population). Ask for the Coupa export with all available columns. Never
+report those checks as clean.
+
 ## Run It
 
 The scripts are Project files: `serif_uc2_flux.py`, `serif_views.py`, `build_pages.py` and
@@ -51,17 +57,17 @@ Put the Project's files and the month's exports in one folder, and run from ther
 `--period`, `--forecast` and the output folder change from month to month:
 
 ```sh
-python3 serif_uc2_flux.py --period "Sep 2026" --gl netsuite_gl_*.xls \
+python3 serif_uc2_flux.py --period "Sep 2026" --gl netsuite_gl_*.xls* \
   --coupa coupa_po_lines_2026.csv --forecast serif_rolling_forecast_2026-09.xlsx \
   --plan serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 --pending . --out out
 
-python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_*.xls \
+python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_*.xls* \
   --plan serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
   --coupa coupa_po_lines_2026.csv --roster ukg_full_roster_hrbp_<date>.csv \
   --netsuite-ids netsuite_link_ids_sep2026.csv \
   --balance-sheet netsuite_balance_sheet_*.xls --keep-names
 
-python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_*.xls \
+python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_*.xls* \
   --income-statement netsuite_income_statement_by_month_*.xls --out out/sep2026
 ```
 
@@ -240,7 +246,7 @@ until the reviewer uses it.
 After the three scripts run, write `drafts.json` and build the console again with it:
 
 ```sh
-python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_*.xls \
+python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_*.xls* \
   --income-statement netsuite_income_statement_by_month_*.xls --out out/sep2026 --drafts drafts.json
 ```
 
