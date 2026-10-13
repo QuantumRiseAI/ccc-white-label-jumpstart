@@ -26,6 +26,8 @@ IS=(); for f in "$I"/netsuite_income_statement_by_month_*.xls; do [ -e "$f" ] &&
 for J in gl-coding-review pl-flux; do
   O="$B/out/$SLUG/$J"; mkdir -p "$O"
   cd "$B/out/dist/$J"
+  # First, as the Projects do: the ledger tied to the Income Statement by account. A failed tie stops here.
+  if [ ${#IS[@]} -gt 0 ]; then python3 serif_sources.py tie --period "$PERIOD" --gl "$GL" "${IS[@]}" $([ "$J" = pl-flux ] && echo --prior); fi
   if [ "$J" = gl-coding-review ]; then
     python3 serif_uc1_engine.py --period "$PERIOD" --gl "$GL" --coupa "$CO" --pending . --out "$O/engine" >/dev/null
   else
@@ -36,7 +38,7 @@ for J in gl-coding-review pl-flux; do
   if [ "$J" = gl-coding-review ]; then
     python3 serif_views.py "$O/run.json" --gl "$GL" --plan "$FC" --plan-vintage 2026-06 --coupa "$CO" \
       --roster "$RO" "${IDS[@]}" --keep-names | tail -1
-    python3 build_pages.py --only coding --coding-run "$O/run.json" --gl "$GL" --out "$O"
+    python3 build_pages.py --only coding --coding-run "$O/run.json" --gl "$GL" "${IS[@]}" --out "$O"
   else
     python3 serif_views.py "$O/run.json" --gl "$GL" --plan "$FC" --plan-vintage 2026-06 --coupa "$CO" \
       --roster "$RO" "${IDS[@]}" "${BS[@]}" --keep-names | tail -1

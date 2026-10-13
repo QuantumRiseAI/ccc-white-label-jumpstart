@@ -31,7 +31,7 @@ name, or missing, and ask for any that are missing before you run anything.
 | Rolling forecast workbook, `.xlsx`, the month's cut | The workbook FP&A saved after the month closed, such as `serif_rolling_forecast_2026-09.xlsx`, for Forecast vs. Actual |
 | Rolling forecast workbook, `.xlsx`, the plan | `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
 | NetSuite Balance Sheet report, monthly columns, `.xls` | For Balance Sheet Flux and the tie-outs |
-| NetSuite Income Statement by month report, `.xls` | For the tie-outs on SOX & GAAP |
+| NetSuite Income Statement by month report, `.xls` | The month and the month before. The ledger is tied to it by account before the console is built, and on SOX & GAAP |
 | UKG roster, `.csv` | The newest roster |
 | NetSuite link IDs, `.csv`, named `netsuite_link_ids_<month>.csv` | Optional, for links. The connector's result for `netsuite_link_ids.sql`; see NetSuite Link IDs |
 
@@ -57,6 +57,9 @@ Put the Project's files and the month's exports in one folder, and run from ther
 `--period`, `--forecast` and the output folder change from month to month:
 
 ```sh
+python3 serif_sources.py tie --period "Sep 2026" --prior --gl netsuite_gl_*.xls* \
+  --income-statement netsuite_income_statement_by_month_*.xls
+
 python3 serif_uc2_flux.py --period "Sep 2026" --gl netsuite_gl_*.xls* \
   --coupa coupa_po_lines_2026.csv --forecast serif_rolling_forecast_2026-09.xlsx \
   --plan serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 --pending . --out out
@@ -79,6 +82,15 @@ Journal Entry approved, or modified or recoded with a note), the adjusted moveme
 adjusted figure. A fix marked Edited in NetSuite is applied too, and named apart, when this flux reads
 the coding run's own GL export; on a later export, which may already hold the edit, it is not applied
 and the run log says so. Open coding findings are listed on the affected row and never applied. Say in the chat that the flux carries the corrections.
+
+The first command ties the ledger to NetSuite's Income Statement, account by account, for the
+month and the month before. If it says the ledger does not tie, stop there: tell the reviewer
+which accounts differ, in which month and by how much, and ask for the GL and the Income
+Statement exported again from NetSuite. Build nothing on figures that do not tie. The build
+checks the same tie and stops too; only when the reviewer asks to go ahead anyway, add
+`--allow-tie-differences` to the build, and the differences lead the first page. The tie's
+result is the first thing you say in the chat, and it shows at the top of the Executive
+Overview.
 
 The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.0.0.html`. Publish it as
 [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML yourself:
@@ -226,7 +238,7 @@ opens its pages beside its title.
     Memo on each line. Journal Date, Posting Period, Memo, Reversing Entry, Reversal Date and Line
     Memo are editable on the entry; Subsidiary, Currency and Exchange Rate are shown, not
     editable. The Journal Date defaults to the last day of the close month;
-  * **SOX & GAAP**: the tie-outs of the ledger to the Income Statement and Balance Sheet, the
+  * **SOX & GAAP**: the tie-outs of the ledger to the Income Statement (by account, and in total) and Balance Sheet, the
     Flagship related-party schedule (Flagship-named vendors and journals, three months), the
     GAAP checklist, the source data and the sign-off.
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
@@ -728,13 +740,13 @@ flux runs in a Project.
 | `serif_views.py` | Lays the run out as schedules and Journal Entries |
 | `build_pages.py` | Builds the console |
 | `serif_design.py`, `serif_fonts.py` | Serif's design tokens, logo and typefaces, and the run log |
-| `serif_sources.py` | Reads the NetSuite, Coupa and forecast exports |
+| `serif_sources.py` | Reads the NetSuite, Coupa and forecast exports, and ties the ledger to the Income Statement (`tie`) |
 | `netsuite_gl_<range>.xls` | NetSuite Custom General Ledger exports. Each month's activity by account and department is read from them. |
 | `netsuite_link_ids_<month>.csv`, `netsuite_link_ids.sql` | The month's NetSuite link IDs, and the query that pulls them |
 | `coupa_po_lines_<year>.csv` | Coupa PO line export for the calendar year, the accrual source |
 | `serif_rolling_forecast_<vintage>.xlsx` | The rolling forecast workbooks: the month's cut, and the one whose prior cut is the plan |
 | `netsuite_balance_sheet_*.xls` | The Balance Sheet report, for Balance Sheet Flux and the tie-outs |
-| `netsuite_income_statement_by_month_*.xls` | The Income Statement by month, for the tie-outs |
+| `netsuite_income_statement_by_month_*.xls` | The Income Statement by month, which the ledger is tied to by account |
 | `ukg_full_roster_hrbp_<date>.csv` | UKG roster, for Payroll Analytics. Personal data. |
 | `serif-*.md` | Chart of accounts, policy rules |
 

@@ -41,7 +41,8 @@ ap.add_argument("--only", choices=("coding", "flux"), help="build one console; b
 ap.add_argument("--coding-run", help="the GL Coding Review run.json, after serif_views.py --keep-names")
 ap.add_argument("--flux-run", help="the P&L Flux run.json, after serif_views.py --keep-names --balance-sheet")
 ap.add_argument("--gl", nargs="+", help="the NetSuite Custom General Ledger export(s), as NetSuite writes them")
-ap.add_argument("--income-statement", help="the NetSuite Income Statement by month report, for the flux tie-outs")
+ap.add_argument("--income-statement", help="the NetSuite Income Statement by month report: the ledger is tied to it by account before the build, and the flux tie-outs")
+ap.add_argument("--allow-tie-differences", action="store_true", help="build although the ledger does not tie to the Income Statement; the differences lead the first page")
 ap.add_argument("--coding-record", help="the GL Coding Review decision record (JSON, format 3), with --coding-run: booked corrections adjust the P&L flux (--only flux)")
 ap.add_argument("--coding-drafts", help="the GL Coding Review's drafts.json, with --coding-record: Journal Entries Claude drafted there, so a decision on one can be applied")
 ap.add_argument("--drafts", help="Claude's drafts.json for the console being built (with --only)")
@@ -138,6 +139,14 @@ def doc_links(doc):
 
 # ---------- the ledger, read as exported ----------
 by_period, _ = SS.read_gl(GL_X)
+# The ledger is tied to NetSuite's Income Statement by account before anything is built on it:
+# the close month, and for the flux the month before too. A failed tie stops the build.
+TIE = SS.income_statement_tie(by_period, IS_X, [PERIOD, PRIOR] if "flux" in WANT else [PERIOD]) if IS_X else None
+if TIE and not TIE["passed"]:
+    print("\n".join(SS.tie_lines(TIE)), file=sys.stderr)
+    if not A.allow_tie_differences:
+        sys.exit("Stopped: the ledger does not tie to the Income Statement, so no console was built. Export the GL and "
+                 "the Income Statement again from NetSuite, or build with --allow-tie-differences to put the differences at the top.")
 PNL = lambda c: c[:1] in "678"
 gl_now, gl_prior = by_period.get(PERIOD, []), by_period.get(PRIOR, [])
 dept_acct_vendor = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))
@@ -541,6 +550,9 @@ details.lines td small{display:block;color:var(--color-fg-secondary)}
 .ck .opts{display:flex;gap:var(--spacing-3xs);margin-top:.4em}
 .ck .opts button{font-size:var(--text--2);padding:.25em .7em}
 .note{font-size:var(--text--1);color:var(--color-fg-secondary);line-height:1.5}
+.tiebar .pad{display:flex;flex-wrap:wrap;gap:.25em 1em;align-items:baseline}
+.tiebar.bad{box-shadow:inset 3px 0 0 var(--color-red-text)}.tiebar.bad b{color:var(--color-red-text)}
+.tiebar.none{box-shadow:inset 3px 0 0 var(--color-mid-gray)}
 .setcard{display:flex;align-items:center;gap:var(--spacing-xs)}
 #sharedbar{background-color:var(--color-bg-inverse);color:var(--color-warm-gray);font-size:var(--text--1);padding:.45em var(--spacing-md-lg);border-top:1px solid rgba(255,255,255,.1)}
 #toast{position:fixed;left:50%;bottom:var(--spacing-md);transform:translateX(-50%);z-index:40;background-color:var(--color-bg-inverse);color:#fff;
@@ -608,6 +620,33 @@ def runlog(run, kind, also=None, read=()):
     out.append('<div class="card"><h3>Build record</h3><div class="tw"><table><tbody>'
                + "".join('<tr><td>%s</td><td class="mono">%s</td></tr>' % (e(a), e(b)) for a, b in rec) + "</tbody></table></div></div>")
     return page("runlog", "<h3>Run Log</h3>" + "".join(out))
+
+
+def tie_card(months):
+    """The Income Statement tie, at the top of a console's first page."""
+    if not TIE:
+        return ('<div class="card tiebar none"><div class="pad"><b>Not tied to the Income Statement</b><span class="note">Build with NetSuite&rsquo;s '
+                'Income Statement by month report (--income-statement) to tie the ledger to it by account before relying on these figures.</span></div></div>')
+    bad = [f for f in TIE["failed"] if f["month"] in months]
+    tot = " &middot; ".join("%s net: ledger %s, Income Statement %s" % (e(m), money(TIE["totals"][m]["ledger"], True), money(TIE["totals"][m]["report"], True)) for m in months)
+    if not bad:
+        return ('<div class="card tiebar" data-tie="pass"><div class="pad"><b>Ties to NetSuite&rsquo;s Income Statement</b><span>%s, %d accounts, every account ties</span>'
+                '<span class="note">%s &middot; %s</span></div></div>' % (e(" and ".join(months)), TIE["accounts"], tot, e(TIE["report"])))
+    rows = "".join('<tr><td>%s</td><td><span class="code">%s</span>%s</td><td class="n2">%s</td><td class="n2">%s</td><td class="n2 unf">%s</td></tr>'
+                   % (e(f["month"]), e(f["code"]), e(f["name"]), money(f["ledger"], True), money(f["report"], True), money(f["difference"], True)) for f in bad)
+    return ('<div class="card tiebar bad" data-tie="fail"><div class="pad"><b>Does not tie to NetSuite&rsquo;s Income Statement</b><span>%d account-month%s differ: '
+            'these figures are not ready to rely on</span><span class="note">%s</span></div><div class="tw"><table><thead><tr><th>Month</th><th>Account</th>'
+            '<th class="n2">Ledger</th><th class="n2">Income Statement</th><th class="n2">Difference</th></tr></thead><tbody>%s</tbody></table></div></div>'
+            % (len(bad), "" if len(bad) == 1 else "s", e(TIE["report"]), rows))
+
+
+def tie_row(months):
+    """The tie as one row of a SOX tie-out table: (check, result)."""
+    if not TIE:
+        return ("Ledger ties to the Income Statement by account", "Not run: no Income Statement by month report")
+    bad = [f for f in TIE["failed"] if f["month"] in months]
+    return ("Ledger ties to the Income Statement by account, " + " and ".join(months),
+            ("Pass: %d accounts, %s" % (TIE["accounts"], TIE["report"])) if not bad else "Fail: %d account-months differ" % len(bad))
 
 
 def hero(title, sub, tiles):
@@ -1354,7 +1393,7 @@ def flux():
     sd = txt(RAW_DRAFTS.get("summary"))
     exec_summary = ('<div class="card"><div class="ch">Executive Summary</div><div class="esum">' + (draft("sum:exec", sd, "exec:summary") if sd else "")
                     + '<textarea class="c" rows="8" data-note="exec:summary" placeholder="Executive summary for the controller"></textarea></div></div>')
-    pages.append(page("ov", hero("P&L Flux Analysis, " + PERIOD, "", tiles) + '<div class="grid">' + "".join(cards) + "</div>"
+    pages.append(page("ov", hero("P&L Flux Analysis, " + PERIOD, "", tiles) + tie_card([PERIOD, PRIOR]) + '<div class="grid">' + "".join(cards) + "</div>"
                       + '<div class="card"><div class="ch">Net Loss Bridge, ' + e(PRIOR) + ' to ' + e(PERIOD) + '</div>' + wf
                       + '<div class="wflegend"><span><i style="background:var(--color-dark-gray)"></i>Net loss</span><span><i style="background:var(--color-red-text)"></i>Raises the loss</span>'
                         '<span><i style="background:var(--color-mid-gray)"></i>Lowers the loss</span></div></div>' + exec_summary + CHECKLIST))
@@ -1782,6 +1821,8 @@ def flux():
             tie(what + ", change in " + MON, bsv(name, PERIOD) - bsv(name, PRIOR), sg * gsum(pre), "Balance Sheet", "GL activity")
     unbal = [x for x in ent if abs(round(sum((l.get("debit") or 0) - (l.get("credit") or 0) for l in x["lines"]), 2)) >= 0.01]
     ties.append('<tr><td>Proposed Journal Entries balance</td><td class="n2" colspan="2">%d of %d</td><td>%s</td></tr>' % (len(ent) - len(unbal), len(ent), "Pass" if not unbal else '<span class="unf">Fail</span>'))
+    tr_ = tie_row([PERIOD, PRIOR])
+    ties.insert(0, '<tr><td>%s</td><td class="n2" colspan="2">%s</td><td>%s</td></tr>' % (e(tr_[0]), e(tr_[1].split(": ", 1)[-1]), "Pass" if tr_[1].startswith("Pass") else '<span class="unf">%s</span>' % e(tr_[1].split(":")[0])))
     tie_note = "" if ISR else '<p class="note pad">Income Statement tie-outs did not run: they need the NetSuite Income Statement by month report.</p>'
     # Related party: Flagship-named vendors, and journals whose memo names Flagship.
     m3 = [SS.shift(PERIOD, -2), PRIOR, PERIOD]
@@ -2112,7 +2153,7 @@ def coding():
         ("Clean Vendors", str(len(clear)), money(sum(r["amount"] for r in clear)) + " &middot; no flags"),
         ("Resolved", '<span data-resolved></span>', "Flags decided")])
     pages = []
-    pages.append(page("ov", hero_ + CHECKLIST))
+    pages.append(page("ov", hero_ + tie_card([PERIOD]) + CHECKLIST))
     def two_way(word, flags, booked_, kind, accts):
         none = lambda what: '<p class="note">%s</p>' % what
         return ('<h4 class="dh">Expensed, May Be %s<span class="note">%s &middot; %s</span></h4>' % (word, count(len(flags), "item"), money(sum(i[5] for i in items if i[0] == kind), True))
@@ -2153,7 +2194,7 @@ def coding():
     tie_rows = "".join('<tr><td>%s</td><td class="mono" style="text-align:right">%s</td></tr>' % (a, b) for a, b in [
         (e(MON + " GL expense total (6xxxxxx)"), money(gl_6x, True)), ("Total flagged amount", money(famt + exc_amt, True)), ("Flagged as % of GL total", "%.2f%%" % (100 * (famt + exc_amt) / gl_6x)),
         *([("Of which accepted exceptions", "%d items, %s" % (len(excepted), money(exc_amt, True)))] if excepted else []),
-        ("Ledger balances", ("Pass: " if tie.get("passed") else "Fail: ") + e(tie.get("note") or "")), ("Flags as subset of GL", "Pass: every flag is drawn from posted GL lines")])
+        ("Ledger balances", ("Pass: " if tie.get("passed") else "Fail: ") + e(tie.get("note") or "")), tuple(e(x) for x in tie_row([PERIOD])), ("Flags as subset of GL", "Pass: every flag is drawn from posted GL lines")])
     pol_rows = "".join('<tr><td>%s</td><td class="mono" style="text-align:right">%s</td></tr>' % (a, b) for a, b in [
         ("Vendors billed this month", str(len(billed))), ("P&amp;L lines this month", format(pl_lines_now, ",")), ("CapEx flags", str(len(cap_cards))), ("Prepaid flags", str(len(pre_cards))),
         ("Department and account flags", str(len(dcards))), *([("Accepted exceptions", "%d items, %s" % (len(excepted), money(exc_amt, True)))] if excepted else []), ("Vendors with no flags", str(len(clear))), ("New vendors", str(len(news)))])

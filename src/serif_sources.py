@@ -11,6 +11,10 @@
     balance sheet  the NetSuite Balance Sheet report, monthly columns, exported as .xls
                    (SpreadsheetML)
 
+    income stmt    the NetSuite Income Statement by month report, exported as .xls,
+                   which the ledger is tied to account by account before a console
+                   is built (python3 serif_sources.py tie --help)
+
 Nothing is sliced, summarized or reshaped on disk. The engines and the schedules
 call these readers and derive what they need in memory, so every figure traces to
 a file a system produced.
@@ -24,6 +28,7 @@ import csv
 import datetime as dt
 import os
 import re
+import sys
 import zipfile
 from collections import defaultdict
 from xml.etree import ElementTree as ET
@@ -968,6 +973,61 @@ def read_balance_sheet(path, months) -> list[dict]:
     return out
 
 
+# ── Tie to the Income Statement ─────────────────────────────────────────────
+#
+# Before a console is built on the ledger, the ledger has to tie back to NetSuite's own
+# Income Statement by month report, account by account. The report shows income as a
+# positive figure and the ledger as a credit, so accounts under the Income and Other
+# Income headings are compared with their sign turned.
+
+INCOME_HEADS = ("income", "other income")
+
+
+def income_statement_tie(by_period, path, months) -> dict:
+    """-> {report, months, accounts, passed, failed: [{month, code, name, ledger, report,
+    difference}], totals: {month: {ledger, report}}}. An account in either the ledger or
+    the report that differs by a cent or more fails."""
+    sign, names, report = 1, {}, defaultdict(float)
+    for row in read_balance_sheet(path, months):
+        if row["kind"] == "head" and not row["code"]:
+            sign = -1 if row["name"].lower() in INCOME_HEADS else 1
+        elif row["code"] and row["kind"] == "account":
+            names[row["code"]] = row["name"].split(" - ", 1)[-1]
+            for m in months:
+                report[(row["code"], m)] += sign * (row["values"].get(m) or 0)
+    failed, totals, codes = [], {}, set(names)
+    for m in months:
+        ledger = defaultdict(float)
+        for line in by_period.get(m, []):
+            if line["account_code"][:1] in "45678":
+                ledger[line["account_code"]] += line["amount"]
+                names.setdefault(line["account_code"], line.get("account_leaf") or "")
+        codes |= set(ledger)
+        totals[m] = {"ledger": round(sum(ledger.values()), 2),
+                     "report": round(sum(v for (c, mm), v in report.items() if mm == m), 2)}
+        for code in sorted(set(ledger) | {c for c, mm in report if mm == m}):
+            a, b = round(ledger.get(code, 0), 2), round(report.get((code, m), 0), 2)
+            if abs(round(a - b, 2)) >= 0.01:
+                failed.append({"month": m, "code": code, "name": names.get(code, ""),
+                               "ledger": a, "report": b, "difference": round(a - b, 2)})
+    return {"report": os.path.basename(path), "months": list(months), "accounts": len(codes),
+            "passed": not failed, "failed": failed, "totals": totals}
+
+
+def tie_lines(tie) -> list[str]:
+    """The tie as plain lines, for a script's output and the chat."""
+    months = " and ".join(tie["months"])
+    if tie["passed"]:
+        return [f"Ties to the Income Statement ({tie['report']}): {months}, "
+                f"{tie['accounts']} accounts, every account ties."]
+    out = [f"Does NOT tie to the Income Statement ({tie['report']}): "
+           f"{len(tie['failed'])} account-month(s) differ in {months}."]
+    out += [f"  {f['month']}  {f['code']} {f['name']}: ledger {f['ledger']:,.2f}, "
+            f"Income Statement {f['report']:,.2f}, difference {f['difference']:,.2f}"
+            for f in tie["failed"]]
+    return out
+
+
 def read_link_ids(paths) -> list[dict]:
     rows = []
     for path in paths or []:
@@ -1049,3 +1109,30 @@ def links(gl_lines, coupa_rows, po_numbers=(), id_rows=()) -> dict:
     po_ids = {p: po_id(p, coupa_ids) for p in sorted(wanted) if po_id(p, coupa_ids)}
     return {"netsuite_account": NETSUITE_ACCOUNT, "coupa_host": COUPA_HOST,
             "docs": docs, "po_ids": po_ids}
+
+
+def main(argv=None):
+    """`python3 serif_sources.py tie`: the Income Statement tie, run before either console."""
+    import argparse
+    ap = argparse.ArgumentParser(description="Tie the NetSuite ledger to the Income Statement by month "
+                                 "report, account by account. Exits 2 when an account does not tie.")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    t = sub.add_parser("tie", help="tie the close month (and with --prior, the month before)")
+    t.add_argument("--period", required=True, help='the close month, eg "Sep 2026"')
+    t.add_argument("--gl", nargs="+", required=True, help="the NetSuite Custom General Ledger export(s)")
+    t.add_argument("--income-statement", required=True, help="the NetSuite Income Statement by month report")
+    t.add_argument("--prior", action="store_true", help="tie the month before as well (the P&L Flux)")
+    args = ap.parse_args(argv)
+    period = shift(args.period.strip(), 0)
+    months = [period, shift(period, -1)] if args.prior else [period]
+    by_period, _ = read_gl(args.gl)
+    absent = [m for m in months if not by_period.get(m)]
+    if absent:
+        raise SystemExit(f"The NetSuite exports hold no lines for {', '.join(absent)}.")
+    tie = income_statement_tie(by_period, args.income_statement, months)
+    print("\n".join(tie_lines(tie)))
+    return 0 if tie["passed"] else 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

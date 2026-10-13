@@ -16,7 +16,18 @@ Commentary is the model's work. Arithmetic is not.
 Every input is an export exactly as its system writes it. Nothing is sliced, converted
 or summarized first: the scripts read the exports and take the months they need in memory.
 
-From this project folder, for a close of Sep 2026:
+From this project folder, for a close of Sep 2026, first tie the ledger to NetSuite's Income
+Statement, account by account, for the month and the month before:
+
+```sh
+python3 serif_sources.py tie --period "Sep 2026" --prior \
+  --gl netsuite_gl_*.xls* \
+  --income-statement netsuite_income_statement_by_month_*.xls
+```
+
+It prints that every account ties, or each account that does not, with the month, both figures
+and the difference, and exits 2. A failed tie stops the close there: export the GL and the
+Income Statement again. Then:
 
 ```sh
 python3 serif_uc2_flux.py --period "Sep 2026" \
@@ -75,7 +86,10 @@ and decides nothing; rerunning it replaces what it added.
 `--roster` reads the UKG roster for Payroll Analytics. With `--keep-names` the console keeps
 names and pay, for the accounting team; without it, the schedules step withholds them.
 `--balance-sheet` reads the NetSuite Balance Sheet report for Balance Sheet Flux and the
-tie-outs, and `--income-statement` the Income Statement by month for the tie-outs.
+tie-outs, and `--income-statement` the Income Statement by month. The build ties the ledger to
+it by account for the month and the month before, as the first command does, and stops when an
+account does not tie; `--allow-tie-differences` builds anyway, with the differences at the top
+of the Executive Overview. Without `--income-statement` the console says the ledger was not tied.
 
 In a Claude Project every uploaded file sits at the top level, so all of these are bare
 filenames. In the repo, `make build PERIOD=sep2026` runs the same commands from the packaged
@@ -324,7 +338,9 @@ The HTML is a working surface, not a report, laid out as the controller's August
 The bar holds three section titles; clicking one opens its pages beside it, each with what is
 left on it. Run log and Settings are the icons at the right.
 
-* **Executive Overview**: total operating expense, net loss, cash and headcount, the cards,
+* **Executive Overview**: total operating expense, net loss, cash and headcount, the tie to
+  NetSuite's Income Statement (every account for the month and the month before, or the ones
+  that differ), the cards,
   the net loss bridge from the prior month (hover a bar for its figures), the executive
   summary Claude drafts (**Use this**, then edit it in place), and the close
   checklist: each page, what is open on it and what that is worth. A line of the checklist
@@ -372,7 +388,8 @@ entry out of balance or unchanged is left out.
 
 ### SOX & GAAP
 
-The tie-outs come first: GL debits against credits; operating expenses, total expense and net
+The tie-outs come first: the ledger against the Income Statement account by account, for the
+month and the month before; GL debits against credits; operating expenses, total expense and net
 income against the Income Statement; net income against the change in the Balance Sheet's Net
 Income; the balance sheet balancing; and the month's change in cash, prepaid expenses, fixed
 assets, accumulated depreciation, accounts payable and accrued expenses against GL activity.
