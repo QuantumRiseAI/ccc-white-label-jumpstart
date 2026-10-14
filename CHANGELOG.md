@@ -37,6 +37,22 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: an import CSV NetSuite will match
+
+- With NetSuite's lists (`--netsuite-ref`: accounts, departments, programs, pulled through the connector),
+  the import CSV carries internal IDs for Subsidiary (97), Account, Department and Program, and Project by
+  name. Serif's account full names carry no number and its departments sit under parents, so a name is
+  not a safe match. The subsidiary name is now NetSuite's, "FL87 Serif Biomedicines, Inc.".
+- Journal Date and Reversal Date are M/D/YYYY. Currency and Exchange Rate are dropped (the subsidiary's
+  USD applies). The readable account number, department and program and the Reversing Entry flag follow
+  as reviewer columns, left unmapped.
+- NetSuite requires a department on every line (DEPTMANDATORY). An entry with a line missing one, or with
+  an account, department or program NetSuite does not hold, stays out of the CSV and the export says why.
+  A flux entry's P&L line without a department takes the one its ledger lines share.
+- Checked: every Aug 2026 coding entry (104, 230 lines) and every Sep 2026 coding entry (228, 456 lines)
+  resolves to an active NetSuite account, department and program. Two Aug flux accruals built from Coupa
+  receipts have no ledger department and wait for the reviewer to pick one.
+
 ## Unreleased: Project and Program on lines and entries, Non-Specific on balance sheet lines (SERIF-144)
 
 - **Both consoles**: each ledger line a card lists shows its Project and Program (the GL's

@@ -127,8 +127,11 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       const [ref, ext] = await p.evaluate(id => [refOf(id), DATA.je[id].id], id), rows = csvText.split('\n').filter(r => r.startsWith(ext + ','));
       ok(/^CAPEX-\d{2}$/.test(ref) && rows.length > 1 && rows.every(r => r.includes(',' + ref + ' | ') || r.includes(',"' + ref + ' | ')), 'gl: the CSV Memo starts with the finding\'s reference ID (' + ref + ')');
       // SERIF-144: Project and Program on each line and on both sides of each entry; balance sheet lines Non-Specific
-      ok(/^﻿?External ID,.*,Account,Department,Project,Program,Debit,Credit,Line Memo\r?$/.test(csvText.split('\n')[0]) && rows.every(r => r.includes(',00 Non-Specific,00 Non-Specific,')),
-         'gl: the CSV carries each line\'s Project and Program beside its department');
+      ok(/^﻿?External ID,.*,Account,Department,Project,Program,Debit,Credit,Line Memo,Account Number,Department Name,Program Name,Reversing Entry\r?$/.test(csvText.split('\n')[0])
+         && rows.every(r => r.includes(',00 Non-Specific,1,') && /,00 Non-Specific,[YN]\r?$/.test(r)),
+         'gl: the CSV carries each line\'s Project, and its Program as NetSuite\'s internal ID with the name for the reviewer');
+      ok(rows.every(r => /^[^,]+,97,\d{1,2}\/\d{1,2}\/\d{4},/.test(r)) && rows.every(r => { const c = (r.match(/("([^"]|"")*"|[^,]*)(,|$)/g) || []).map(x => x.replace(/,$/, '')); return /^\d+$/.test(c[6] || '') && /^\d+$/.test(c[7] || ''); }),
+         'gl: Subsidiary is internal ID 97, dates are M/D/YYYY and accounts are internal IDs');
       ok(await p.evaluate(() => { const ids = Object.keys(DATA.je).filter(i => /^(C|P|CB|PB|D)-/.test(i));
         return ids.length > 10 && ids.every(i => { const m = {};
           DATA.je[i].lines.forEach(l => { const d = l.project + '|' + l.program; m[d] = (m[d] || 0) + (Number(l.debit) || 0) - (Number(l.credit) || 0); });
@@ -286,6 +289,9 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.evaluate(pid => jeOf(pid).lines[1].department === 'Non-Specific' && $('[data-jef="' + pid + '|1|department"]').value === 'Non-Specific', pid),
          'pl: a line moved to a balance sheet account takes the Non-Specific department');
       await p.fill('[data-jef="' + pid + '|0|debit"]', '500'); await p.fill('[data-jef="' + pid + '|1|credit"]', '500');
+      ok(await p.evaluate(pid => { S.notes[pid] = S.notes[pid] || 'Reviewer note'; const w = jeWhy(pid); delete S.notes[pid]; return /missing department/.test(w); }, pid),
+         'pl: a proposed line with no department is held (NetSuite requires one)');
+      await p.fill('[data-jef="' + pid + '|0|department"]', 'General R&D');
       await p.fill('[data-jef="' + pid + '|0|memo"]', 'Reclass test line');
       await p.selectOption('[data-jeh="' + pid + '|reversing"]', 'Y');
       ok(await p.evaluate(pid => { S.notes[pid] = 'Reviewer note'; return !jeReady(pid); }, pid), 'pl: reversing without a reversal date is held');
@@ -303,12 +309,18 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.evaluate(pid => jeReady(pid), pid), 'pl: a balanced, noted proposal is ready');
       const [d2] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
       const rowsCsv = d2 ? fs.readFileSync(await d2.path(), 'utf8').split('\n') : [];
-      ok(/^\ufeff?External ID,Subsidiary,Journal Date,Posting Period,Currency,Exchange Rate,Memo,Reversing Entry,Reversal Date,Account,Department,Project,Program,Debit,Credit,Line Memo$/.test(rowsCsv[0] || ''), 'pl: the CSV carries the NetSuite header and line fields');
+      ok(/^\ufeff?External ID,Subsidiary,Journal Date,Posting Period,Memo,Reversal Date,Account,Department,Project,Program,Debit,Credit,Line Memo,Account Number,Department Name,Program Name,Reversing Entry$/.test(rowsCsv[0] || ''), 'pl: the CSV carries the NetSuite header and line fields');
       ok(await p.evaluate(() => { const x = Object.values(DATA.je).filter(j => /^Capitalize /.test(j.memo || ''));
         return x.length > 0 && x.every(j => j.lines.every(l => /^1/.test(l.account) ? l.department === 'Non-Specific' : l.department !== 'Non-Specific')
           && new Set(j.lines.map(l => l.project + '|' + l.program)).size === 1 && !!j.lines[0].project); }),
          'pl: a Capitalize entry\'s asset line is Non-Specific and both lines carry the bill\'s Project and Program');
-      ok(rowsCsv.some(r => /"?Serif Biomedicines, Inc\.?"?,2026-08-31,Aug 2026,USD,1,.*,Y,2026-09-01,.*Reclass test line/.test(r)), 'pl: the proposed entry exports with subsidiary, posting period, reversal and line memo');
+      ok(rowsCsv.some(r => /^[^,]+,97,8\/31\/2026,Aug 2026,.*,9\/1\/2026,.*Reclass test line.*,Y$/.test(r)), 'pl: the proposed entry exports with subsidiary 97, posting period, M/D/YYYY dates, reversal and line memo');
+      ok(await p.evaluate(pid => { const was = S.je[pid], j = JSON.parse(JSON.stringify(jeOf(pid).lines)); const say = [];
+        S.je[pid] = j.map((l, i) => i ? l : Object.assign({}, l, {account: '9999999'})); say.push(jeWhy(pid));
+        S.je[pid] = j.map((l, i) => i ? l : Object.assign({}, l, {department: ''})); say.push(jeWhy(pid));
+        if (was) S.je[pid] = was; else delete S.je[pid];
+        return /not an active NetSuite account/.test(say[0]) && /missing department/.test(say[1]); }, pid),
+         'pl: an account NetSuite does not hold, or a line with no department, holds the entry out of the import');
       ok(await p.locator('#p-ava [data-pane="mom"] th', {hasText: '3-mo avg'}).count() === 1, 'pl: MoM carries trailing averages');
       ok(await p.locator('#p-dept .ch', {hasText: 'Credits in Expense Accounts'}).count() === 1 && await p.locator('[data-note^="cr:"]').count() > 0, 'pl: credits in expense accounts listed');
       ok(await p.locator('[data-note="bonus:total"]').count() === 1, 'pl: bonus accrual check, in total');

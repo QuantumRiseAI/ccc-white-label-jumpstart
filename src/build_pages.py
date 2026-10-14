@@ -21,6 +21,7 @@ access. Every figure is computed here from the runs and the NetSuite exports.
 import argparse
 from datetime import datetime
 import calendar
+import csv
 import hashlib
 import html
 import json
@@ -47,6 +48,9 @@ ap.add_argument("--coding-record", help="the GL Coding Review decision record (J
 ap.add_argument("--coding-drafts", help="the GL Coding Review's drafts.json, with --coding-record: Journal Entries Claude drafted there, so a decision on one can be applied")
 ap.add_argument("--drafts", help="Claude's drafts.json for the console being built (with --only)")
 ap.add_argument("--out", help="output folder")
+ap.add_argument("--netsuite-ref", nargs="+", default=[], metavar="CSV",
+                help="NetSuite's lists from the connector (netsuite_ref_accounts.csv, netsuite_ref_departments.csv, "
+                     "netsuite_ref_programs.csv): the import CSV then carries internal IDs")
 A = ap.parse_args()
 WANT = [A.only] if A.only else ["flux", "coding"]
 EMPTY = {"views": {}, "findings": [], "manifest": {}}
@@ -96,7 +100,32 @@ for r in (PLR, GLR):
     for k, v in (r["views"].get("accounts") or {}).items():
         ACC[k] = v.get("name") if isinstance(v, dict) else v
 acct_name = lambda c: ACC.get(c) or ""
-JE_SUBSIDIARY, JE_CURRENCY, JE_RATE = "Serif Biomedicines, Inc.", "USD", 1   # NetSuite subsidiary 97
+JE_SUBSIDIARY, JE_CURRENCY, JE_RATE = "FL87 Serif Biomedicines, Inc.", "USD", 1   # NetSuite subsidiary 97
+JE_SUBSIDIARY_ID = "97"
+
+
+def read_nsref(paths):
+    """NetSuite's internal IDs, from the connector's lists: {acct: {number: id}, dept: {name: id},
+    prog: {name: id}}. The import matches on these, not on names, which NetSuite nests under parents."""
+    out = {"acct": {}, "dept": {}, "prog": {}}
+    for path in paths:
+        with open(path, encoding="utf-8-sig", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+        base = os.path.basename(path).lower()
+        for r in rows:
+            if (r.get("isinactive") or "F").strip().upper() == "T":
+                continue
+            if "acctnumber" in r:
+                if (r["acctnumber"] or "").strip():
+                    out["acct"][r["acctnumber"].strip()] = r["id"].strip()
+            elif "department" in base:
+                out["dept"][r["name"].strip()] = r["id"].strip()
+            elif "program" in base:
+                out["prog"][r["name"].strip()] = r["id"].strip()
+    return out if any(out.values()) else {}
+
+
+NSREF = read_nsref(A.netsuite_ref)
 PERIOD_END = "%s-%02d-%02d" % (PERIOD[-4:], list(calendar.month_abbr).index(PERIOD[:3]), calendar.monthrange(int(PERIOD[-4:]), list(calendar.month_abbr).index(PERIOD[:3]))[1])
 LINKS = {}
 for r in (PLR, GLR):
@@ -1139,9 +1168,18 @@ const isoOk = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '') && !isNaN(Date.parse(s)) 
 /* why an entry cannot go into the import yet, or '' */
 const jeWhy = id => { const j = jeOf(id);
   return jeBal(j) ? 'out of balance' : jeNoop(j) ? 'unchanged' : !decided(id) ? 'missing note' : !j.lines.every(l => (l.account || '').trim()) ? 'missing account'
+    : !j.lines.every(l => (l.department || '').trim()) ? 'missing department (NetSuite requires one on every line)' : nsMiss(j) ? nsMiss(j)
     : !isoOk(j.date) ? 'Journal Date is not a valid date' : !/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}$/.test(j.period || '') ? 'Posting Period is not Mon YYYY'
     : j.reversing === 'Y' && !(j.reversal_date || '').trim() ? 'reversal date missing' : j.reversing === 'Y' && !(isoOk(j.reversal_date) && j.reversal_date > j.date) ? 'Reversal Date is not a date after the Journal Date' : ''; };
 const jeReady = id => jeLive(id) && decided(id) && !jeWhy(id);
+/* With NetSuite's lists supplied, every account, department and program must be one NetSuite holds */
+const NO_PROG = p => !p || /^- No .* -$/.test(p);
+function nsMiss(j){ const R = DATA.nsref || {}; if (!R.acct) return '';
+  for (const l of j.lines){ const a = (l.account || '').trim(), d = (l.department || '').trim(), p = (l.program || '').trim();
+    if (!R.acct[a]) return 'account ' + a + ' is not an active NetSuite account';
+    if (!R.dept[d]) return 'department ' + d + ' is not an active NetSuite department';
+    if (!NO_PROG(p) && !R.prog[p]) return 'program ' + p + ' is not an active NetSuite program'; }
+  return ''; }
 const jeOpen = pg => $$('#p-' + pg + ' [data-jerow]').filter(r => jeEdited(r.dataset.jerow) && !(jeLive(r.dataset.jerow) && jeReady(r.dataset.jerow)));   // proposals begun and not ready
 function editJE(t){
   if (Shared.ro()) return;
@@ -1176,12 +1214,20 @@ function paintJE(){
 }
 /* NetSuite rejects a Memo over 999 characters; a reviewer's note or edit can take one past it */
 const memoCut = m => m.length > 999 ? m.slice(0, 996).trimEnd() + '...' : m;
+/* NetSuite reads an import's dates in the importing user's format, M/D/YYYY at Serif */
+const nsDate = d => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || ''); return m ? +m[2] + '/' + +m[3] + '/' + m[1] : (d || ''); };
 function exportCSV(){
-  const rows = [['External ID', 'Subsidiary', 'Journal Date', 'Posting Period', 'Currency', 'Exchange Rate', 'Memo', 'Reversing Entry', 'Reversal Date', 'Account', 'Department', 'Project', 'Program', 'Debit', 'Credit', 'Line Memo']];
+  /* Subsidiary, Account, Department and Program carry NetSuite's internal IDs when its lists were
+     supplied (map them by Internal ID); the last four columns are for the reviewer, left unmapped. */
+  const R = DATA.nsref || {}, id_ = (m, v) => (m && m[v]) || v;
+  const rows = [['External ID', 'Subsidiary', 'Journal Date', 'Posting Period', 'Memo', 'Reversal Date', 'Account', 'Department', 'Project', 'Program', 'Debit', 'Credit', 'Line Memo',
+                 'Account Number', 'Department Name', 'Program Name', 'Reversing Entry']];
   const held = Object.keys(DATA.je).filter(id => jeLive(id) && !jeReady(id)).map(id => jeOf(id).memo.slice(0, 60) + ': ' + jeWhy(id)).join('; ');
   Object.keys(DATA.je).forEach(id => { if (!jeReady(id)) return;
-    const j = jeOf(id); j.lines.forEach(l => rows.push([j.id, j.subsidiary, j.date, j.period, j.currency, j.rate, memoCut(j.memo + (S.notes[id] ? ' | ' + S.notes[id] : '')), j.reversing,
-      j.reversing === 'Y' ? j.reversal_date : '', l.account, l.department || '', l.project || '', l.program || '', l.debit || '', l.credit || '', memoCut(l.memo || '')])); });
+    const j = jeOf(id); j.lines.forEach(l => { const prog = NO_PROG(l.program) ? '' : l.program;
+      rows.push([j.id, R.acct ? DATA.sub_id : j.subsidiary, nsDate(j.date), j.period, memoCut(j.memo + (S.notes[id] ? ' | ' + S.notes[id] : '')),
+        j.reversing === 'Y' ? nsDate(j.reversal_date) : '', id_(R.acct, l.account), id_(R.dept, l.department || ''), l.project || '', id_(R.prog, prog),
+        l.debit || '', l.credit || '', memoCut(l.memo || ''), l.account, l.department || '', prog, j.reversing]); }); });
   const ns = nsIds().length, edited = ns ? plural(ns, 'item') + ' edited in NetSuite, not in the import: the CSV holds only the reclasses to book' : '';
   const said = [held ? 'Left out: ' + held : '', edited].filter(Boolean).join('. ');
   if (rows.length === 1){ alertBox(said ? said + '.' : 'Approve an entry first: only approved entries go into the import.'); return; }
@@ -1906,7 +1952,7 @@ def flux():
                 ("Close Workflow", ([("bs", "Balance Sheet Flux")] if bs["rows"] else []) + [("adj", "Adjustments"), ("sox", "SOX & GAAP")])]
     SKIPPED.extend("commentary for " + k for k in (RAW_DRAFTS.get("commentary") or {}) if k not in used_com)
     SKIPPED.extend("adjustment note for " + k for k in (RAW_DRAFTS.get("adjustments") or {}) if k not in used_adj)
-    data = {"kind": "flux", "run": M["run_id"], "slug": SLUG, "thr": thr, "je": je_finish(je), "icons": {}, "drafts": DRAFTS}
+    data = {"kind": "flux", "run": M["run_id"], "slug": SLUG, "thr": thr, "je": je_finish(je), "icons": {}, "drafts": DRAFTS, "nsref": NSREF, "sub_id": JE_SUBSIDIARY_ID}
     js = r"""
 function refresh(){
   marks(); paintItems(); counts(); signs(); checklist();
@@ -2313,7 +2359,7 @@ def coding():
         j["memo"] = ref_memo(ref.get(iid), j["memo"])
     pages = [re.sub(r"\{ref:([\w-]+)\}", lambda m: '<span class="ref mono">%s</span>' % ref[m.group(1)] if m.group(1) in ref else m.group(0), x) for x in pages]
     CODING_BUILT.update(je=je_finish(je), items=items)
-    data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "thr_capex": THR["thr_capex"], "thr_prepaid": THR["thr_prepaid"], "je":je_finish(je), "ref": ref, "icons": {}, "drafts": DRAFTS}
+    data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "thr_capex": THR["thr_capex"], "thr_prepaid": THR["thr_prepaid"], "je":je_finish(je), "ref": ref, "icons": {}, "drafts": DRAFTS, "nsref": NSREF, "sub_id": JE_SUBSIDIARY_ID}
     js = r"""
 function refresh(){
   marks(); paintItems(); counts(); signs(); checklist();

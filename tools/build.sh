@@ -22,6 +22,8 @@ RO=$(ls "$I"/ukg_full_roster_*.csv)
 IDS=(); for f in "$I"/netsuite_link_ids_*.csv; do [ -e "$f" ] && IDS+=(--netsuite-ids "$f"); done
 BS=(); for f in "$I"/netsuite_balance_sheet_*.xls; do [ -e "$f" ] && BS+=(--balance-sheet "$f"); done
 IS=(); for f in "$I"/netsuite_income_statement_by_month_*.xls; do [ -e "$f" ] && IS+=(--income-statement "$f"); done
+REF=(); for f in "$I"/netsuite_ref_*.csv "$B/inputs/reference"/netsuite_ref_*.csv; do [ -e "$f" ] && REF+=("$f"); done
+[ ${#REF[@]} -gt 0 ] && REF=(--netsuite-ref "${REF[@]}")
 
 for J in gl-coding-review pl-flux; do
   O="$B/out/$SLUG/$J"; mkdir -p "$O"
@@ -38,11 +40,11 @@ for J in gl-coding-review pl-flux; do
   if [ "$J" = gl-coding-review ]; then
     python3 serif_views.py "$O/run.json" --gl "$GL" --plan "$FC" --plan-vintage 2026-06 --coupa "$CO" \
       --roster "$RO" "${IDS[@]}" --keep-names | tail -1
-    python3 build_pages.py --only coding --coding-run "$O/run.json" --gl "$GL" "${IS[@]}" --out "$O"
+    python3 build_pages.py --only coding --coding-run "$O/run.json" --gl "$GL" "${IS[@]}" "${REF[@]}" --out "$O"
   else
     python3 serif_views.py "$O/run.json" --gl "$GL" --plan "$FC" --plan-vintage 2026-06 --coupa "$CO" \
       --roster "$RO" "${IDS[@]}" "${BS[@]}" --keep-names | tail -1
-    python3 build_pages.py --only flux --flux-run "$O/run.json" --gl "$GL" "${IS[@]}" --out "$O"
+    python3 build_pages.py --only flux --flux-run "$O/run.json" --gl "$GL" "${IS[@]}" "${REF[@]}" --out "$O"
   fi
   V=$(python3 -c "import re,sys; print(re.search(r'^VERSION = \"(.+)\"', open(sys.argv[1]).read(), re.M).group(1))" build_pages.py)
   cp "$O/serif-$J-$SLUG-v$V.html" "$B/consoles/serif-$J.html"
