@@ -31,7 +31,7 @@ name, or missing, and ask for any that are missing before you run anything.
 | Rolling forecast workbook, `.xlsx`, the month's cut | The workbook FP&A saved after the month closed, such as `serif_rolling_forecast_2026-09.xlsx`, for Forecast vs. Actual |
 | Rolling forecast workbook, `.xlsx`, the plan | `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
 | NetSuite Balance Sheet report, monthly columns, `.xls` | For Balance Sheet Flux and the tie-outs |
-| NetSuite Income Statement by month report, `.xls`, by accounting period (a connector query grouped by transaction date does not tie) | The month and the month before. The ledger is tied to it by account before the console is built, and on SOX & GAAP |
+| NetSuite Income Statement by month report, `.xls`, by accounting period (a connector query grouped by transaction date does not tie), or the connector's result for `netsuite_income_statement.sql` (see Income Statement by Connector) | The month and the month before. The ledger is tied to it by account before the console is built, and on SOX & GAAP |
 | UKG roster, `.csv` | The newest roster |
 | NetSuite link IDs, `.csv`, named `netsuite_link_ids_<month>.csv` | Optional, for links. The connector's result for `netsuite_link_ids.sql`; see NetSuite Link IDs |
 
@@ -167,6 +167,23 @@ Opened as a file, the console keeps the review in one browser.
   written to the shared state.
 * The decision record holds the shared state. In shared mode the reviewer still saves it
   from Settings for the close file and for a rerun.
+
+## Income Statement by Connector
+
+When the NetSuite connector is connected and the Income Statement report is not supplied:
+
+1. Run `netsuite_income_statement.sql` through the connector, with the month before and
+   the close month in place of `Aug 2026` and `Sep 2026`. Page through the results until
+   every row is read.
+2. Save the rows with code, straight from the results, as
+   `netsuite_income_statement_by_period_<months>.csv`
+   (`netsuite_income_statement_by_period_aug-sep2026.csv`). Never retype, summarize or edit a row.
+3. Pass it as `--income-statement` to the tie and the build, in place of the report.
+
+The query groups by accounting period, as NetSuite's Income Statement does. Its totals come
+from the same posted lines as the GL export, so the tie shows the export is complete and in
+the right periods. Pull the GL export and run the query at the same time: an entry posted
+between the two will not tie. If the query fails, say so and ask for the report.
 
 ## NetSuite Link IDs
 
@@ -742,6 +759,7 @@ flux runs in a Project.
 | `serif_design.py`, `serif_fonts.py` | Serif's design tokens, logo and typefaces, and the run log |
 | `serif_sources.py` | Reads the NetSuite, Coupa and forecast exports, and ties the ledger to the Income Statement (`tie`) |
 | `netsuite_gl_<range>.xls` | NetSuite Custom General Ledger exports. Each month's activity by account and department is read from them. |
+| `netsuite_income_statement_by_period_<months>.csv`, `netsuite_income_statement.sql` | The Income Statement by accounting period from the connector, when the report is not supplied |
 | `netsuite_link_ids_<month>.csv`, `netsuite_link_ids.sql` | The month's NetSuite link IDs, and the query that pulls them |
 | `coupa_po_lines_<year>.csv` | Coupa PO line export for the calendar year, the accrual source |
 | `serif_rolling_forecast_<vintage>.xlsx` | The rolling forecast workbooks: the month's cut, and the one whose prior cut is the plan |

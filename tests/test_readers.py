@@ -105,6 +105,21 @@ with tempfile.TemporaryDirectory() as d:
     ok(a[0]["memo"] == "Aug order" and a[0]["subsidiary"].startswith("FL87"),
        "a skipped cell (ss:Index) does not shift the columns after it")
 
+    print("Income Statement, the connector's query result")
+    q = os.path.join(d, "netsuite_income_statement_by_period_aug.csv")
+    open(q, "w").write("period,account_number,account_name,account_type,debit,credit,amount\n"
+                       "Aug 2026,6410000,6410000 - Lab Supplies/Consumables,Expense,100.5,0,100.5\n")
+    ok(S.is_income_statement_query(q), "the query result is recognized by its columns")
+    t = S.income_statement_tie(lines, q, ["Aug 2026"])
+    ok(t["passed"] and t["accounts"] == 1, "the ledger ties to it by account, in the ledger's sign")
+    ok(S.income_statement_totals(q, "Aug 2026")["Total - 6000000 - Operating Expenses"]["Aug 2026"] == 100.5,
+       "its totals carry the report's names")
+    try:
+        S.income_statement_tie(lines, q, ["Sep 2026"])
+        ok(False, "a month with no rows stops the tie")
+    except SystemExit as e:
+        ok("Sep 2026" in str(e), "a month with no rows stops the tie, naming it")
+
     print("GL, a different saved search saved as .xlsx")
     serial = (S.dt.date(2026, 9, 3) - S.EXCEL_EPOCH).days
     rows = TITLE + [SEP,

@@ -984,18 +984,85 @@ def read_balance_sheet(path, months) -> list[dict]:
 INCOME_HEADS = ("income", "other income")
 
 
+# The same figures can come from the NetSuite connector: netsuite_income_statement.sql
+# returns each P&L account's posted debit and credit by accounting period, saved as a
+# .csv. Its amount is debit less credit, the ledger's own sign, so nothing is turned.
+
+IS_QUERY_COLS = ("period", "account_number", "amount")
+
+
+def is_income_statement_query(path) -> bool:
+    if not str(path).lower().endswith(".csv"):
+        return False
+    with open(path, encoding="utf-8-sig", newline="") as handle:
+        header = [(f or "").strip().lower() for f in next(csv.reader(handle), [])]
+    return all(c in header for c in IS_QUERY_COLS)
+
+
+def read_income_statement_query(path, months) -> list[dict]:
+    """-> [{code, name, type, values: {month: amount}}], from the connector's result for
+    netsuite_income_statement.sql. Stops when a month asked for has no rows."""
+    if not os.path.exists(path):
+        raise SystemExit(f"Not found: {path}")
+    if not is_income_statement_query(path):
+        raise SystemExit(f"{os.path.basename(path)} is not the result of netsuite_income_statement.sql: "
+                         f"it needs the columns {', '.join(IS_QUERY_COLS)}.")
+    rows = {}
+    with open(path, encoding="utf-8-sig", newline="") as handle:
+        for r in csv.DictReader(handle):
+            r = {(k or "").strip().lower(): (v or "").strip() for k, v in r.items()}
+            code = re.match(r"\d+", r["account_number"])
+            if not code:
+                continue
+            row = rows.setdefault(code.group(0), {"code": code.group(0), "type": r.get("account_type", ""),
+                                                  "name": r.get("account_name", "").split(":")[-1].split(" - ", 1)[-1].strip(),
+                                                  "values": defaultdict(float)})
+            row["values"][r["period"]] += _num(r["amount"])
+    held = {m for row in rows.values() for m in row["values"]}
+    missing = [m for m in months if m and m not in held]
+    if missing:
+        raise SystemExit(f"{os.path.basename(path)} has no rows for " + ", ".join(missing)
+                         + ". Run netsuite_income_statement.sql for that period.")
+    return [{**row, "values": {m: round(row["values"].get(m, 0.0), 2) for m in months}}
+            for row in sorted(rows.values(), key=lambda x: x["code"])]
+
+
+def income_statement_totals(path, month) -> dict:
+    """The Income Statement's totals for one month, by the names NetSuite's report gives
+    them, from either the .xls report or the connector's query result."""
+    if not is_income_statement_query(path):
+        return {r["name"].strip(): r["values"] for r in read_balance_sheet(path, [month])}
+    total = defaultdict(float)
+    for row in read_income_statement_query(path, [month]):
+        v, t = row["values"][month], row["type"]
+        if t in ("Income", "OthIncome"):
+            total["Total - Income" if t == "Income" else "Total - Other Income"] -= v
+        else:
+            total["Total - Expense" if t in ("Expense", "COGS") else "Total - Other Expense"] += v
+        if row["code"].startswith("6"):
+            total["Total - 6000000 - Operating Expenses"] += v
+    return {k: {month: round(v, 2)} for k, v in total.items()}
+
+
 def income_statement_tie(by_period, path, months) -> dict:
     """-> {report, months, accounts, passed, failed: [{month, code, name, ledger, report,
     difference}], totals: {month: {ledger, report}}}. An account in either the ledger or
-    the report that differs by a cent or more fails."""
+    the report that differs by a cent or more fails. The report is NetSuite's .xls or the
+    connector's result for netsuite_income_statement.sql."""
     sign, names, report = 1, {}, defaultdict(float)
-    for row in read_balance_sheet(path, months):
-        if row["kind"] == "head" and not row["code"]:
-            sign = -1 if row["name"].lower() in INCOME_HEADS else 1
-        elif row["code"] and row["kind"] == "account":
-            names[row["code"]] = row["name"].split(" - ", 1)[-1]
+    if is_income_statement_query(path):
+        for row in read_income_statement_query(path, months):
+            names[row["code"]] = row["name"]
             for m in months:
-                report[(row["code"], m)] += sign * (row["values"].get(m) or 0)
+                report[(row["code"], m)] += row["values"][m]
+    else:
+        for row in read_balance_sheet(path, months):
+            if row["kind"] == "head" and not row["code"]:
+                sign = -1 if row["name"].lower() in INCOME_HEADS else 1
+            elif row["code"] and row["kind"] == "account":
+                names[row["code"]] = row["name"].split(" - ", 1)[-1]
+                for m in months:
+                    report[(row["code"], m)] += sign * (row["values"].get(m) or 0)
     failed, totals, codes = [], {}, set(names)
     for m in months:
         ledger = defaultdict(float)

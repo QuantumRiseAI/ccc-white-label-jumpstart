@@ -1809,7 +1809,7 @@ def flux():
     ties.append('<tr><td>GL debits equal credits</td><td class="n2" colspan="2">%s</td><td>%s</td></tr>' % (e(tl.get("note") or ""), "Pass" if tl.get("passed") else '<span class="unf">Fail</span>'))
     ISR = {}
     if IS_X:
-        ISR = {r["name"].strip(): r["values"] for r in SS.read_balance_sheet(IS_X, [PERIOD])}
+        ISR = SS.income_statement_totals(IS_X, PERIOD)
     isv = lambda n: (ISR.get(n) or {}).get(PERIOD) or 0
     gl_ni = -sum(l["amount"] for l in by_period.get(PERIOD, []) if l["account_code"][:1] in "45678")
     if ISR:
