@@ -1050,9 +1050,10 @@ def income_statement_tie(by_period, path, months) -> dict:
     the report that differs by a cent or more fails. The report is NetSuite's .xls or the
     connector's result for netsuite_income_statement.sql."""
     sign, names, report = 1, {}, defaultdict(float)
+    query_names = {}
     if is_income_statement_query(path):
         for row in read_income_statement_query(path, months):
-            names[row["code"]] = row["name"]
+            query_names[row["code"]] = row["name"]   # the ledger's account names come first
             for m in months:
                 report[(row["code"], m)] += row["values"][m]
     else:
@@ -1063,7 +1064,11 @@ def income_statement_tie(by_period, path, months) -> dict:
                 names[row["code"]] = row["name"].split(" - ", 1)[-1]
                 for m in months:
                     report[(row["code"], m)] += sign * (row["values"].get(m) or 0)
-    failed, totals, codes = [], {}, set(names)
+    failed, totals, codes = [], {}, set(names) | set(query_names)
+    for lines in by_period.values():
+        for line in lines:
+            if query_names and line["account_code"] in query_names:
+                names.setdefault(line["account_code"], line.get("account_leaf") or "")
     for m in months:
         ledger = defaultdict(float)
         for line in by_period.get(m, []):
@@ -1073,6 +1078,8 @@ def income_statement_tie(by_period, path, months) -> dict:
         codes |= set(ledger)
         totals[m] = {"ledger": round(sum(ledger.values()), 2),
                      "report": round(sum(v for (c, mm), v in report.items() if mm == m), 2)}
+        for code, name in query_names.items():
+            names.setdefault(code, name)
         for code in sorted(set(ledger) | {c for c, mm in report if mm == m}):
             a, b = round(ledger.get(code, 0), 2), round(report.get((code, m), 0), 2)
             if abs(round(a - b, 2)) >= 0.01:
