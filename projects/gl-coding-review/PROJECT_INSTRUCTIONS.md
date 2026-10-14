@@ -228,8 +228,10 @@ three months by account and department with the line descriptions, and its lines
 Project and Program. A flag's
 Journal Entry is filled in and editable: approve it, reject it, or edit it, which marks it
 Modified and needs a note. Both sides of an entry carry the Project and Program of the line it
-corrects; a balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the `Non-Specific`
-department, and only income statement lines carry one. **Edited in NetSuite**, beside Approve Recode and Recode, records a fix
+corrects; a new balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the `Non-Specific`
+department, and only income statement lines carry one. The line that reverses the ledger line
+being corrected keeps that line's department, on a balance sheet account too (a bill recoded off
+prepaid credits prepaid on the bill's department), so it nets the original. **Edited in NetSuite**, beside Approve Recode and Recode, records a fix
 made on the bill or Journal Entry itself while the period is open: it settles the item, needs no
 note, and stays out of the CSV, which holds only the reclasses to book. A Journal Entry you drafted
 has no Edited in NetSuite. Export lists the items edited in NetSuite and saves the **Work paper,
@@ -273,7 +275,7 @@ reviewer the rebuilt file, and say in the chat what you drafted.
        {"account": "6410000", "department": "Production", "project": "Internal CMC", "program": "00 Non-Specific",
         "vendor": "...", "debit": 2261.00, "documents": ["..."]},
        {"account": "6504000", "department": "Production", "project": "Internal CMC", "program": "00 Non-Specific",
-        "vendor": "...", "credit": 2261.00, "documents": ["..."]}
+        "vendor": "...", "credit": 2261.00, "documents": ["..."], "reverses_line": true}
      ]}
   ]
 }
@@ -292,7 +294,8 @@ Read from `out/<period>/run.json`:
   `owner`, and `detail.items`, the lines with date, document, text, account, department,
   project, program and amount.
 * `findings`, and `views.explain` for each finding: why it was raised, what to do, its limit.
-* `views.entries`: the proposed Journal Entries, balanced, line by line.
+* `views.entries`: the proposed Journal Entries, balanced, line by line, each line with its
+  Project and Program; `reverses_line` marks the line that reverses a posted one.
 
 ### 1. Vendor Notes
 
@@ -337,8 +340,10 @@ Draft an entry where the coding is wrong and no proposed entry in `views.entries
 * Both sides carry the posted line's Project and Program (`project`, `program`, as in
   `detail.items` or the GL), unless the correction is to the Project or Program itself. A
   wrong Project or Program on a reclass leaves stray balances that surface a year later.
-* A balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the `Non-Specific` department; only
-  income statement lines carry a department. The build sets it on every entry.
+* Mark the line that credits (reverses) a posted line `"reverses_line": true`. It keeps the
+  posted line's department, on a balance sheet account too, so it nets the original. Every
+  other balance sheet line (accounts 1xxxxxx to 3xxxxxx) is new and takes the `Non-Specific`
+  department; only income statement lines carry one. The build sets it on every entry.
 * Each line carries the account code and name, department, Project, Program, vendor and
   document numbers.
 * Memo, per the Data Entry Policy: `Specific description | Mon'YY`, for example
@@ -470,7 +475,8 @@ NetSuite."
    the console again.
 3. When the reviewer attaches the exported file, check it with code: each External ID
    balances, and balances within each Project and Program unless the entry moves one, each
-   Date is in the close month, each balance sheet line's Department is `Non-Specific`, and the
+   Date is in the close month, each new balance sheet line's Department is `Non-Specific` (a
+   line reversing a posted one keeps that line's), and the
    entries match those approved in the decision record. Report what does not. Change nothing
    in the file.
 4. A person imports it into NetSuite. You never post it.

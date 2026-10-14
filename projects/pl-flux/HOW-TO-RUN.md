@@ -377,8 +377,9 @@ not the ledger's. Payroll tax on the bonus needs the payroll register.
   entry shows whether it balances; **Reset** brings back the proposal. Entries Claude drafted are
   here too. Both sides of an entry carry the Project and Program of the bill it corrects; an
   accrual from Coupa receipts or a reclass staged in the forecast has no bill behind it and
-  leaves them to fill. A balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the
+  leaves them to fill. A new balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the
   `Non-Specific` department, as does a line moved to one; only income statement lines carry one.
+  The line that reverses the posted line keeps its department, so it nets the original.
 * **Section B, forecast revisions**: where the month's forecast and the ledger differ.
   **Acknowledge & Flag** sends it to FP&A; **No Action** leaves it.
 * **Section C, billed twice after a gap**: a vendor with two or more bills this month and none

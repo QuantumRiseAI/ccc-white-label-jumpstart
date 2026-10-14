@@ -134,9 +134,18 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
           return DATA.je[i].lines.every(l => l.project || l.program) && Object.values(m).every(v => Math.abs(v) < 0.005); })
           && ids.some(i => DATA.je[i].lines.some(l => l.project === 'Internal CMC')); }),
          'gl: both sides of each entry from a ledger line carry that line\'s Project and Program');
-      ok(await p.evaluate(() => { const c = Object.keys(DATA.je).filter(i => /^(C|P|CB|PB)-/.test(i));
-        return c.length > 0 && c.every(i => DATA.je[i].lines.every(l => /^[123]/.test(l.account) ? l.department === 'Non-Specific' : !!l.department && l.department !== 'Non-Specific')); }),
-         'gl: on CapEx and Prepaid entries the balance sheet line is Non-Specific; the expense line keeps its department');
+      ok(await p.evaluate(() => { const c = Object.keys(DATA.je).filter(i => /^(C|P)-/.test(i));
+        return c.length > 0 && c.every(i => DATA.je[i].lines.every(l => /^[123]/.test(l.account) ? l.department === 'Non-Specific' && Number(l.debit) > 0 : !!l.department && l.department !== 'Non-Specific')); }),
+         'gl: on CapEx and Prepaid flags the new balance sheet line is Non-Specific; the expense line keeps its department');
+      ok(await p.evaluate(() => { const b = Object.keys(DATA.je).filter(i => /^(PB|CB)-/.test(i)), seen = [];
+        const ok_ = b.length > 0 && b.every(i => { const x = $('[data-item="' + i + '"]'), kv = {};
+          x.querySelectorAll('.kv > div').forEach(d => { kv[d.querySelector('.l').textContent] = d.querySelector('.x').textContent; });
+          const cr = DATA.je[i].lines.filter(l => Number(l.credit));
+          seen.push(cr[0].department);
+          return cr.length === 1 && /^1/.test(cr[0].account) && kv['Current coding'].startsWith(cr[0].account) && cr[0].department === kv['Department']
+            && Math.abs(Number(cr[0].credit) - Number(x.dataset.amt)) < 0.005; });
+        return ok_ && seen.some(d => d !== 'Non-Specific'); }),
+         'gl: a bill booked to prepaid or fixed assets is reversed on its own account and department, netting the original');
       ok(await p.evaluate(() => { const i = Object.keys(DATA.je).find(i => i.startsWith('C-') && /^1/.test(DATA.je[i].lines[0].account)), l = DATA.je[i].lines[0];
         return !!DATA.je[i].lines[1].department && DATA.je[i].lines[1].department !== 'Non-Specific' && $('[data-item="' + i + '"] .kv').textContent.includes(DATA.acct[l.account] + ' / Non-Specific'); }),
          'gl: a CapEx card recommends the asset account with Non-Specific, not the expense\'s department');

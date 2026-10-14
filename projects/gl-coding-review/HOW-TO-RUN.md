@@ -347,11 +347,12 @@ month's bills posted to fixed-asset (15xxxxx) or prepaid (13xxxxx) accounts. A b
 confirmed (it stays on the balance sheet) or recoded to expense, with a Journal Entry filled in
 from the vendor's usual expense account and department.
 
-On every proposed entry the balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the
+On every proposed entry a new balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the
 `Non-Specific` department; only income statement lines carry one. A recode to 1505000 Capital in
-Process debits it `Non-Specific`, not the expense line's department, and a bill recoded off
-prepaid credits the prepaid account `Non-Specific`. Both sides carry the original line's Project
-and Program.
+Process debits it `Non-Specific`, not the expense line's department. The line that reverses the
+ledger line being corrected keeps that line's department, so it nets the original: a bill
+recoded off prepaid credits the prepaid account on the bill's own department (`General R&D` on
+prepaid rent, for example). Both sides carry the original line's Project and Program.
 
 ### Settling an Item
 

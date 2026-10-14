@@ -148,8 +148,9 @@ if TIE and not TIE["passed"]:
         sys.exit("Stopped: the ledger does not tie to the Income Statement, so no console was built. Export the GL and "
                  "the Income Statement again from NetSuite, or build with --allow-tie-differences to put the differences at the top.")
 PNL = lambda c: c[:1] in "678"
-# A balance sheet account, 1xxxxxx to 3xxxxxx. On a proposed Journal Entry its line takes
-# BS_DEPARTMENT: only income statement lines carry a department.
+# A balance sheet account, 1xxxxxx to 3xxxxxx. On a proposed Journal Entry a new line on one
+# takes BS_DEPARTMENT: only income statement lines carry a department. A line that reverses
+# the ledger line being corrected (`reverses_line`) keeps that line's.
 BS = lambda c: bool(c) and c[0] in "123"
 BS_DEPARTMENT = "Non-Specific"
 gl_now, gl_prior = by_period.get(PERIOD, []), by_period.get(PRIOR, [])
@@ -294,7 +295,7 @@ def drafted_entries(fids_ok=None):
     out = []
     for i, x in enumerate(RAW_DRAFTS.get("entries") or [], 1):
         lines = [{"account": txt(l.get("account")), "department": txt(l.get("department")), "vendor": txt(l.get("vendor")),
-                  "project": txt(l.get("project")), "program": txt(l.get("program")),
+                  "project": txt(l.get("project")), "program": txt(l.get("program")), "reverses_line": l.get("reverses_line") is True,
                   "debit": round(float(l.get("debit") or 0), 2), "credit": round(float(l.get("credit") or 0), 2),
                   "documents": [txt(d) for d in (l.get("documents") or [])]} for l in x.get("lines") or []]
         dr, cr = round(sum(l["debit"] for l in lines), 2), round(sum(l["credit"] for l in lines), 2)
@@ -312,10 +313,11 @@ def count(n, word):
 
 def je_lines(lines, src=None):
     """A proposed entry's lines. Each carries the Project and Program of `src`, the line it
-    corrects, unless it names its own, so both sides of a reclass keep them. A balance sheet
-    line takes BS_DEPARTMENT; only income statement lines carry a department."""
+    corrects, unless it names its own, so both sides of a reclass keep them. A new balance
+    sheet line takes BS_DEPARTMENT; the line marked `reverses_line`, which reverses the ledger
+    line being corrected, keeps its department so the reversal nets the original."""
     src = src or {}
-    return [{"account": l["account"], "department": BS_DEPARTMENT if BS(l["account"]) else l.get("department") or "",
+    return [{"account": l["account"], "department": BS_DEPARTMENT if BS(l["account"]) and not l.get("reverses_line") else l.get("department") or "",
              "project": l.get("project", src.get("project")) or "", "program": l.get("program", src.get("program")) or "",
              "debit": round(l.get("debit") or 0, 2), "credit": round(l.get("credit") or 0, 2)} for l in lines]
 
@@ -2006,7 +2008,7 @@ def coding():
             iid = sid(prefix, r["vendor"], r["from_account"], r["to_account"], r.get("what"), r.get("department"))
             doc = r["doc"] or line_doc(r["vendor"], r["from_account"])
             je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": doc["date"] if doc else "", "memo": "Recode %s %s from %s to %s" % (r["vendor"], r.get("what") or "", r["from_account"], r["to_account"]),
-                       "lines": je_lines([{"account": r["to_account"], "department": r["department"], "debit": r["amount"]}, {"account": r["from_account"], "department": r["department"], "credit": r["amount"]}], doc)}
+                       "lines": je_lines([{"account": r["to_account"], "department": r["department"], "debit": r["amount"]}, {"account": r["from_account"], "department": r["department"], "credit": r["amount"], "reverses_line": True}], doc)}
             items.append(("capex" if prefix == "C" else "prepaid", iid, typ, r["vendor"], r.get("what") or "", r["amount"], r["from_account"], r["to_account"]))
             bucket.append(card(iid, r["vendor"], r["amount"], True, coding_(r["from_account"], r["department"]), '<span class="arrow">&rarr;</span> ' + coding_(r["to_account"], je[iid]["lines"][0]["department"]),
                                doc, '<div><div class="l">Department</div><div class="x">' + e(r["department"]) + "</div></div>", en(r["why"]) + (" " + en(r["do"]) if r["do"] else ""), "",
@@ -2030,7 +2032,7 @@ def coding():
             ea, ed = usual_expense(v, l["department"] or "")
             amt = round(l["amount"], 2)
             je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": l["date"], "memo": "Recode %s %s from %s to expense" % (v, desc(l), l["account_code"]),
-                       "lines": je_lines([{"account": ea, "department": ed, "debit": amt}, {"account": l["account_code"], "department": l["department"], "credit": amt}], l), "when": "recode"}
+                       "lines": je_lines([{"account": ea, "department": ed, "debit": amt}, {"account": l["account_code"], "department": l["department"], "credit": amt, "reverses_line": True}], l), "when": "recode"}
             doc = {"type": l["txn_type"], "document": l["document_number"], "text": desc(l), "date": l["date"]}
             out.append(card(iid, v, amt, amt >= thr, coding_(l["account_code"], l["department"]), "&ndash;", doc,
                             '<div><div class="l">Department</div><div class="x">' + e(l["department"] or "&ndash;") + "</div></div>"
@@ -2113,7 +2115,7 @@ def coding():
         pp = {(i.get("project") or "", i.get("program") or "") for i in (r.get("detail") or {}).get("items") or []
               if i["account"] == a and (i.get("department") or "Non-Specific") == dept}
         je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": (doc or {}).get("date") or "", "memo": "Recode %s from %s %s" % (r["vendor"], a, dept),
-                   "lines": je_lines([{"account": a, "department": dept, "debit": camt}, {"account": a, "department": dept, "credit": camt}],
+                   "lines": je_lines([{"account": a, "department": dept, "debit": camt}, {"account": a, "department": dept, "credit": camt, "reverses_line": True}],
                                      dict(zip(("project", "program"), pp.pop())) if len(pp) == 1 else None), "when": "recode"}
         amts[iid] = r["amount"] or 0
         return ('<div class="item" data-item="%s" data-amt="%s"><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span><span class="tag%s">%s</span></div>'

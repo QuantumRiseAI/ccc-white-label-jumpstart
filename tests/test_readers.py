@@ -155,6 +155,13 @@ with tempfile.TemporaryDirectory() as d:
        "a balance sheet line takes Non-Specific; the income statement line keeps its department")
     ok(all(l["project"] == "Internal CMC" and l["program"] == "00 Non-Specific" for l in e2),
        "a finding's lines with no Project of their own take the ledger line's, on both sides")
+    off = dict(a[0], account_code="1305000", department="General R&D", vendor_or_name="Fisher Scientific")
+    rec = {"finding_id": "x3", "rule_id": "T4.PO_ACCOUNT_MISMATCH", "transactions": [off],
+           "evidence": {"expected": "account 6601000"}}
+    e3 = {l["account"]: l for l in V.entries([rec], "Aug 2026")[0]["lines"]}
+    ok(e3["1305000"]["department"] == "General R&D" and e3["1305000"]["credit"] == 100.5
+       and e3["6601000"]["department"] == "General R&D",
+       "a reclass off a balance sheet line reverses it on its own department, netting the original")
 
     print("GL, a file that is not the ledger")
     bad = os.path.join(d, "netsuite_gl_bad.xls")

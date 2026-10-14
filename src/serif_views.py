@@ -70,8 +70,9 @@ AP_ACCOUNT = "2000100"
 # The ten department names the ledger uses.
 GL_DEPARTMENTS = {"Non-Specific", "Platform", "General R&D", "Production", "General G&A",
                   "Biology", "Chemistry", "In Vivo", "Finance", "Computational Sciences"}
-# A balance sheet line on a proposed Journal Entry takes this department; only income
-# statement lines carry one. Balance sheet accounts are 1xxxxxx to 3xxxxxx.
+# A new balance sheet line on a proposed Journal Entry takes this department; only income
+# statement lines carry one. A line that reverses the ledger line being corrected
+# (`reverses_line`) keeps that line's. Balance sheet accounts are 1xxxxxx to 3xxxxxx.
 BS_DEPARTMENT = "Non-Specific"
 
 
@@ -1321,12 +1322,14 @@ def dims(t, lookup):
 
 
 def bs_department(lines):
-    """Balance sheet lines take Non-Specific; only income statement lines carry a
-    department. A recode to Capital in Process does not keep the expense's."""
+    """A new balance sheet line takes Non-Specific: a recode to Capital in Process does
+    not keep the expense's department. A line that reverses the ledger line being
+    corrected (`reverses_line`) keeps that line's department, so the reversal nets the
+    original. Income statement lines keep theirs."""
     for l in lines:
         l.setdefault("project", "")
         l.setdefault("program", "")
-        if is_bs(l.get("account")):
+        if is_bs(l.get("account")) and not l.get("reverses_line"):
             l["department"] = BS_DEPARTMENT
     return lines
 
@@ -1364,7 +1367,10 @@ def entries(findings, period, accrual_depts=None, lookup=None):
     screens, variances) produce none. Both sides of a reclass carry the original
     line's Project and Program (from `lookup`, the ledger's, when the finding's
     transactions do not carry them); an entry with no ledger line behind it (an
-    accrual from Coupa receipts, a reclass staged in the forecast) leaves them blank."""
+    accrual from Coupa receipts, a reclass staged in the forecast) leaves them blank.
+    The side that reverses a posted line is marked `reverses_line` and keeps its
+    department, on a balance sheet account too; a new balance sheet line takes
+    Non-Specific."""
     accrual_depts = accrual_depts or {}
     lookup = lookup or {}
     out = []
@@ -1386,7 +1392,7 @@ def entries(findings, period, accrual_depts=None, lookup=None):
                                    "department": t.get("department", ""),
                                    "vendor": t.get("vendor_or_name", ""),
                                    "debit": r2(max(-amt, 0)), "credit": r2(max(amt, 0)),
-                                   "document": t.get("document_number", "")}, **dims(t, lookup)))
+                                   "document": t.get("document_number", ""), "reverses_line": True}, **dims(t, lookup)))
             vendor = (txns_of(f) or [{}])[0].get("vendor_or_name", "")
             memo = "Reclass %s from %s to %s" % (vendor, (txns_of(f) or [{}])[0].get("department", ""), to_dept)
         elif rule == "T4.PO_ACCOUNT_MISMATCH":
@@ -1403,7 +1409,7 @@ def entries(findings, period, accrual_depts=None, lookup=None):
                                    "department": t.get("department", ""),
                                    "vendor": t.get("vendor_or_name", ""),
                                    "debit": r2(max(-amt, 0)), "credit": r2(max(amt, 0)),
-                                   "document": t.get("document_number", "")}, **dims(t, lookup)))
+                                   "document": t.get("document_number", ""), "reverses_line": True}, **dims(t, lookup)))
             vendor = (txns_of(f) or [{}])[0].get("vendor_or_name", "")
             froms = sorted({t.get("account_code", "") for t in txns_of(f)} - {""})
             memo = "Reclass %s from %s to %s" % (vendor, ", ".join(froms), to_acct)
@@ -1418,7 +1424,8 @@ def entries(findings, period, accrual_depts=None, lookup=None):
                                "department": first.get("department", ""),
                                "vendor": first.get("vendor_or_name", ""),
                                "debit": r2(max(-repeat, 0)), "credit": r2(max(repeat, 0)),
-                               "document": first.get("document_number", "")}, **dims(first, lookup)))
+                               "document": first.get("document_number", ""), "reverses_line": True},
+                              **dims(first, lookup)))
             if first.get("txn_type") == "Bill":
                 lines.append(dict({"account": AP_ACCOUNT, "department": "",
                                    "vendor": first.get("vendor_or_name", ""),
@@ -1442,10 +1449,13 @@ def entries(findings, period, accrual_depts=None, lookup=None):
             # else blank, for the reviewer to fill.
             both = {tuple(dims(t, lookup).values()) for t in txns_of(f)}
             pp = both.pop() if len(both) == 1 else ("", "")
+            posted = {(t.get("account_code") or "").strip() for t in txns_of(f)} - {""}
             for line in parsed:
                 line["vendor"] = vendor
                 line["document"] = ""
                 line["project"], line["program"] = pp
+                if line["account"] in posted:
+                    line["reverses_line"] = True
                 if line["debit"] and not line["department"]:
                     line["department"] = accrual_depts.get(f["finding_id"], "")
             lines = parsed
