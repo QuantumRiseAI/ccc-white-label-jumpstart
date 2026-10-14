@@ -928,7 +928,8 @@ def read_balance_sheet(path, months) -> list[dict]:
         root = ET.parse(path).getroot()
     except ET.ParseError:
         raise SystemExit(f"{os.path.basename(path)} is not a NetSuite .xls export (SpreadsheetML). "
-                         "Export the Balance Sheet report again as .xls.")
+                         "Run the report in NetSuite with one column per month, by accounting period, "
+                         "and export it again as .xls.")
     sheet = root.find(_SS + "Worksheet")
     table = sheet.find(_SS + "Table") if sheet is not None else None
     if table is None:
@@ -943,12 +944,12 @@ def read_balance_sheet(path, months) -> list[dict]:
     head = next((i for i, c in enumerate(grid) if c and (c[0] or "").strip() == "Financial Row"), None)
     if head is None:
         raise SystemExit(f"{os.path.basename(path)}: no 'Financial Row' header. Export the "
-                         "NetSuite Balance Sheet report with one column per month.")
+                         "NetSuite report with one column per month.")
     col = {(m or "").strip(): i for i, m in enumerate(grid[head]) if i}
     missing = [m for m in months if m and m not in col]
     if missing:
         raise SystemExit(f"{os.path.basename(path)} has no column for " + ", ".join(missing)
-                         + ". Export the Balance Sheet report through the period.")
+                         + ". Export the report through the period.")
     out, depth = [], 0
     for cells in grid[head + 2:]:
         name = (cells[0] if cells else "").replace("\xa0", " ").strip()
