@@ -167,6 +167,13 @@ with tempfile.TemporaryDirectory() as d:
     ok(exp[0]["internal_id"] == "77" and exp[0]["coupa_url"] == url and exp[0]["coupa_po"] == "FL087030260",
        "the internal ID and Coupa fields come with each line, for links")
 
+    noted = os.path.join(d, "netsuite_gl_detail_noted.csv")
+    open(noted, "w").write(head
+        + f'6815000,Operating Expenses : Office Non-Cap Equipment/Furniture,Journal,2026-09-30,JE-5,,30,,Sep 2026,General G&A,00 Non-Specific,00 Non-Specific,{sub},"{url} | Expensed: no piece over the threshold",,78,1,,\n'
+        + f"1505000,Fixed Assets : Capital in Process,Journal,2026-09-30,JE-5,,,30,Sep 2026,Non-Specific,00 Non-Specific,00 Non-Specific,{sub},,,78,2,,\n")
+    ok([l["coupa_url"] for l in S.read_gl([noted])[0]["Sep 2026"] if l["account_code"] == "6815000"] == [url],
+       "a line memo that starts with a Coupa link gives the link alone")
+
     print("GL, the connector's result: what the review of PR #23 found")
     conn2 = os.path.join(d, "netsuite_gl_detail_oct2026.csv")
     head2 = ("account_number,account_name,parent_number,parent_name,grandparent_number,grandparent_name,type,date,"

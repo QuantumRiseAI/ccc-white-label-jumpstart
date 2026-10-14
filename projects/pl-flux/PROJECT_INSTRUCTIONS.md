@@ -30,7 +30,7 @@ name, or missing, and ask for any that are missing before you run anything.
 | Coupa PO line report, `.csv`: the export with all available columns, or the Coupa Data Pull (PO Lines) report | The export for the month's calendar year. The scripts list any column the report lacks or leaves empty under `coupa_coverage.columns_absent` in `run.json` |
 | Rolling forecast workbook, `.xlsx`, the month's cut | The workbook FP&A saved after the month closed, such as `serif_rolling_forecast_2026-09.xlsx`, for Forecast vs. Actual |
 | Rolling forecast workbook, `.xlsx`, the plan | `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
-| NetSuite Balance Sheet report, monthly columns, `.xls` | For Balance Sheet Flux and the tie-outs |
+| NetSuite Balance Sheet report, monthly columns, `.xls` | Through the month, for Balance Sheet Flux and the tie-outs. A report that ends before the month (last month's) leaves Balance Sheet Flux out; report that it did not run |
 | NetSuite Income Statement by month report, `.xls`, by accounting period (a connector query grouped by transaction date does not tie), or the connector's result for `netsuite_income_statement.sql` (see The Month through the Connector) | The month and the month before. The ledger is tied to it by account before the console is built, and on SOX & GAAP |
 | UKG roster, `.csv` | The newest roster |
 | NetSuite link IDs, `.csv`, named `netsuite_link_ids_<month>.csv` | Optional, for links. The connector's result for `netsuite_link_ids.sql`; see NetSuite Link IDs |
@@ -38,7 +38,9 @@ name, or missing, and ask for any that are missing before you run anything.
 
 The scripts take every month they need from the exports. If a month is missing, they say
 which; ask the reviewer for that export. If there is no cut for the month, leave out
-`--forecast` and report that Forecast vs. Actual did not run. Never build a file for the
+`--forecast` and report that Forecast vs. Actual did not run. An earlier month's cut is not
+the month's cut: its column for the month is a forecast, not posted actuals, so comparing it
+with the ledger shows every difference between plan and actual as a forecast error. Never build a file for the
 scripts to read; the connector's results, saved as the queries return them, are the one exception.
 
 If `coupa_coverage.columns_absent` in `run.json` lists columns, tell the reviewer before
@@ -60,7 +62,7 @@ Put the Project's files and the month's exports in one folder, and run from ther
 
 ```sh
 python3 serif_sources.py tie --period "Sep 2026" --prior --gl netsuite_gl_* \
-  --income-statement netsuite_income_statement_by_month_*.xls
+  --income-statement netsuite_income_statement_by_*
 
 python3 serif_uc2_flux.py --period "Sep 2026" --gl netsuite_gl_* \
   --coupa coupa_po_lines_2026.csv --forecast serif_rolling_forecast_2026-09.xlsx \
@@ -73,7 +75,7 @@ python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_* \
   --balance-sheet netsuite_balance_sheet_*.xls --keep-names
 
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_* \
-  --income-statement netsuite_income_statement_by_month_*.xls \
+  --income-statement netsuite_income_statement_by_* \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 
@@ -191,7 +193,8 @@ in place of the exports. Run both queries in one go, so an entry posted in betwe
 Page through each result until every row is read. Save the rows with code, straight from
 the results; never retype, summarize or edit a row. The scripts read these files as they
 are: pass the GL file with `--gl`, beside any saved search exports for earlier months (no
-month in two files), and the Income Statement file with `--income-statement`. The GL file
+month in two files), and the Income Statement file with `--income-statement`. Given both
+the report and the query's result, the scripts tie to the one that holds every month needed. The GL file
 carries each line's internal ID and Coupa fields, so the link IDs query is not needed with it.
 
 The Income Statement query groups by accounting period, as NetSuite's report does; a query
@@ -313,7 +316,7 @@ After the three scripts run, write `drafts.json` and build the console again wit
 
 ```sh
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_* \
-  --income-statement netsuite_income_statement_by_month_*.xls --netsuite-ref netsuite_ref_*.csv --out out/sep2026 --drafts drafts.json
+  --income-statement netsuite_income_statement_by_* --netsuite-ref netsuite_ref_*.csv --out out/sep2026 --drafts drafts.json
 ```
 
 The build checks every draft against the run. An account that is not in the pack, a finding
@@ -419,7 +422,13 @@ For each adjustment over the threshold, recommend **Approve** (`book`) or **Reje
   billing-pattern accrual is an estimate: say so, and name who confirms the work was done.
 * **Prepaids and Capital**: say what the item is and what term or useful life the invoice
   shows. If the invoice is needed, say so.
-* **Reclassifications**: say what the document is and where it belongs.
+* **Reclassifications**: say what the document is and where it belongs. A journal with no
+  vendor (`F8.VENDOR_DROPPED`) is often Serif's own close entry, such as a prepaid release or
+  an accrual reversal; NetSuite shows no name on any journal line. Read its memo and say what
+  it is.
+
+Only an adjustment with a proposed Journal Entry has a card on Adjustments, and a note on
+any other is left out of the console. Cover the others in the summary.
 
 ### 3. Journal Entries
 

@@ -22,7 +22,7 @@ Statement, account by account, for the month and the month before:
 ```sh
 python3 serif_sources.py tie --period "Sep 2026" --prior \
   --gl netsuite_gl_* \
-  --income-statement netsuite_income_statement_by_month_*.xls
+  --income-statement netsuite_income_statement_by_*
 ```
 
 It prints that every account ties, or each account that does not, with the month, both figures
@@ -62,7 +62,7 @@ python3 serif_views.py out/sep2026/run.json \
 ```sh
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json \
   --gl netsuite_gl_* \
-  --income-statement netsuite_income_statement_by_month_*.xls \
+  --income-statement netsuite_income_statement_by_* \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 

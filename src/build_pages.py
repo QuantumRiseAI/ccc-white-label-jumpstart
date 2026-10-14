@@ -42,7 +42,7 @@ ap.add_argument("--only", choices=("coding", "flux"), help="build one console; b
 ap.add_argument("--coding-run", help="the GL Coding Review run.json, after serif_views.py --keep-names")
 ap.add_argument("--flux-run", help="the P&L Flux run.json, after serif_views.py --keep-names --balance-sheet")
 ap.add_argument("--gl", nargs="+", help="the NetSuite Custom General Ledger export(s), as NetSuite writes them")
-ap.add_argument("--income-statement", help="the NetSuite Income Statement by month report: the ledger is tied to it by account before the build, and the flux tie-outs")
+ap.add_argument("--income-statement", nargs="+", action="extend", help="the NetSuite Income Statement by month report: the ledger is tied to it by account before the build, and the flux tie-outs")
 ap.add_argument("--allow-tie-differences", action="store_true", help="build although the ledger does not tie to the Income Statement; the differences lead the first page")
 ap.add_argument("--coding-record", help="the GL Coding Review decision record (JSON, format 3), with --coding-run: booked corrections adjust the P&L flux (--only flux)")
 ap.add_argument("--coding-drafts", help="the GL Coding Review's drafts.json, with --coding-record: Journal Entries Claude drafted there, so a decision on one can be applied")

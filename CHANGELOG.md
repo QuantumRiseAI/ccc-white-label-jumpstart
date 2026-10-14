@@ -37,6 +37,19 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: a September run as the Projects run it
+
+- **Either Income Statement file**: `tie`, `--income-statement` on `build_pages.py` and the
+  instructions take several files (`netsuite_income_statement_by_*`) and tie to the first that holds
+  every month needed. Last month's report beside the connector's result no longer stops the tie.
+- **Last month's Balance Sheet**: a report that ends before the month leaves Balance Sheet Flux out,
+  saying which file and why, instead of stopping the flux views.
+- **Coupa links from line memos**: a field that starts with a Coupa invoice link and goes on with a
+  note gives the link alone.
+- **P&L Flux instructions**: an earlier month's forecast cut is not the month's cut; a journal with
+  no vendor is often Serif's own close entry, to be read from its memo; and only an adjustment with
+  a proposed Journal Entry takes a note, so the summary covers the rest.
+
 ## Unreleased: what the September run taught
 
 - **GL from the NetSuite connector**: `netsuite_gl_detail.sql` pulls the month's posted lines (with
