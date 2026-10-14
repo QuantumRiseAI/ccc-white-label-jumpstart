@@ -147,6 +147,78 @@ with tempfile.TemporaryDirectory() as d:
     ok(s[0]["coupa_po"] == "FL087030260", "a PO Number column gives the line's Coupa PO")
     ok(round(sum(x["amount"] for x in s), 2) == 0, "debits equal credits")
 
+    print("GL, the NetSuite connector's result for netsuite_gl_detail.sql")
+    conn = os.path.join(d, "netsuite_gl_detail_sep2026.csv")
+    head = ("account_number,account_name,type,date,document_number,name,debit,credit,period,department,"
+            "program,project,subsidiary,description,memo,internal_id,line_id,coupa_transaction_url,coupa_po_num\n")
+    sub = '"FL87 Serif Biomedicines, Inc."'
+    url = "https://" + S.COUPA_HOST + "/invoices/9"
+    open(conn, "w").write(head
+        + f"2000100,Accounts Payable : Accounts Payable 3rd party,Bill,2026-09-03,B-9,Abcam Inc,,150,Sep 2026,Non-Specific,00 Non-Specific,00 Non-Specific,{sub},,,77,0,{url},\n"
+        + f"6410000,Operating Expenses : Lab Expenses : Lab Supplies/Consumables,Bill,2026-09-03,B-9,,75,,Sep 2026,Platform,00 Non-Specific,00 Non-Specific,{sub},Antibody,,77,1,{url},FL087030260-1\n"
+        + f"6410000,Operating Expenses : Lab Expenses : Lab Supplies/Consumables,Bill,2026-09-03,B-9,,75,,Sep 2026,Platform,00 Non-Specific,00 Non-Specific,{sub},Antibody,,77,2,{url},FL087030260-1\n"
+        + f"6410000,Operating Expenses : Lab Expenses : Lab Supplies/Consumables,Bill,2026-09-03,B-9,,,,Sep 2026,Platform,00 Non-Specific,00 Non-Specific,{sub},Freight,,77,3,{url},\n")
+    c = S.read_gl([conn])[0]["Sep 2026"]
+    exp = [l for l in c if l["account_code"] == "6410000"]
+    ok(len(c) == 2 and len(exp) == 1 and exp[0]["amount"] == 150.0,
+       "identical lines of one transaction add up into one, as the saved search shows them; a zero line is left out")
+    ok(exp[0]["account_leaf"] == "Lab Supplies/Consumables", "the account is its number and the last part of its name")
+    ok(exp[0]["vendor_or_name"] == "Abcam Inc", "an expense line takes the vendor from its bill's payable line")
+    ok(exp[0]["internal_id"] == "77" and exp[0]["coupa_url"] == url and exp[0]["coupa_po"] == "FL087030260",
+       "the internal ID and Coupa fields come with each line, for links")
+
+    print("GL, the connector's result: what the review of PR #23 found")
+    conn2 = os.path.join(d, "netsuite_gl_detail_oct2026.csv")
+    head2 = ("account_number,account_name,parent_number,parent_name,grandparent_number,grandparent_name,type,date,"
+             "document_number,name,debit,credit,period,department,program,project,subsidiary,description,memo,"
+             "internal_id,line_id,coupa_transaction_url,coupa_po_num\n")
+    lab = "6410000,Operating Expenses : Lab Expenses : Lab Supplies/Consumables,6400000,Operating Expenses : Lab Expenses,6000000,Operating Expenses"
+    open(conn2, "w").write(head2
+        + f"{lab},Journal,2026-10-31,JE-1,Jena Bioscience GmbH,30,,Oct 2026,Platform,,,{sub},,Reclass,88,1,,\n"
+        + f"{lab},Journal,2026-10-31,JE-1,,,30,Oct 2026,Platform,,,{sub},,Reclass,88,2,,\n"
+        + f"{lab},Journal,2026-10-31,JE-1,,40,,Oct 2026,Production,,,{sub},,Reclass,88,3,,\n"
+        + f"{lab},Journal,2026-10-31,JE-1,,,40,Oct 2026,Biology,,,{sub},,Reclass,88,4,,\n")
+    oct_ = S.read_gl([conn2, os.path.join(d, "netsuite_gl_detail.sql"), os.path.join(d, "netsuite_gl_detail_oct2026.json")])[0]["Oct 2026"]
+    ok(True, "a .sql query and a .json raw result picked up by netsuite_gl_* are passed over")
+    ok(all(l["vendor_or_name"] == "" for l in oct_), "a Journal's lines carry no name, as the saved search shows them")
+    ok(len([l for l in oct_ if l["department"] == "Platform"]) == 2,
+       "a debit and a credit that match on every other column stay two lines")
+    ok(oct_[0]["account_path"] == "6000000 - Operating Expenses:6400000 - Lab Expenses:6410000 - Lab Supplies/Consumables",
+       "the parent columns give the account's path, as the saved search writes it")
+    both = S.read_gl([aug, conn])[0]["Sep 2026"]
+    ok(next(l for l in both if l["account_code"] == "6410000")["account_path"]
+       == "6000000 - Operating Expenses:6410000 - Lab Supplies/Consumables",
+       "without them, an account takes its path from another export of the same account")
+    ss_csv = os.path.join(d, "netsuite_gl_saved.csv")
+    open(ss_csv, "w").write("Account,Type,Date,Document Number,Name,Debit,Credit\n" + ACCT + ",Bill,9/30/2026,B,X,\"1,234.56\",\n")
+    try:
+        S.read_gl([ss_csv])
+        ok(False, "the saved search saved as .csv is refused")
+    except SystemExit as e:
+        ok(".xls" in str(e), "the saved search saved as .csv is refused, asking for the .xls")
+    ok(S.month_end_gaps({"Sep 2026": []}, "Sep 2026") is None, "with less than three months before, the month-end check says it did not run")
+
+    print("Is the month closed?")
+    def je(m, day, code, amt):
+        return {"txn_type": "Journal", "date": f"2026-{m:02d}-{day:02d}", "account_code": code,
+                "account_leaf": "Acct " + code, "amount": amt}
+    codes = ["6601000", "6609000", "7110000", "7160000", "6102000"]
+    ends = {6: 30, 7: 31, 8: 31, 9: 30}
+    led = {f"{S.MONTH_NAMES[m - 1]} 2026": [je(m, ends[m], c, 5000.0) for c in codes] for m in (6, 7, 8)}
+    led["Sep 2026"] = [je(9, 15, "6101000", 9000.0)]
+    gaps = S.month_end_gaps(led, "Sep 2026")
+    ok([g["code"] for g in gaps] == sorted(codes), "five recurring month-end entries missing are listed")
+    led["Sep 2026"] += [je(9, 30, c, 5000.0) for c in codes[:2]]
+    ok(S.month_end_gaps(led, "Sep 2026") == [], "fewer than five missing is ordinary variation, not listed")
+
+    print("Coupa, a report that stops at a row limit")
+    capped = os.path.join(d, "coupa_capped.csv")
+    open(capped, "w").write("PO Number,Order Date,Supplier,Amt\n" + "".join(f"FL0870{i:05d},9/3/2026,,1\n" for i in range(5000)))
+    ok(S.coupa_row_limit(capped) == 5000, "a report of exactly 5,000 lines is flagged as capped")
+    short = os.path.join(d, "coupa_short.csv")
+    open(short, "w").write("PO Number,Order Date,Supplier,Amt\n" + "".join(f"FL0870{i:05d},9/3/2026,,1\n" for i in range(4999)))
+    ok(S.coupa_row_limit(short) is None, "a report of another size is not")
+
     print("Project and Program, from the reader to a proposed Journal Entry")
     cur = V.load_gl(a + s)
     item = V.lines_for(cur, vendor="Fisher Scientific")["items"][0]

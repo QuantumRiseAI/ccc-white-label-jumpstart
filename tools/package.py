@@ -17,7 +17,7 @@ import zipfile
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SCRIPTS = ["serif_uc2_flux.py", "serif_views.py", "serif_sources.py", "serif_design.py",
            "serif_fonts.py", "build_pages.py", "netsuite_link_ids.sql",
-           "netsuite_income_statement.sql"]
+           "netsuite_income_statement.sql", "netsuite_gl_detail.sql"]
 SHARED = ["WHEN-DATA-BREAKS.md", "CONNECT-NETSUITE.md", "serif-accounts-and-departments.md",
           "serif-policy-rules.md"]
 TEMPLATES = ["accruals_log.csv", "coupa_dept_code_mapping.csv", "fixed_asset_register.csv",

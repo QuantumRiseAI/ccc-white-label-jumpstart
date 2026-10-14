@@ -90,7 +90,7 @@ GL_HEADERS = {
     "account_path": ("account",),
     "txn_type": ("type", "transaction type"),
     "date": ("date",),
-    "document_number": ("document number",),
+    "document_number": ("document number", "document_number"),
     "name": ("name",),
     "debit": ("debit", "amount (debit)"),
     "credit": ("credit", "amount (credit)"),
@@ -104,6 +104,11 @@ GL_HEADERS = {
 GL_REQUIRED = ("account_path", "txn_type", "date", "document_number", "name", "debit",
                "credit", "period", "department")
 PROJECT_HEADERS = ("projectid: name", "project: name", "projectid", "project")
+# The NetSuite connector's result for the GL query gives the account as two columns, and
+# its parent and grandparent accounts in two more pairs when the query asks for them.
+GL_ACCOUNT_PARTS = ("account_number", "account_name")
+GL_PARENT_PARTS = (("grandparent_number", "grandparent_name"), ("parent_number", "parent_name"))
+NAMELESS_TYPES = ("Journal", "Currency Revaluation")
 NO_PROJECT = re.compile(r"^(|00 non-specific|non-specific|- no .* -)$", re.I)
 
 
@@ -122,7 +127,11 @@ def split_account(path: str) -> tuple[str, str]:
 
 
 def _gl_sheet_rows(path: str):
-    """Every row's cell values, as text, from either export format."""
+    """Every row's cell values, as text, from any of the export formats."""
+    if str(path).lower().endswith(".csv"):
+        with open(path, encoding="utf-8-sig", newline="") as handle:
+            yield from csv.reader(handle)
+        return
     if zipfile.is_zipfile(path):
         zf = zipfile.ZipFile(path)
         part = next(iter(_sheet_map(zf).values()), "xl/worksheets/sheet1.xml")
@@ -157,7 +166,12 @@ def _gl_rows(path: str, header=None):
     seen = None
     for index, values in enumerate(_gl_sheet_rows(path)):
         if seen is None:
-            if values and values[0].strip().lower() == "account":
+            names = [v.strip().lower() for v in values]
+            connector = all(c in names for c in GL_ACCOUNT_PARTS)
+            if str(path).lower().endswith(".csv") and values and names[0] == "account" and not connector:
+                raise SystemExit(f"{os.path.basename(path)} is the saved search saved as .csv, which loses its dates "
+                                 "and amounts' format. Export it from NetSuite as .xls.")
+            if values and (names[0] == "account" or connector):
                 seen = values
                 if header is not None:
                     header[:] = values
@@ -179,15 +193,20 @@ def _gl_columns(path, header) -> dict:
     cols = {}
     for field, options in GL_HEADERS.items():
         cols[field] = next((names.index(o) for o in options if o in names), None)
+    if cols["account_path"] is None and all(c in names for c in GL_ACCOUNT_PARTS):
+        cols["account_parts"] = tuple(names.index(c) for c in GL_ACCOUNT_PARTS)
+        cols["account_path"] = cols["account_parts"][0]
+        cols["parent_parts"] = [tuple(names.index(c) for c in pair) for pair in GL_PARENT_PARTS
+                                if all(c in names for c in pair)]
     missing = [GL_HEADERS[f][0] for f in GL_REQUIRED if cols[f] is None]
     if missing:
         raise SystemExit(
             f"{os.path.basename(path)} has no column for: {', '.join(missing)}. "
             f"Its columns are: {', '.join(h for h in header if h)}.")
     cols["projects"] = [i for i, h in enumerate(names) if h in PROJECT_HEADERS]
-    cols["internal_id"] = next((i for i, h in enumerate(names) if h == "internal id"), None)
+    cols["internal_id"] = next((i for i, h in enumerate(names) if h in ("internal id", "internal_id")), None)
     cols["coupa_po"] = [i for i, h in enumerate(names)
-                        if ("coupa" in h and re.search(r"\bpo\b", h)) or h == "po number"]
+                        if ("coupa" in h and re.search(r"\bpo\b", h)) or h in ("po number", "coupa_po_num")]
     cols["date_serial"] = zipfile.is_zipfile(path)
     return cols
 
@@ -201,7 +220,14 @@ def _gl_date(value: str, serial: bool) -> str:
 def _gl_line(values, cols):
     get = lambda key: (values[cols[key]] if cols[key] is not None and cols[key] < len(values)
                        else "").strip()
-    code, leaf = split_account(get("account_path"))
+    if cols.get("account_parts"):
+        cell = lambda i: values[i].strip() if i < len(values) else ""
+        parts = [(cell(a), cell(b)) for a, b in cols["parent_parts"] + [cols["account_parts"]]]
+        # The saved search writes the path as "6000000 - Operating Expenses:6400000 - Lab Expenses:...".
+        account_path = ":".join(f"{n} - {m.split(':')[-1].strip()}" for n, m in parts if n)
+    else:
+        account_path = get("account_path")
+    code, leaf = split_account(account_path)
     debit, credit = _float(get("debit")), _float(get("credit"))
     projects = [values[i].strip() for i in cols["projects"] if i < len(values)]
     po = next((m.group(1) for i in cols["coupa_po"] if i < len(values)
@@ -210,7 +236,7 @@ def _gl_line(values, cols):
         "period": get("period"), "date": _gl_date(get("date"), cols["date_serial"]),
         "txn_type": get("txn_type"),
         "document_number": get("document_number"), "vendor_or_name": get("name"),
-        "account_path": get("account_path"), "account_code": code, "account_leaf": leaf,
+        "account_path": account_path, "account_code": code, "account_leaf": leaf,
         "amount": round(debit - credit, 2), "debit": debit, "credit": credit,
         "department": get("department"),
         "project": next((p for p in projects if not NO_PROJECT.match(p)),
@@ -235,6 +261,9 @@ def read_gl(paths) -> tuple[dict, list[dict]]:
     by_period: dict[str, list[dict]] = {}
     owner: dict[str, str] = {}
     files = []
+    # A glob such as netsuite_gl_* also picks up the query (.sql) and the connector's raw
+    # result (.json) beside the data; only .xls, .xlsx and .csv files are ledgers.
+    paths = [p for p in paths if os.path.splitext(str(p))[1].lower() in (".xls", ".xlsx", ".csv")]
     for path in paths:
         if not os.path.exists(path):
             raise SystemExit(f"Not found: {path}")
@@ -245,8 +274,41 @@ def read_gl(paths) -> tuple[dict, list[dict]]:
             if cols is None:
                 cols = _gl_columns(path, header)
             line = _gl_line(values, cols)
-            if line["period"]:
+            # A line with no debit and no credit posts nothing; the saved search leaves it out.
+            if line["period"] and (line["debit"] or line["credit"]):
                 mine[line["period"]].append(line)
+        # The connector's GL returns every transaction line; the saved search adds up the lines
+        # of one transaction that match on every other column. Read it the same way.
+        if cols and cols.get("account_parts"):
+            for period in list(mine):
+                merged = {}
+                for line in mine[period]:
+                    key = tuple(line[k] for k in ("internal_id", "account_path", "department", "program", "project",
+                                                  "vendor_or_name", "description", "memo", "date", "txn_type",
+                                                  "coupa_po", "coupa_url")) + (bool(line["debit"]),)
+                    if key in merged:
+                        m = merged[key]
+                        m["debit"] = round(m["debit"] + line["debit"], 2)
+                        m["credit"] = round(m["credit"] + line["credit"], 2)
+                        m["amount"] = round(m["debit"] - m["credit"], 2)
+                    else:
+                        merged[key] = dict(line)
+                mine[period] = list(merged.values())
+        # The connector's GL gives a bill's vendor on its payable line only; its other lines
+        # take the same transaction's name, as NetSuite's saved search shows them. The saved
+        # search shows no name on a Journal or a Currency Revaluation, so neither gets one.
+        if cols and cols.get("account_parts"):
+            named = {}
+            for lines in mine.values():
+                for line in lines:
+                    if line["txn_type"] in NAMELESS_TYPES:
+                        line["vendor_or_name"] = ""
+                    elif line["internal_id"] and line["vendor_or_name"]:
+                        named.setdefault(line["internal_id"], line["vendor_or_name"])
+            for lines in mine.values():
+                for line in lines:
+                    if not line["vendor_or_name"] and line["txn_type"] not in NAMELESS_TYPES:
+                        line["vendor_or_name"] = named.get(line["internal_id"], "")
         for period, lines in mine.items():
             if period in owner:
                 raise SystemExit(
@@ -256,7 +318,31 @@ def read_gl(paths) -> tuple[dict, list[dict]]:
             by_period[period] = lines
         files.append({"path": path, "periods": sorted(mine, key=period_key),
                       "rows": sum(len(v) for v in mine.values())})
+    _fill_account_paths(by_period)
     return by_period, files
+
+
+def _fill_account_paths(by_period):
+    """A connector GL pulled without the parent columns gives each account alone, where the
+    saved search gives the path through its parents, which the flux groups by. Take the
+    path from another export's line for the same account, or from one under the same
+    parent (the first two digits of the code)."""
+    paths, sections = {}, defaultdict(lambda: defaultdict(int))
+    for lines in by_period.values():
+        for line in lines:
+            if ":" in line["account_path"] and line["account_code"]:
+                paths.setdefault(line["account_code"], line["account_path"])
+                sections[line["account_code"][:2]][line["account_path"].rsplit(":", 1)[0]] += 1
+    for lines in by_period.values():
+        for line in lines:
+            code = line["account_code"]
+            if ":" in line["account_path"] or not code:
+                continue
+            if code in paths:
+                line["account_path"] = paths[code]
+            elif sections.get(code[:2]):
+                parent = max(sections[code[:2]].items(), key=lambda kv: kv[1])[0]
+                line["account_path"] = parent + ":" + line["account_path"]
 
 
 def activity(lines) -> list[dict]:
@@ -374,6 +460,14 @@ COUPA_USED = ("PO Number (Header)", "Order Date (Header)", "Supplier", "Account"
               "Line Total", "Item", "Qty", "Received", "Approved Invoiced", "Line Status",
               "Order Status (Header)", "Commodity", "Requested By (Header)", "PO ID")
 _coupa_cache: dict = {}
+# Report row limits: a report that stops at exactly one of these may have been cut off.
+ROW_LIMITS = (1000, 2000, 5000, 10000, 25000, 50000, 65535, 65536, 100000)
+
+
+def coupa_row_limit(path):
+    """The row limit the report stops at, or None. A capped report holds only part of the year."""
+    n = len(coupa_rows(path)[0])
+    return n if n in ROW_LIMITS else None
 
 
 def coupa_rows(path) -> tuple[list[dict], list[str]]:
@@ -1072,7 +1166,7 @@ def income_statement_tie(by_period, path, months) -> dict:
     for m in months:
         ledger = defaultdict(float)
         for line in by_period.get(m, []):
-            if line["account_code"][:1] in "45678":
+            if line["account_code"][:1] and line["account_code"][0] in "45678":
                 ledger[line["account_code"]] += line["amount"]
                 names.setdefault(line["account_code"], line.get("account_leaf") or "")
         codes |= set(ledger)
@@ -1087,6 +1181,52 @@ def income_statement_tie(by_period, path, months) -> dict:
                                "ledger": a, "report": b, "difference": round(a - b, 2)})
     return {"report": os.path.basename(path), "months": list(months), "accounts": len(codes),
             "passed": not failed, "failed": failed, "totals": totals}
+
+
+# ── Is the month closed? ────────────────────────────────────────────────────
+#
+# Rent, depreciation, amortization, the bonus accrual and interest book as Journal Entries
+# dated the last day of the month. Several accounts that carried one at each of the three
+# month-ends before, and have none at this one, say the GL was pulled before the month
+# closed. A few such accounts are ordinary month-to-month variation.
+
+def month_end_gaps(by_period, period, floor=1000.0, at_least=5):
+    """-> [{code, name, prior}]: P&L accounts with a month-end Journal Entry of at least
+    `floor` in each of the three months before and none in this month; empty when fewer
+    than `at_least` accounts qualify. None when the GL lacks one of the three months
+    before, so the check could not run."""
+    if any(not by_period.get(shift(period, -k)) for k in (1, 2, 3)):
+        return None
+    import calendar
+
+    def month_end(m):
+        year, month = period_key(m)
+        last = f"{year:04d}-{month:02d}-{calendar.monthrange(year, month)[1]:02d}"
+        totals, names = defaultdict(float), {}
+        for line in by_period.get(m, []):
+            if (line["txn_type"] == "Journal" and line["date"] == last
+                    and line["account_code"][:1] and line["account_code"][0] in "45678"):
+                totals[line["account_code"]] += line["amount"]
+                names[line["account_code"]] = line.get("account_leaf") or ""
+        return totals, names
+
+    now, _ = month_end(period)
+    before, names = month_end(shift(period, -1))
+    earlier = [month_end(shift(period, -k))[0] for k in (2, 3)]
+    gaps = [{"code": c, "name": names.get(c, ""), "prior": round(before[c], 2)}
+            for c in sorted(before)
+            if abs(before[c]) >= floor and all(abs(e.get(c, 0)) >= floor for e in earlier) and c not in now]
+    return gaps if len(gaps) >= at_least else []
+
+
+def month_end_lines(gaps, period) -> list[str]:
+    if gaps is None:
+        return [f"Month-end check not run for {period}: the GL holds less than the three months before it."]
+    if not gaps:
+        return []
+    return ([f"Month-end entries not in the GL for {period}: {len(gaps)} accounts carried one at each "
+             f"of the three month-ends before. The GL may have been pulled before the month closed."]
+            + [f"  {g['code']} {g['name']}: {g['prior']:,.2f} last month" for g in gaps])
 
 
 def tie_lines(tie) -> list[str]:
@@ -1205,7 +1345,7 @@ def main(argv=None):
     if absent:
         raise SystemExit(f"The NetSuite exports hold no lines for {', '.join(absent)}.")
     tie = income_statement_tie(by_period, args.income_statement, months)
-    print("\n".join(tie_lines(tie)))
+    print("\n".join(tie_lines(tie) + month_end_lines(month_end_gaps(by_period, period), period)))
     return 0 if tie["passed"] else 2
 
 

@@ -37,6 +37,31 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: what the September run taught
+
+- **GL from the NetSuite connector**: `netsuite_gl_detail.sql` pulls the month's posted lines (with
+  Program from `class` and Project from `custcol_cseg_sik_project`), and the GL reader reads the saved
+  result as it is: the account path from the account and its parents (or, for a pull without the
+  parent columns, from another export of the same account), a bill's vendor on every line but none on
+  a Journal or a Currency Revaluation (as the saved search shows them), zero lines left out, and
+  identical lines of one transaction and side added up, as the saved search shows them. A `.sql` or
+  `.json` file that a `netsuite_gl_*` glob picks up is passed over; a saved search saved as `.csv` is
+  refused. Checked on Sep 2026: the documents shared with the saved search export carry the same
+  accounts, departments and amounts (bar entries edited after it), and the month ties to NetSuite's
+  Income Statement on every account. Its internal IDs and Coupa fields
+  give the console's links without the link IDs file. Both Projects say how to pull the month through
+  the connector (engine 0.2.7).
+- **Is the month closed?** The tie and both consoles list month-end entries the GL lacks: five or more
+  accounts with a Journal Entry at each of the last three month-ends and none at this one. On the
+  13 Oct Sep 2026 export it lists 12 (bonus, depreciation, interest and others); on 17 closed months
+  from Apr 2025 to Aug 2026 it lists none. When the GL holds less than the three months before, it
+  says the check did not run.
+- **A capped Coupa report**: a report that stops at a row limit (5,000 for the Data Pull) is recorded
+  as `coupa_coverage.row_limit`, and the Projects ask for the full export.
+- **The tie in plain words**: a failed tie leads with one sentence and the totals, and the accounts
+  sit behind "Show the accounts", largest difference first. Without an Income Statement the note no
+  longer shows a command-line flag.
+
 ## Unreleased: Income Statement from the NetSuite connector
 
 - `netsuite_income_statement.sql` pulls each P&L account's posted debit and credit by accounting

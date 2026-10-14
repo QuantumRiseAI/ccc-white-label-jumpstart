@@ -174,6 +174,7 @@ by_period, _ = SS.read_gl(GL_X)
 # The ledger is tied to NetSuite's Income Statement by account before anything is built on it:
 # the close month, and for the flux the month before too. A failed tie stops the build.
 TIE = SS.income_statement_tie(by_period, IS_X, [PERIOD, PRIOR] if "flux" in WANT else [PERIOD]) if IS_X else None
+GAPS = SS.month_end_gaps(by_period, PERIOD)
 if TIE and not TIE["passed"]:
     print("\n".join(SS.tie_lines(TIE)), file=sys.stderr)
     if not A.allow_tie_differences:
@@ -676,22 +677,50 @@ def runlog(run, kind, also=None, read=()):
     return page("runlog", "<h3>Run Log</h3>" + "".join(out))
 
 
+def gap_card():
+    """Month-end entries the GL lacks: a sign it was pulled before the month closed."""
+    if GAPS is None:
+        return ('<div class="card tiebar none"><div class="pad"><b>Not checked whether the month is closed</b><span class="note">'
+                'The GL holds less than the three months before %s. Supply the earlier months to check for missing month-end entries.</span></div></div>' % e(PERIOD))
+    if not GAPS:
+        return ""
+    rows = "".join('<tr><td><span class="code">%s</span>%s</td><td class="n2">%s</td></tr>' % (e(g["code"]), e(g["name"]), money(g["prior"], True))
+                   for g in GAPS)
+    return ('<div class="card tiebar bad" data-gaps><div class="pad"><b>This GL may be from before the month closed</b><span>%d account%s carried a '
+            'month-end Journal Entry at each of the last three month-ends and %s none at %s. Export the GL again after close before relying '
+            'on these figures.</span></div><details><summary class="pad">Show the accounts</summary><div class="tw"><table><thead><tr><th>Account</th>'
+            '<th class="n2">Last month</th></tr></thead><tbody>%s</tbody></table></div></details></div>'
+            % (len(GAPS), "" if len(GAPS) == 1 else "s", "has" if len(GAPS) == 1 else "have", e(PERIOD), rows))
+
+
 def tie_card(months):
-    """The Income Statement tie, at the top of a console's first page."""
+    """The Income Statement tie, at the top of a console's first page, and any month-end gap."""
+    return tie_card_only(months) + gap_card()
+
+
+def tie_card_only(months):
     if not TIE:
-        return ('<div class="card tiebar none"><div class="pad"><b>Not tied to the Income Statement</b><span class="note">Build with NetSuite&rsquo;s '
-                'Income Statement by month report (--income-statement) to tie the ledger to it by account before relying on these figures.</span></div></div>')
+        return ('<div class="card tiebar none"><div class="pad"><b>Not checked against NetSuite&rsquo;s Income Statement</b><span class="note">'
+                'Supply NetSuite&rsquo;s Income Statement by month to confirm these figures match NetSuite.</span></div></div>')
     bad = [f for f in TIE["failed"] if f["month"] in months]
     tot = " &middot; ".join("%s net: ledger %s, Income Statement %s" % (e(m), money(TIE["totals"][m]["ledger"], True), money(TIE["totals"][m]["report"], True)) for m in months)
     if not bad:
         return ('<div class="card tiebar" data-tie="pass"><div class="pad"><b>Ties to NetSuite&rsquo;s Income Statement</b><span>%s, %d accounts, every account ties</span>'
                 '<span class="note">%s &middot; %s</span></div></div>' % (e(" and ".join(months)), TIE["accounts"], tot, e(TIE["report"])))
+    bad.sort(key=lambda f: -abs(f["difference"]))
     rows = "".join('<tr><td>%s</td><td><span class="code">%s</span>%s</td><td class="n2">%s</td><td class="n2">%s</td><td class="n2 unf">%s</td></tr>'
                    % (e(f["month"]), e(f["code"]), e(f["name"]), money(f["ledger"], True), money(f["report"], True), money(f["difference"], True)) for f in bad)
-    return ('<div class="card tiebar bad" data-tie="fail"><div class="pad"><b>Does not tie to NetSuite&rsquo;s Income Statement</b><span>%d account-month%s differ: '
-            'these figures are not ready to rely on</span><span class="note">%s</span></div><div class="tw"><table><thead><tr><th>Month</th><th>Account</th>'
-            '<th class="n2">Ledger</th><th class="n2">Income Statement</th><th class="n2">Difference</th></tr></thead><tbody>%s</tbody></table></div></div>'
-            % (len(bad), "" if len(bad) == 1 else "s", e(TIE["report"]), rows))
+    off = [m for m in months if any(f["month"] == m for f in bad)]
+    said = " ".join("%s: this GL shows %s, NetSuite shows %s, a difference of %s across %d account%s."
+                    % (e(m), money(TIE["totals"][m]["ledger"], True), money(TIE["totals"][m]["report"], True),
+                       money(TIE["totals"][m]["ledger"] - TIE["totals"][m]["report"], True), n, "" if n == 1 else "s")
+                    for m in off for n in [sum(1 for f in bad if f["month"] == m)])
+    ok = [m for m in months if m not in off]
+    return ('<div class="card tiebar bad" data-tie="fail"><div class="pad"><b>This GL does not match NetSuite</b><span>%s%s Entries posted in NetSuite after the GL '
+            'was exported, or left out of the export, cause this. Export the GL again before relying on these figures.</span><span class="note">Checked against %s</span></div>'
+            '<details><summary class="pad">Show the %d account%s</summary><div class="tw"><table><thead><tr><th>Month</th><th>Account</th>'
+            '<th class="n2">This GL</th><th class="n2">NetSuite</th><th class="n2">Difference</th></tr></thead><tbody>%s</tbody></table></div></details></div>'
+            % (said, (" " + e(" and ".join(ok)) + " matches on every account.") if ok else "", e(TIE["report"]), len(bad), "" if len(bad) == 1 else "s", rows))
 
 
 def tie_row(months):
