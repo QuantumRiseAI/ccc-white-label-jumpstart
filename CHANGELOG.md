@@ -37,6 +37,15 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: Income Statement from the NetSuite connector
+
+- `netsuite_income_statement.sql` pulls each P&L account's posted debit and credit by accounting
+  period for the close month and the month before, through the NetSuite connector. The tie
+  (`serif_sources.py tie`) and the build take the saved result as `--income-statement` in place
+  of NetSuite's `.xls` report, with the report's totals on SOX & GAAP. Both Projects say how to
+  run it. Checked on Aug 2026: the report's figures in the query's layout tie on every account
+  and give the same totals as the `.xls`.
+
 ## Unreleased: an import CSV NetSuite will match
 
 - With NetSuite's lists (`--netsuite-ref`: accounts, departments, programs, pulled through the connector),

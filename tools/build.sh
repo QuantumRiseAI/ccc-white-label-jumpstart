@@ -21,7 +21,7 @@ FC=$(ls "$I"/serif_rolling_forecast_*.xlsx | head -1)
 RO=$(ls "$I"/ukg_full_roster_*.csv)
 IDS=(); for f in "$I"/netsuite_link_ids_*.csv; do [ -e "$f" ] && IDS+=(--netsuite-ids "$f"); done
 BS=(); for f in "$I"/netsuite_balance_sheet_*.xls; do [ -e "$f" ] && BS+=(--balance-sheet "$f"); done
-IS=(); for f in "$I"/netsuite_income_statement_by_month_*.xls; do [ -e "$f" ] && IS+=(--income-statement "$f"); done
+IS=(); for f in "$I"/netsuite_income_statement_by_month_*.xls "$I"/netsuite_income_statement_by_period_*.csv; do [ -e "$f" ] && IS+=(--income-statement "$f"); done
 REF=(); for f in "$I"/netsuite_ref_*.csv "$B/inputs/reference"/netsuite_ref_*.csv; do [ -e "$f" ] && REF+=("$f"); done
 [ ${#REF[@]} -gt 0 ] && REF=(--netsuite-ref "${REF[@]}")
 
