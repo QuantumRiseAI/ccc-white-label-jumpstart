@@ -307,10 +307,10 @@ threshold. A line needs commentary when its move reaches it.
 ## What You Write
 
 Your drafts go into the console, beside the items they belong to, marked "Drafted by Claude"
-with a **Use this** button. Drafted commentary sits on the account's line on Actual vs. Actual
-(MoM); a drafted note on an adjustment carries your recommendation. Using it copies it into the
-commentary or the note, and sets the recommended decision. Nothing you write counts as reviewed
-until the reviewer uses it.
+with **Accept** and **Edit**. Drafted commentary sits on the account's line on Actual vs. Actual
+(MoM); a drafted note on an adjustment carries your recommendation. Accept copies it into the
+commentary or the note, and sets the recommended decision; Edit copies it to change. Nothing you
+write counts as reviewed until the reviewer accepts or edits it.
 
 After the three scripts run, write `drafts.json` and build the console again with it:
 

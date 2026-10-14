@@ -104,6 +104,9 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.evaluate(() => !$$('[data-item^="DR-"] [data-v="netsuite"]').length && $$('#p-clear [data-v="netsuite"]').length > 0 && $$('#p-prepaid [data-v="netsuite"]').length > 0),
          'gl: Edited in NetSuite is offered beside each fix to a transaction, not on an entry Claude drafted');
       await p.evaluate(() => show('dept'));
+      // A page of many cards opens folded: the reviewer opens the card first.
+      ok(await p.locator('[data-item="' + ns.id + '"] [data-v="netsuite"]').isHidden(), 'gl: a long page opens with its cards folded');
+      await p.click('[data-item="' + ns.id + '"] > .ih');
       await p.click('[data-item="' + ns.id + '"] [data-v="netsuite"]');
       ok(await p.evaluate(n => S.dec[n].v === 'netsuite' && decided(n) && !jeLive(n) && /Edited in NetSuite/.test($('[data-item="' + n + '"] .stp').textContent)
          && !$('[data-note="' + n + '"]').hidden, ns.id), 'gl: Edited in NetSuite counts as decided, no note required, the note offered');
@@ -169,6 +172,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     if (k === 'gl'){
       const r = await p.evaluate(() => document.querySelector('#p-clear [data-item]').dataset.item);
       await p.evaluate(() => show('clear'));
+      await p.click('[data-item="' + r + '"] > .ih b');
       await p.click('[data-item="' + r + '"] [data-v="confirm"]');
       ok(await p.locator('[data-item="' + r + '"] > .ib').isHidden(), 'gl: a confirmed vendor card folds to its name');
       await p.click('[data-item="' + r + '"] > .ih b');

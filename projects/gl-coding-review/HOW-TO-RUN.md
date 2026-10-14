@@ -395,8 +395,11 @@ purchase, and coded as planned. A check with nothing to compare against says so 
 the two months before, no Coupa PO, no plan line) rather than passing. Confirm each vendor, or
 recode it if the coding is wrong, starting with those at $2,500 or more.
 
-A draft from Claude sits on its card with **Use this**, which copies the note and sets the
-recommended decision. Only the current month gets an entry.
+A draft from Claude sits on its card with **Accept**, which copies the note and sets the
+recommended decision (marked Recommended on its button), and **Edit**, which copies the note to change.
+A card leads with its facts, the draft and the decision; why it was flagged, the Journal Entry, the
+last three months and the lines open beneath it. A page of more than 12 cards opens folded to one
+line each, with Expand all. Only the current month gets an entry.
 
 ### Export
 

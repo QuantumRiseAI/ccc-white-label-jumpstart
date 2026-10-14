@@ -33,6 +33,7 @@ const num = s => Number(String(s).replace(/[^0-9.\-]/g, '')) * (/\(/.test(s) ? -
     ok(!!draftId, 'the drafted entry is a card in the coding console, its Memo led by its reference ID');
     const approve = [fac[0], fac[1], syn[0], draftId], reject = syn[1], heldId = syn[2];
     await p.evaluate(() => show('dept'));
+    await p.click('#p-dept [data-foldall="0"]');   // the page opens folded; Expand all opens every card
     for (const id of approve) await p.click('[data-item="' + id + '"] [data-v="approve"]');
     await p.click('[data-item="' + reject + '"] [data-v="reject"]');
     await p.click('[data-item="' + heldId + '"] [data-v="modify"]');          // no note: not decided

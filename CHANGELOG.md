@@ -37,6 +37,24 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: consoles that lead with the decision
+
+- **Claude's drafts**: a draft reads full width under "Drafted by Claude" with its recommendation,
+  **Accept** (the note and the decision) and **Edit** (the note, to change). The empty note box waits
+  behind a draft until Edit. In a table a long draft shows four lines, with Show all; a note box
+  grows to its text.
+- **Cards**: the facts, the draft and the decision first, the recommended decision marked
+  Recommended. Why it was flagged (when there is a draft), the Journal Entry, the last three months
+  and the lines fold into one list beneath. Approving, modifying, recoding or editing in NetSuite
+  opens the Journal Entry. A folded card's header carries Claude's recommendation.
+- **Long pages**: a page of more than 12 cards (Dept & Entity's 172 in Sep 2026) opens folded to one
+  line each, with Expand all and Collapse all; a confirmed card still folds.
+- **Vendor notes on the right cards**: a note that names some of the vendor's bills goes on those
+  bills' cards only; in Sep 2026 that took 29 notes off cards for other bills.
+- **P&L Flux overview**: the executive summary follows the tie, ahead of the cards and the bridge; the
+  cash tile is left out without a Balance Sheet report. The coding card's "Recommended" column is now
+  "Proposed recode", so it no longer reads as Claude's recommendation.
+
 ## Unreleased: a September run as the Projects run it
 
 - **Either Income Statement file**: `tie`, `--income-statement` on `build_pages.py` and the

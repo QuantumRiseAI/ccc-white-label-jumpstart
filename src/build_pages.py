@@ -319,8 +319,11 @@ def draft(key, note, target, item=None, v=None, label=""):
     """Claude's draft beside the item it belongs to. It counts for nothing until
     the reviewer uses it, which copies it into the note (and the decision)."""
     DRAFTS[key] = {"note": note, "target": target, "item": item, "v": v}
-    return ('<div class="draft" data-draft="%s"><span class="tag">Drafted by Claude</span>%s<span class="dt">%s</span>'
-            '<button class="lk" data-use="%s">Use this</button></div>' % (e(key), (" <b>" + e(label) + "</b>") if label else "", e(note), e(key)))
+    # Accept takes the draft as written (and its decision); Edit puts it in the note to change.
+    return ('<div class="draft" data-draft="%s"><div class="dhd"><span class="who">Drafted by Claude</span>%s<span class="dacts">'
+            '<button class="pill sm solid" data-use="%s">Accept</button><button class="pill sm" data-edit="%s">Edit</button></span></div>'
+            '<div class="dt">%s</div><button class="lk more" data-dmore hidden>Show all</button></div>'
+            % (e(key), ('<b class="rec">' + e(label) + "</b>") if label else "", e(key), e(key), e(note)))
 
 
 def drafted_entries(fids_ok=None):
@@ -548,13 +551,47 @@ tr.jr > td{padding:.4em .8em}
 .jee input.num{text-align:right;font-variant-numeric:tabular-nums;max-width:12ch}
 .jee .jh [data-jebal]{text-transform:none;letter-spacing:0}
 .jee.edited{border-color:var(--color-dark-gray)}
-.draft{display:flex;gap:var(--spacing-2xs);align-items:baseline;flex-wrap:wrap;background-color:var(--color-bg-primary);border-radius:var(--radius-xs);
-  padding:.5em .7em;margin:0 0 .6em;font-size:var(--text--1);line-height:1.45}
-.draft .dt{flex:1 1 16rem}
+.draft{border:1px solid var(--color-hairline);border-left:3px solid var(--color-dark-gray);border-radius:var(--radius-xs);background-color:var(--color-stark);
+  padding:.55em .8em .65em;margin:0 0 .7em;font-size:var(--text--1);line-height:1.5}
+.draft .dhd{display:flex;align-items:center;gap:.4em .7em;flex-wrap:wrap;margin-bottom:.35em}
+.draft .who{font-size:var(--text--2);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--color-fg-secondary)}
+.draft .rec{font-weight:600}
+.draft .dacts{margin-left:auto;display:flex;gap:.4em}
+.pill.sm{padding:.2em .8em;font-size:var(--text--2)}
+.draft .dt{white-space:pre-line}
+td .draft .dt{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+td .draft.open .dt{display:block}
+.draft .lk.more{margin:.3em 0 0}
 .esum{padding:var(--spacing-sm) var(--spacing-sm-md);display:grid;gap:var(--spacing-xs)}
-.esum .dt{white-space:pre-line;line-height:1.5}
+.esum .draft{font-size:var(--text-0);padding:.8em 1em}
+.esum .dt{max-width:80ch;line-height:1.6}
 .esum textarea.c{font-size:var(--text-0);line-height:1.5}
-.draft .lk{margin-left:0}
+.xtra > details.fold{margin:0 0 .6em;border:1px solid var(--color-hairline);border-radius:var(--radius-xs)}
+.xtra > details.fold > summary{cursor:pointer;font-size:var(--text--2);text-transform:uppercase;letter-spacing:.04em;color:var(--color-fg-secondary);
+  padding:.5em .8em;display:flex;gap:.6em;align-items:center}
+.xtra > details.fold > summary .sumx{text-transform:none;letter-spacing:0;color:var(--color-fg-primary)}
+.xtra > details.fold[open] > summary{border-bottom:1px solid var(--color-hairline)}
+.xtra > details.fold > .why,.xtra > details.fold > .pol{margin:.6em .8em}
+.xtra > details.fold > .hist,.xtra > details.fold > .jee{margin:0;border:0;border-radius:0}
+.xtra > details.fold > .jee > .jh{display:none}
+.ib > .acts{margin:0 0 .8em}
+.pill.rec{border-width:2px;font-weight:600}
+.pill.rec::after{content:"Recommended";font-size:var(--text--2);font-weight:400;color:var(--color-fg-secondary);margin-left:.2em}
+.pill.rec.on::after{color:inherit}
+.ih .dchip{font-size:var(--text--2);color:var(--color-fg-secondary);border:1px solid var(--color-hairline);border-radius:var(--radius-pill);padding:.1em .6em}
+.foldall{display:flex;gap:var(--spacing-xs);align-items:center;margin:0 0 var(--spacing-xs);font-size:var(--text--1);color:var(--color-fg-secondary)}
+.foldall .lk{margin-left:0;font-size:var(--text--1)}
+.xtra{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);margin:0 0 .4em;overflow:hidden}
+.item .xtra > details.fold,.item .xtra > details.lines{border:0;border-radius:0;margin:0}
+.item .xtra > details + details{border-top:1px solid var(--color-hairline)}
+.xtra > details.fold > summary,.xtra > details.lines > summary{list-style:none}
+.xtra > details.fold > summary::-webkit-details-marker,.xtra > details.lines > summary::-webkit-details-marker{display:none}
+.xtra > details.fold > summary::before,.xtra > details.lines > summary::before{content:"";width:.45em;height:.45em;border-right:1.5px solid currentColor;
+  border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s;flex:none}
+.xtra > details.fold[open] > summary::before,.xtra > details.lines[open] > summary::before{transform:rotate(45deg)}
+.xtra > details.lines{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);margin:0 0 .6em}
+.xtra > details.lines > summary{display:flex;gap:.6em;align-items:center;padding:.5em .8em;font-size:var(--text--2);text-transform:uppercase;letter-spacing:.04em}
+.xtra > details.lines[open] > summary{border-bottom:1px solid var(--color-hairline)}
 .lk{margin-left:auto;border:0;background:none;padding:0;font-size:var(--text--2);color:var(--color-fg-secondary);text-decoration:underline;cursor:pointer}
 .dh{font-size:var(--text-1);font-weight:500;margin:var(--spacing-md) 0 var(--spacing-3xs);display:flex;align-items:baseline;gap:var(--spacing-xs)}
 .dh .note{font-size:var(--text--1)}
@@ -1111,7 +1148,7 @@ document.addEventListener('click', ev => {
 document.addEventListener('change', ev => { if (ev.target.id === 'recfile' && ev.target.files[0]){ loadRecord(ev.target.files[0]); ev.target.value = ''; } });
 document.addEventListener('input', ev => {
   const t = ev.target;
-  if (t.dataset.note !== undefined){ S.notes[t.dataset.note] = t.value; save(); return; }
+  if (t.dataset.note !== undefined){ S.notes[t.dataset.note] = t.value; t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; save(); return; }
   if (t.dataset.jef || t.dataset.jeh){ editJE(t); return; }
   if (t.dataset.thrin){ const v = Number(String(t.value).replace(/[^0-9.]/g, '')); if (isFinite(v) && v > 0){ S[t.dataset.thrin] = v; save(); refresh(); } }
 });
@@ -1133,6 +1170,8 @@ function decide(id, v, label){
   const cur = S.dec[id];
   if (cur && cur.v === v) delete S.dec[id];
   else S.dec[id] = {v, at: new Date().toISOString(), by_uid: Shared.uid()};
+  if (S.dec[id]) openJE(id);
+  if (S.dec[id] && v === 'confirm'){ const el = $('[data-item="' + id + '"]'); if (el) el.classList.remove('unfold'); }
   logAdd({id, label: label || id, v: S.dec[id] ? v : 'cleared', note: S.notes[id] || ''});
   save(); refresh();
 }
@@ -1140,10 +1179,11 @@ const decided = id => !!S.dec[id] && (['modify', 'recode'].indexOf(S.dec[id].v) 
 function paintItems(){
   $$('[data-item]').forEach(el => { const id = el.dataset.item, d = S.dec[id];
     el.classList.toggle('done', !!d);
-    const fold = !!d && d.v === 'confirm';
+    const fold = (!!d && d.v === 'confirm') || el.dataset.autofold === '1';
     if (!fold) el.classList.remove('unfold');
     el.classList.toggle('folded', fold && !el.classList.contains('unfold'));
     el.classList.toggle('foldable', fold);
+    el.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('rec', REC[id] === b.dataset.v));
     const st = el.querySelector('.stp'); if (st){ st.textContent = d ? (LABEL[d.v] || d.v) + ((['modify','recode'].indexOf(d.v) > -1 && !(S.notes[id]||'').trim()) ? ', add a note' : '')
       + (d.by_uid ? ' · ' + Shared.name(d.by_uid) : '') : 'Pending';
       st.className = 'stp' + (d ? (d.v === 'reject' || d.v === 'none' ? ' rej' : ' done') : ''); }
@@ -1152,8 +1192,63 @@ function paintItems(){
       if (document.activeElement !== nt) nt.value = S.notes[id] || ''; } });
   $$('textarea.c[data-note]').forEach(t => { if (!t.closest('[data-item]') && document.activeElement !== t) t.value = S.notes[t.dataset.note] || ''; });
   paintJE();
-  $$('[data-draft]').forEach(x => { const d = (DATA.drafts || {})[x.dataset.draft]; if (d) x.hidden = !!String(S.notes[d.target] || '').trim(); });
+  $$('[data-draft]').forEach(x => { const d = (DATA.drafts || {})[x.dataset.draft]; if (!d) return;
+    x.hidden = !!String(S.notes[d.target] || '').trim();
+    // An empty note box waits behind a draft until Edit.
+    if (!d.item){ const t = $('textarea[data-note="' + d.target + '"]'); if (t) t.hidden = !x.hidden && document.activeElement !== t; }
+    const m = x.querySelector('[data-dmore]'), dt = x.querySelector('.dt');
+    if (m && x.closest('td') && dt.offsetParent) m.hidden = !x.classList.contains('open') && dt.scrollHeight <= dt.clientHeight + 2; });
+  $$('textarea.c').forEach(t => { if (t.offsetParent && t.value){ t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; } });
+  $$('details.fold.je').forEach(f => { const b = f.querySelector('[data-jebal]'), t = f.querySelector('[data-jesum]'); if (b && t) t.textContent = b.textContent; });
 }
+/* cards: the facts, Claude's draft and the decision first; the rest folded away */
+const REC = {};
+Object.values(DATA.drafts || {}).forEach(d => { if (d.item && d.v) REC[d.item] = d.v; });
+function fold(el, title, extra){
+  const d = document.createElement('details'); d.className = 'fold';
+  d.innerHTML = '<summary>' + title + (extra ? ' <span class="sumx">' + extra + '</span>' : '') + '</summary>';
+  el.parentNode.insertBefore(d, el); d.appendChild(el); return d;
+}
+// A card approved, modified, recoded or edited in NetSuite shows the Journal Entry that will go to NetSuite.
+function openJE(id){ const d = S.dec[id]; if (!d || ['approve', 'modify', 'recode', 'netsuite'].indexOf(d.v) < 0) return;
+  const el = $('[data-item="' + id + '"]'); if (!el) return;
+  el.querySelectorAll('details.fold.je').forEach(f => f.open = true);
+  if (el.dataset.autofold === '1') el.classList.add('unfold'); }
+function shapeCards(){
+  $$('.item > .ib').forEach(ib => {
+    const kv = ib.querySelector(':scope > .kv'), dr = ib.querySelector('.draft'), ac = ib.querySelector(':scope > .acts');
+    const why = ib.querySelector(':scope > .why'), pol = ib.querySelector(':scope > .pol');
+    let at = kv;
+    if (dr && kv){ kv.after(dr); at = dr; }
+    else if (why && kv){ kv.after(why); at = why; }
+    if (ac && at) at.after(ac);
+    if (dr && why){ const f = fold(why, 'Why it was flagged'); if (pol) f.appendChild(pol); }
+    else if (pol && !why){ fold(pol, 'Policy'); }
+    ib.querySelectorAll(':scope > .jee:not([data-when])').forEach(j => { fold(j, 'Journal Entry', '<span data-jesum></span>').classList.add('je'); });
+    ib.querySelectorAll(':scope > .hist').forEach(h => fold(h, 'Last three months'));
+    const ds = ib.querySelectorAll(':scope > details.fold, :scope > details.lines');
+    if (ds.length){ const g = document.createElement('div'); g.className = 'xtra'; ds[0].before(g); ds.forEach(d => g.appendChild(d)); }
+    const it = ib.parentElement, lab = dr && dr.querySelector('.rec');
+    if (lab){ const c = document.createElement('span'); c.className = 'dchip'; c.textContent = 'Claude: ' + lab.textContent.replace(/[.:].*$/, '');
+      it.querySelector('.ih .stp').before(c); }
+  });
+  // A page of many cards opens folded to their headers.
+  $$('.page').forEach(pg => { const its = pg.querySelectorAll('[data-item]'); if (its.length <= 12) return;
+    its.forEach(x => x.dataset.autofold = '1');
+    const bar = document.createElement('div'); bar.className = 'foldall';
+    bar.innerHTML = '<span>' + its.length + ' items, folded to one line each.</span><button class="lk" data-foldall="0">Expand all</button><button class="lk" data-foldall="1">Collapse all</button>';
+    its[0].parentNode.insertBefore(bar, its[0]); });
+  Object.keys(S.dec || {}).forEach(openJE);
+}
+document.addEventListener('click', ev => {
+  const ed = ev.target.closest('[data-edit]');
+  if (ed){ if (blocked()) return; const d = DATA.drafts[ed.dataset.edit]; S.notes[d.target] = S.notes[d.target] || d.note; save(); refresh();
+    const t = $('textarea[data-note="' + d.target + '"]'); if (t){ t.hidden = false; t.focus(); } return; }
+  const mo = ev.target.closest('[data-dmore]');
+  if (mo){ const dr = mo.closest('.draft'); dr.classList.toggle('open'); mo.textContent = dr.classList.contains('open') ? 'Show less' : 'Show all'; return; }
+  const fa = ev.target.closest('[data-foldall]');
+  if (fa){ fa.closest('.page').querySelectorAll('[data-item]').forEach(x => x.classList.toggle('unfold', fa.dataset.foldall === '0')); paintItems(); return; }
+});
 /* counts: what is open on each page, and in each section */
 function counts(){
   $$('[data-c]').forEach(el => { const items = $$('#p-' + el.dataset.c + ' [data-item]');
@@ -1508,16 +1603,16 @@ def flux():
              tile("Total Headcount", str(sum((pay.get("headcount") or {}).get("by_type", {}).values())),
                   " &middot; ".join(e(str(n) + " " + k) for k, n in ((pay.get("headcount") or {}).get("by_type") or {}).items())),
              tile("Cash &amp; Equiv. (" + MON + " BS)", short(cash_now),
-                  " &middot; ".join(e(r["name"].split(" - ", 1)[-1].replace("Serif - ", "")) + ": " + short(r["values"][PERIOD]) for r in banks)),
+                  " &middot; ".join(e(r["name"].split(" - ", 1)[-1].replace("Serif - ", "")) + ": " + short(r["values"][PERIOD]) for r in banks)) if bs["rows"] else "",
              tile("Flags to Review", '<span data-cm></span>', '<span data-cmn></span>')]
     # The executive summary for the controller: Claude's draft, used and edited by the reviewer.
     sd = txt(RAW_DRAFTS.get("summary"))
     exec_summary = ('<div class="card"><div class="ch">Executive Summary</div><div class="esum">' + (draft("sum:exec", sd, "exec:summary") if sd else "")
                     + '<textarea class="c" rows="8" data-note="exec:summary" placeholder="Executive summary for the controller"></textarea></div></div>')
-    pages.append(page("ov", hero("P&L Flux Analysis, " + PERIOD, "", tiles) + tie_card([PERIOD, PRIOR]) + '<div class="grid">' + "".join(cards) + "</div>"
+    pages.append(page("ov", hero("P&L Flux Analysis, " + PERIOD, "", tiles) + tie_card([PERIOD, PRIOR]) + exec_summary + '<div class="grid">' + "".join(cards) + "</div>"
                       + '<div class="card"><div class="ch">Net Loss Bridge, ' + e(PRIOR) + ' to ' + e(PERIOD) + '</div>' + wf
                       + '<div class="wflegend"><span><i style="background:var(--color-dark-gray)"></i>Net loss</span><span><i style="background:var(--color-red-text)"></i>Raises the loss</span>'
-                        '<span><i style="background:var(--color-mid-gray)"></i>Lowers the loss</span></div></div>' + exec_summary + CHECKLIST))
+                        '<span><i style="background:var(--color-mid-gray)"></i>Lowers the loss</span></div></div>' + CHECKLIST))
 
     # ----- Actual vs. Actual
     corr, ns_corr, opened, n_booked, n_edited, coding_notes, n_open = coding_corrections() if CODING_REC else ({}, {}, {}, 0, 0, [], 0)
@@ -1999,7 +2094,7 @@ function refresh(){
   $$('[data-ckdone]').forEach(x => { const v = Object.values(S.ck); x.textContent = v.filter(y => y === 'ok').length + ' reviewed · ' + v.filter(y => y === 'flag').length + ' to follow up'; });
   $$('[data-signs]').forEach(x => x.textContent = Object.keys(S.sign).filter(k => k !== 'prep').length + ' / 2');
 }
-show('ov');
+shapeCards(); show('ov');
 """
     pages.append(runlog(PLR, "flux", read=[("Also read", "GL Coding Review run %s and its decision record %s, saved %s" % (
         GLR["manifest"]["run_id"], hashlib.sha256(open(A.coding_record, "rb").read()).hexdigest()[:16], str(CODING_REC.get("saved_at") or "")[:16].replace("T", " ")))]
@@ -2045,6 +2140,13 @@ def coding():
         return ('<details class="lines"><summary>Lines (%d)</summary><div class="tw"><table><thead><tr><th>Date</th><th>Document</th><th>Description</th><th>Account</th><th>Department</th>'
                 '<th>Project / Program</th><th class="n2">Amount</th></tr></thead><tbody>%s</tbody></table></div>%s</details>' % (len(its), rows, ('<p class="note">%d more lines in NetSuite.</p>' % more) if more > 0 else ""))
 
+    def note_fits(vname, dv, doc):
+        """A vendor note that names some of the vendor's documents belongs on those cards
+        only; one that names none is about the vendor and goes on each of its cards."""
+        docs = {i["document"] for r in vrows if r["vendor"] == vname for i in (r.get("detail") or {}).get("items") or [] if i.get("document")}
+        named = {d for d in docs if re.search(r"(?<![\w-])" + re.escape(d) + r"(?![\w-])", txt(dv.get("note")))}
+        return not named or bool(doc and doc["document"] in named)
+
     def acts(iid, label, actions):
         return "".join('<button class="pill" data-d="%s" data-v="%s" data-label="%s">%s</button>' % (iid, v, e(label), lab) for v, lab in actions)
 
@@ -2060,7 +2162,7 @@ def coding():
         if doc:
             nsdoc.setdefault(iid, doc["type"] + " " + doc["document"])
         dv = (RAW_DRAFTS.get("vendors") or {}).get(vendor) or {}
-        if flag and dv.get("recommend") in ("clear", "question", "entry"):
+        if flag and dv.get("recommend") in ("clear", "question", "entry") and note_fits(vendor, dv, doc):
             used_ven.add(vendor)
             v_ = {"clear": "reject", "entry": "approve"}.get(dv["recommend"])
             more = draft("ven:" + iid, txt(dv.get("note")), iid, iid if v_ else None, v_,
@@ -2073,7 +2175,7 @@ def coding():
             hi = over(thr, amount if tamt is None else tamt)
         tag = ('<span class="tag hi" data-rev%s>Review</span>' % ("" if hi else " hidden") if thr else '<span class="tag hi">Review</span>' if hi else "")
         return ('<div class="item%s" data-item="%s" data-amt="%s"%s%s><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span>%s</div><div class="ib"><div class="kv">'
-                '<div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Recommended</div><div class="x">%s</div></div>'
+                '<div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Proposed recode</div><div class="x">%s</div></div>'
                 '<div><div class="l">Document / item</div><div class="x">%s%s</div></div>%s</div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="%s"%s></textarea></div></div></div>'
                 % (" hi" if hi else "", iid, round(amount or 0, 2), " data-flag" if flag else "",
                    (' data-thr="%s"' % thr + (' data-tamt="%s"' % round(tamt, 2) if tamt is not None else "")) if thr else "",
@@ -2448,7 +2550,7 @@ function workPaper(){
   download('serif-' + DATA.kind + '-work-paper-' + DATA.slug + '.html', html, 'text/html');
 }
 document.addEventListener('click', ev => { if (ev.target.closest('[data-wpsave]')) workPaper(); });
-show('ov');
+shapeCards(); show('ov');
 """
     pages.append(runlog(GLR, "coding"))
     return shell("Serif GL Coding Review - " + PERIOD, "GL Coding Review", sections, pages, dict(data, docs=nsdoc), js)

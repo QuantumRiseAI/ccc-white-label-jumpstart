@@ -305,8 +305,11 @@ Capital in Process and asks the Controller which account to use. Never invent on
 ## What You Write
 
 Your drafts go into the console, beside the items they belong to, marked "Drafted by Claude"
-with a **Use this** button, on every card of that vendor: its flags and its vendor card. Using
-it copies the note onto the card and sets the recommended decision. Nothing you write counts as reviewed until the reviewer uses it.
+with **Accept** and **Edit**. A vendor note that names some of the vendor's bills (by document
+number) goes on those bills' cards and the vendor card; one that names none goes on every card of
+that vendor. Name the bill when the note is about one bill. Accept copies the note onto the card and
+sets the recommended decision, which the card marks Recommended; Edit copies the note to change it.
+Nothing you write counts as reviewed until the reviewer accepts or edits it.
 
 After the three scripts run, write `drafts.json` and build the console again with it:
 

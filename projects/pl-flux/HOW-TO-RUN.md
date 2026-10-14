@@ -343,8 +343,8 @@ left on it. Run log and Settings are the icons at the right.
 * **Executive Overview**: total operating expense, net loss, cash and headcount, the tie to
   NetSuite's Income Statement (every account for the month and the month before, or the ones
   that differ), the cards,
-  the net loss bridge from the prior month (hover a bar for its figures), the executive
-  summary Claude drafts (**Use this**, then edit it in place), and the close
+  the executive summary Claude drafts (**Accept**, or **Edit** to change it), the net loss
+  bridge from the prior month (hover a bar for its figures), and the close
   checklist: each page, what is open on it and what that is worth. A line of the checklist
   opens its page.
 * **Analysis**: Actual vs. Actual (MoM, with a YoY tab), Actual vs. Budget, By Department
@@ -356,7 +356,8 @@ left on it. Run log and Settings are the icons at the right.
 Commentary is the deliverable. A line at or over the threshold is marked Review and needs
 commentary; the close checklist counts it open until it has some. Actual vs. Actual, Actual
 vs. Budget, By Department and Balance Sheet Flux each take commentary on their lines. A draft
-from Claude sits on its line with **Use this**, which copies it into the field.
+from Claude sits on its line with **Accept**, which copies it into the field, and **Edit**, which
+copies it to change; a long draft shows its first lines, with Show all.
 
 Actual vs. Actual (MoM) also shows each account's average over the 3 and 6 months before.
 By Department ends with **Credits in Expense Accounts**: every account and department whose
