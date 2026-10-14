@@ -69,10 +69,13 @@ serif-pl-flux-aug2026-v1.8.2.html
   (it tested $10,000 before), so lowering the Prepaid threshold in Settings shows more; $25,000 is
   the review default. A prepaid under $25,000 says it stays expense, and the P&L Flux proposes no
   Journal Entry for it (`serif_views.entries`), so its adjustments do not fill with small prepaids:
-  the finding is in the run, not on a flux page.
+  the finding is in the run, not on a flux page. Capital is the same: the P&L Flux proposes a
+  capital entry only for a bill of $5,000 or more, its lines together, so it never proposes
+  capitalizing what the coding card says stays expense.
 - **Flux engine 0.8.0, ruleset 2026.10-uc2-flux-serif-thresholds; views 1.7.0.** F9.PREPAID lists
   from $2,500 and the views propose its entry from $25,000. F10.CAPITALIZE still lists every bill
-  from the $2,500 reporting floor, so a reviewer can lower the CapEx threshold; each finding's correction carries
+  from the $2,500 reporting floor, so a reviewer can lower the CapEx threshold, and the views
+  propose its entry from $5,000; each finding's correction carries
   `placement` (`to`, `kind`: buildout, not_in_service, in_service or no_account, `asset`,
   `in_service`, `why`, `ask`), and its policy citation names the $5,000 threshold. The views put
   each bill's placement and its finding's total on the flag's `match`. The coding engine is
@@ -85,9 +88,10 @@ serif-pl-flux-aug2026-v1.8.2.html
   prepaid: 7 lines, Review 7 before, 2 now. Dept & Entity: 53 cards, Review 17 before, 41 now
   (every Department flag). The coding run id is unchanged and every card keeps its id. Flux: 99
   findings, $7,893,172.90, to 101, $7,905,284.90 (two more prepaid candidates); proposed Journal
-  Entries 14 to 13 (the Nova prepaid entry is under $25,000). A new flux ruleset means a new run
-  id: bring the earlier run's decisions in from Settings; the capital adjustment to Capital in
-  Process has a new memo, so a new item id.
+  Entries 14 to 11 (the Nova prepaid entry is under $25,000; Bay State IT's and Repligen's capital
+  entries are under $5,000). A new flux ruleset means a new run id: bring the earlier run's
+  decisions in from Settings; the capital adjustment to Capital in Process has a new memo, so a
+  new item id.
 - New `tests/test_screens.py` in `make test`. The console tests edit the CapEx flag's entry where
   they edited the Prepaid one's, and check that lowering the Prepaid threshold marks more.
 

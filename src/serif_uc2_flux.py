@@ -81,8 +81,8 @@ REPORTING_FLOOR = 2_500.0
 # Serif's prepaid and PP&E thresholds, from Mike's write-up of 12 Oct 2026. They replace
 # the $10,000 the draft prepaid policy was read as, and the draft asset policy's none.
 # Both screens list from the reporting floor, so the reviewer can lower either line;
-# these are the review defaults, and a prepaid under its threshold is not proposed
-# for booking (serif_views.py).
+# these are the review defaults, and a prepaid or capital purchase under its
+# threshold is not proposed for booking (serif_views.py).
 PREPAID_THRESHOLD = 25_000.0      # aggregated per good or service
 CAPITALIZATION_THRESHOLD = 5_000.0
 

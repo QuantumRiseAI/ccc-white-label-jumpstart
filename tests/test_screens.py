@@ -85,6 +85,11 @@ x = V.explain(rp, {}, "Aug 2026")
 ok("under the $5,000 capitalization threshold" in x["why"] and "no in-service date" in x["do"], "under $5,000 it says so, and asks the in-service date")
 x = V.explain(rt, {}, "Aug 2026")
 ok("under the $5,000" not in x["why"] and "build-out work" in x["why"] and x["do"].startswith("Read the bill."), "over $5,000, the build-out reason and the question")
+cap = lambda amt: F.capex_findings([bill("Fisher Scientific", "6415000", amt / 2, "Benchtop centrifuge", doc="9001"),
+                                    bill("Fisher Scientific", "6415000", amt / 2, "Centrifuge rotor", doc="9001")], LEAVES, "Aug 2026", [0])
+ok(not V.entries(cap(4_999.98), "Aug 2026") and len(V.entries(cap(5_000), "Aug 2026")) == 1
+   and not V.entries([rp], "Aug 2026") and len(V.entries([rt], "Aug 2026")) == 1,
+   "the P&L Flux proposes a capital entry only at or over $5,000, the bill's lines together")
 ok(V.capitalize_memo("Red Thread", rt["correction"]["placement"]).endswith("until it is placed in service")
    and V.capitalize_memo("Repligen", rp["correction"]["placement"]) == "Capitalize Repligen purchase as a fixed asset",
    "the flux entry's memo says Capital in Process or fixed asset; an asset in service keeps the memo it had")

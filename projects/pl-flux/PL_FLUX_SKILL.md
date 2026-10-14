@@ -14,7 +14,7 @@ file to explain a result, not to reproduce one.
 | `F3.ACCRUAL_RECEIPT` | Accrual Proposals | Goods received in Coupa and not invoiced, $5,000 or more per supplier and account |
 | `F6.ACCRUAL_PATTERN` | Accrual Proposals | A vendor that bills every month and billed nothing this month, at its three-month average |
 | `F9.PREPAID` | Prepaids and Capital | Bills for one good or service of $2,500 or more that name a service term, or sit on a term account the vendor does not bill most months. Only those of $25,000 or more (Serif's prepaid threshold, related charges together) get a proposed Journal Entry; the rest stay expense |
-| `F10.CAPITALIZE` | Prepaids and Capital | Bills of $2,500 or more on an account the asset policy names for review, or on repairs and maintenance, that do not name a service term. Each says whether it goes to Capital in Process or its fixed asset account, and why; under Serif's $5,000 capitalization threshold it says so |
+| `F10.CAPITALIZE` | Prepaids and Capital | Bills of $2,500 or more on an account the asset policy names for review, or on repairs and maintenance, that do not name a service term. Each says whether it goes to Capital in Process or its fixed asset account, and why. Only a bill of $5,000 or more (Serif's capitalization threshold, the bill's lines together) gets a proposed Journal Entry; under it, it says it stays expense |
 | `F7.REVENUE_IN_EXPENSE` | Reclassifications | A customer document posted to an expense account |
 | `F8.VENDOR_DROPPED` | Reclassifications | A journal with no vendor where the same account, department and amount carried one before, including prepaid releases |
 

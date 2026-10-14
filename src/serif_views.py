@@ -65,7 +65,8 @@ PL_PREFIXES = ("6", "7", "8")
 # decided in the console, against the reviewer's own threshold.
 FLOOR = 2500.0
 # Serif's PP&E capitalization threshold (12 Oct 2026), the flux engine's
-# CAPITALIZATION_THRESHOLD. A capital flag under it says so.
+# CAPITALIZATION_THRESHOLD. A capital flag under it says so, and the P&L Flux
+# proposes no Journal Entry for it.
 CAPITALIZATION = 5000.0
 # Serif's prepaid threshold (12 Oct 2026), the flux engine's PREPAID_THRESHOLD. The
 # prepaid screen lists from the reporting floor; a flag under this says so, and the
@@ -1353,9 +1354,10 @@ def entries(findings, period, accrual_depts=None):
         rule = f.get("rule_id", "")
         ev = f.get("evidence") or {}
         lines, kind, memo = [], "", ""
-        # A prepaid under Serif's threshold is listed for the reviewer, not proposed for
-        # booking: the policy leaves it in expense.
-        if rule == "F9.PREPAID" and (f.get("amount_at_risk") or 0) < PREPAID:
+        # A prepaid or capital purchase under Serif's threshold is listed for the reviewer,
+        # not proposed for booking: the policy leaves it in expense.
+        if (rule == "F9.PREPAID" and (f.get("amount_at_risk") or 0) < PREPAID
+                or rule == "F10.CAPITALIZE" and (f.get("amount_at_risk") or 0) < CAPITALIZATION):
             continue
         if rule == "T1.DEPT_INCONSISTENCY":
             to_dept = quoted(ev.get("expected"), "department")

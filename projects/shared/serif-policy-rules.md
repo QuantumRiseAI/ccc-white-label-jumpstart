@@ -31,7 +31,7 @@ both (`PREPAID_THRESHOLD`, `CAPITALIZATION_THRESHOLD`); the coding engine's cons
 same names are not used, because prepaid and fixed-asset tests are outside its scope. The
 prepaid and capital screens list from the **$2,500** reporting floor, so a reviewer can look
 below the line; a flag under its threshold says it stays expense, and the P&L Flux proposes
-no prepaid entry under $25,000.
+no prepaid entry under $25,000 and no capital entry under $5,000.
 
 The GL Coding Review gives each review screen its own threshold, in Settings: CapEx at
 **$5,000**, Prepaid at **$25,000**, the others at **$2,500**. Department flags have none:
