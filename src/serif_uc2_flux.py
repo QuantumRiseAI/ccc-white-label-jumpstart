@@ -1284,6 +1284,8 @@ def main(argv=None):
             "supplied": True, "lines": len(coupa_rows),
             # Columns this pull lacks or leaves empty: what reads them finds nothing.
             "columns_absent": sources.coupa_rows(args.coupa)[1],
+            # A report that stops at a row limit holds only part of the year.
+            "row_limit": sources.coupa_row_limit(args.coupa),
             "join_key": "supplier_name",
             "join_caveat": ("Coupa carries no NetSuite PO reference, so accrual proposals "
                             "are supplier-level. Never assert a line-level match."),

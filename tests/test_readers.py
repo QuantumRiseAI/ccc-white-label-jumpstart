@@ -144,6 +144,47 @@ with tempfile.TemporaryDirectory() as d:
     ok(s[0]["coupa_po"] == "FL087030260", "a PO Number column gives the line's Coupa PO")
     ok(round(sum(x["amount"] for x in s), 2) == 0, "debits equal credits")
 
+    print("GL, the NetSuite connector's result for netsuite_gl_detail.sql")
+    conn = os.path.join(d, "netsuite_gl_detail_sep2026.csv")
+    head = ("account_number,account_name,type,date,document_number,name,debit,credit,period,department,"
+            "program,project,subsidiary,description,memo,internal_id,line_id,coupa_transaction_url,coupa_po_num\n")
+    sub = '"FL87 Serif Biomedicines, Inc."'
+    url = "https://" + S.COUPA_HOST + "/invoices/9"
+    open(conn, "w").write(head
+        + f"2000100,Accounts Payable : Accounts Payable 3rd party,Bill,2026-09-03,B-9,Abcam Inc,,150,Sep 2026,Non-Specific,00 Non-Specific,00 Non-Specific,{sub},,,77,0,{url},\n"
+        + f"6410000,Operating Expenses : Lab Expenses : Lab Supplies/Consumables,Bill,2026-09-03,B-9,,75,,Sep 2026,Platform,00 Non-Specific,00 Non-Specific,{sub},Antibody,,77,1,{url},FL087030260-1\n"
+        + f"6410000,Operating Expenses : Lab Expenses : Lab Supplies/Consumables,Bill,2026-09-03,B-9,,75,,Sep 2026,Platform,00 Non-Specific,00 Non-Specific,{sub},Antibody,,77,2,{url},FL087030260-1\n"
+        + f"6410000,Operating Expenses : Lab Expenses : Lab Supplies/Consumables,Bill,2026-09-03,B-9,,,,Sep 2026,Platform,00 Non-Specific,00 Non-Specific,{sub},Freight,,77,3,{url},\n")
+    c = S.read_gl([conn])[0]["Sep 2026"]
+    exp = [l for l in c if l["account_code"] == "6410000"]
+    ok(len(c) == 2 and len(exp) == 1 and exp[0]["amount"] == 150.0,
+       "identical lines of one transaction add up into one, as the saved search shows them; a zero line is left out")
+    ok(exp[0]["account_leaf"] == "Lab Supplies/Consumables", "the account is its number and the last part of its name")
+    ok(exp[0]["vendor_or_name"] == "Abcam Inc", "an expense line takes the vendor from its bill's payable line")
+    ok(exp[0]["internal_id"] == "77" and exp[0]["coupa_url"] == url and exp[0]["coupa_po"] == "FL087030260",
+       "the internal ID and Coupa fields come with each line, for links")
+
+    print("Is the month closed?")
+    def je(m, day, code, amt):
+        return {"txn_type": "Journal", "date": f"2026-{m:02d}-{day:02d}", "account_code": code,
+                "account_leaf": "Acct " + code, "amount": amt}
+    codes = ["6601000", "6609000", "7110000", "7160000", "6102000"]
+    ends = {6: 30, 7: 31, 8: 31, 9: 30}
+    led = {f"{S.MONTH_NAMES[m - 1]} 2026": [je(m, ends[m], c, 5000.0) for c in codes] for m in (6, 7, 8)}
+    led["Sep 2026"] = [je(9, 15, "6101000", 9000.0)]
+    gaps = S.month_end_gaps(led, "Sep 2026")
+    ok([g["code"] for g in gaps] == sorted(codes), "five recurring month-end entries missing are listed")
+    led["Sep 2026"] += [je(9, 30, c, 5000.0) for c in codes[:2]]
+    ok(S.month_end_gaps(led, "Sep 2026") == [], "fewer than five missing is ordinary variation, not listed")
+
+    print("Coupa, a report that stops at a row limit")
+    capped = os.path.join(d, "coupa_capped.csv")
+    open(capped, "w").write("PO Number,Order Date,Supplier,Amt\n" + "".join(f"FL0870{i:05d},9/3/2026,,1\n" for i in range(5000)))
+    ok(S.coupa_row_limit(capped) == 5000, "a report of exactly 5,000 lines is flagged as capped")
+    short = os.path.join(d, "coupa_short.csv")
+    open(short, "w").write("PO Number,Order Date,Supplier,Amt\n" + "".join(f"FL0870{i:05d},9/3/2026,,1\n" for i in range(4999)))
+    ok(S.coupa_row_limit(short) is None, "a report of another size is not")
+
     print("GL, a file that is not the ledger")
     bad = os.path.join(d, "netsuite_gl_bad.xls")
     open(bad, "w").write(spreadsheetml(TITLE + [["Account", "Type", "Debit", "Credit"],

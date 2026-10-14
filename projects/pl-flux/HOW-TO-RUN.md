@@ -21,7 +21,7 @@ Statement, account by account, for the month and the month before:
 
 ```sh
 python3 serif_sources.py tie --period "Sep 2026" --prior \
-  --gl netsuite_gl_*.xls* \
+  --gl netsuite_gl_* \
   --income-statement netsuite_income_statement_by_month_*.xls
 ```
 
@@ -31,7 +31,7 @@ Income Statement again. Then:
 
 ```sh
 python3 serif_uc2_flux.py --period "Sep 2026" \
-  --gl       netsuite_gl_*.xls* \
+  --gl       netsuite_gl_* \
   --coupa    coupa_po_lines_2026.csv \
   --forecast serif_rolling_forecast_2026-09.xlsx \
   --plan     serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
@@ -51,7 +51,7 @@ python3 serif_uc2_flux.py --period "Sep 2026" \
 
 ```sh
 python3 serif_views.py out/sep2026/run.json \
-  --gl     netsuite_gl_*.xls* \
+  --gl     netsuite_gl_* \
   --plan   serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
   --coupa  coupa_po_lines_2026.csv \
   --roster ukg_full_roster_hrbp_<date>.csv \
@@ -61,7 +61,7 @@ python3 serif_views.py out/sep2026/run.json \
 
 ```sh
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json \
-  --gl netsuite_gl_*.xls* \
+  --gl netsuite_gl_* \
   --income-statement netsuite_income_statement_by_month_*.xls \
   --out out/sep2026
 ```
@@ -113,6 +113,8 @@ Serif sends these exports, uploaded as they are:
    from it also reads), named `netsuite_gl_<range>.xls`. Columns are found by name, so a
    search with columns added or moved reads the same. Exporting a month at a time keeps each file small: the
    month's own export is then the only new one.
+   Claude can also pull the month through the NetSuite connector with `netsuite_gl_detail.sql`
+   and `netsuite_income_statement.sql`; the scripts read the saved results as they are.
 2. The Coupa PO line report with all available columns, for the calendar year, as `.csv`.
 3. The rolling forecast workbook FP&A saved after the month closed, as `.xlsx`.
 4. The newest UKG roster, as `.csv`.
