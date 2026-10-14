@@ -46,6 +46,119 @@ serif-pl-flux-aug2026-v1.8.2.html
   run it. Checked on Aug 2026: the report's figures in the query's layout tie on every account
   and give the same totals as the `.xls`.
 
+## Unreleased: an import CSV NetSuite will match
+
+- With NetSuite's lists (`--netsuite-ref`: accounts, departments, programs, pulled through the connector),
+  the import CSV carries internal IDs for Subsidiary (97), Account, Department and Program, and Project by
+  name. Serif's account full names carry no number and its departments sit under parents, so a name is
+  not a safe match. The subsidiary name is now NetSuite's, "FL87 Serif Biomedicines, Inc.".
+- Journal Date and Reversal Date are M/D/YYYY. Currency and Exchange Rate are dropped (the subsidiary's
+  USD applies). The readable account number, department and program and the Reversing Entry flag follow
+  as reviewer columns, left unmapped.
+- NetSuite requires a department on every line (DEPTMANDATORY). An entry with a line missing one, or with
+  an account, department or program NetSuite does not hold, stays out of the CSV and the export says why.
+  A flux entry's P&L line without a department takes the one its ledger lines share.
+- Checked: every Aug 2026 coding entry (104, 230 lines) and every Sep 2026 coding entry (228, 456 lines)
+  resolves to an active NetSuite account, department and program. Two Aug flux accruals built from Coupa
+  receipts have no ledger department and wait for the reviewer to pick one.
+
+## Unreleased: Project and Program on lines and entries, Non-Specific on balance sheet lines (SERIF-144)
+
+- **Both consoles**: each ledger line a card lists shows its Project and Program (the GL's
+  `ProjectID: Name` and `Program: Name`) beside its department: a card's lines, and a bill booked
+  to prepaid or fixed assets (GL Coding Review). Every proposed Journal Entry carries them on both
+  sides, from the line it corrects, so a reclass leaves no stray balance on a Project. The entry
+  editor edits them (an edit marks the item Modified, as any edit does), and Export, the work
+  paper and the NetSuite CSV carry them: two line columns, `Project` and `Program`, after
+  `Department`. A reclass whose lines sit on different Projects becomes a line per Project, each
+  netting to zero. An entry with no ledger line behind it (an accrual from Coupa receipts, a
+  reclass staged in the forecast, Propose entry) leaves them blank to fill.
+- **New balance sheet lines take `Non-Specific`**: on every proposed entry, a new line on a
+  balance sheet account (1xxxxxx to 3xxxxxx) takes the `Non-Specific` department; income statement
+  lines keep theirs. A CapEx recode to 1505000 Capital in Process put the expense's General R&D on
+  the asset line; the card and the entry now say Non-Specific. The line that reverses the ledger
+  line being corrected keeps that line's department, on a balance sheet account too, so it nets
+  the original: a bill booked to prepaid and recoded to expense credits prepaid on the bill's own
+  department. Entry lines mark it `reverses_line` (in `views.entries` and in Claude's drafted
+  entries). A line the reviewer moves to a balance sheet account takes Non-Specific, which can
+  still be changed. Balance sheet lines keep the Project and Program. Ledger balance sheet lines
+  that carry another department are not flagged: that is an open question to Serif (123 of 1,260
+  in Aug 2026).
+- **Saved reviews** load as before: an entry edit saved earlier takes the run's Project and
+  Program on its lines. The decision record's format stays 3.
+- `serif_views.py`: `detail.items` and the `views.entries` lines carry `project` and `program`; a
+  flux finding's transactions, which do not, take them from the GL by document and account, and
+  only when its lines agree.
+- Aug 2026: 2,711 of 2,713 ledger lines carry a Project and all carry a Program (212 on
+  `Internal CMC`). GL Coding Review: all 226 lines of the 102 entries carry both (22 on Internal
+  CMC); the 4 new balance sheet lines move to Non-Specific (CAPEX-01 to 03 from the expense's
+  department, PREPAID-01), the 7 prepaid credits on PPD-01 to 07 keep the bills' General R&D, and
+  two reclasses split by Project (DEPT-01, 6 lines to 8; DEPT-21, 4 to 6). P&L Flux: 8 of the 14
+  adjustments carry both; its 12 balance sheet lines are all new (8 accrual credits to 2206000,
+  3 Capitalize and 1 prepaid debit) and, having had no department, take Non-Specific.
+- Tests: `test_console.js` (116) checks both sides of each entry, the new CapEx and Prepaid
+  asset lines, the prepaid credit that nets the bill, the CSV columns, a Project edit and an
+  earlier saved edit; `test_readers.py` (25) follows Project and Program from the reader to both
+  sides of an entry and reverses a balance sheet line on its own department.
+
+## Unreleased: a threshold per coding screen, and Capital in Process or a fixed asset (SERIF-142, SERIF-147)
+
+- **Serif's thresholds** (Mike's write-up, 12 Oct 2026): **$5,000** PP&E capitalization and
+  **$25,000** prepaid. They replace the draft asset policy's "no threshold, by design" and the
+  $10,000 the draft prepaid policy had been read as. The P&L Flux commentary threshold is not
+  changed; it is still open with Serif.
+- **GL Coding Review, Settings** has three thresholds, each saved in the browser with the review as
+  the one threshold was: **Review threshold** ($2,500: the account recodes on Dept & Entity and
+  drafted entries), **CapEx threshold** ($5,000) and **Prepaid threshold** ($25,000). A CapEx card
+  is marked Review at or over the CapEx threshold, a Prepaid card at or over the Prepaid one, each
+  against its bill or, for a prepaid, its related charges together; the bills booked to fixed
+  assets or prepaid take their page's. Every **Department** flag is marked Review, whatever its
+  size. Changing a threshold marks its screen again at once (before, an item's Review mark was
+  fixed at build). Stored as `thr`, `thr_capex` and `thr_prepaid`; a review saved with `thr` alone
+  restores as it was, its threshold kept, CapEx and Prepaid at their defaults. SOX Documentation
+  lists the defaults.
+- **Each CapEx recommendation says where it goes and why** (SERIF-147): `1505000` Capital in
+  Process for build-out work (the wording names a build-out, fit-out, construction, renovation,
+  tenant improvement, a phase, or an office or space expansion) or an asset not yet in service (a
+  deposit, a down payment, a progress or milestone payment); otherwise the asset is in service at
+  the invoice date, per policy, and goes to its fixed asset account (`1510000` Lab Equipment - New;
+  `1530000` Computers & Software for software and computers). Office furniture and equipment has
+  no fixed asset account in the chart: the entry holds it in Capital in Process and asks the
+  Controller which account to use. The ledger has no in-service date, so the card asks for it
+  (**Placed in service** on the card, and its note kept open for the date) unless the line states
+  one. The card text, the Journal Entry Memo (`..., Capital in Process: build-out, until in use`;
+  `..., in service: fixed asset`) and the P&L Flux's entry memo say which applies. A capital bill
+  under $5,000 says it is under the threshold.
+- **Prepaid lists like CapEx.** F9.PREPAID lists related charges from the $2,500 reporting floor
+  (it tested $10,000 before), so lowering the Prepaid threshold in Settings shows more; $25,000 is
+  the review default. A prepaid under $25,000 says it stays expense, and the P&L Flux proposes no
+  Journal Entry for it (`serif_views.entries`), so its adjustments do not fill with small prepaids:
+  the finding is in the run, not on a flux page. Capital is the same: the P&L Flux proposes a
+  capital entry only for a bill of $5,000 or more, its lines together, so it never proposes
+  capitalizing what the coding card says stays expense.
+- **Flux engine 0.8.0, ruleset 2026.10-uc2-flux-serif-thresholds; views 1.7.0.** F9.PREPAID lists
+  from $2,500 and the views propose its entry from $25,000. F10.CAPITALIZE still lists every bill
+  from the $2,500 reporting floor, so a reviewer can lower the CapEx threshold, and the views
+  propose its entry from $5,000; each finding's correction carries
+  `placement` (`to`, `kind`: buildout, not_in_service, in_service or no_account, `asset`,
+  `in_service`, `why`, `ask`), and its policy citation names the $5,000 threshold. The views put
+  each bill's placement and its finding's total on the flag's `match`. The coding engine is
+  unchanged: its prepaid and fixed-asset constants still carry the draft readings and are not used.
+- **Aug 2026.** Coding: CapEx 3 flags, Review 3 before, 1 now (Red Thread Spaces, $38,590.70, to
+  Capital in Process as build-out work, as Serif moved Phase 1 there on 31 Jul; Bay State IT
+  $3,240.63 and Repligen $2,823.39 are under $5,000). Prepaid 1 flag before (Nova Biomedical,
+  $16,746.00 service contract, marked Review), 3 now, none marked Review at $25,000 (Nova; Beckman
+  Coulter, $7,540.00; Agilent, $4,572.00, all service contracts); at $5,000, 2 are. Booked to
+  prepaid: 7 lines, Review 7 before, 2 now. Dept & Entity: 53 cards, Review 17 before, 41 now
+  (every Department flag). The coding run id is unchanged and every card keeps its id. Flux: 99
+  findings, $7,893,172.90, to 101, $7,905,284.90 (two more prepaid candidates); proposed Journal
+  Entries 14 to 11 (the Nova prepaid entry is under $25,000; Bay State IT's and Repligen's capital
+  entries are under $5,000). A new flux ruleset means a new run id: bring the earlier run's
+  decisions in from Settings; the capital adjustment to Capital in Process has a new memo, so a
+  new item id.
+- New `tests/test_screens.py` in `make test`. The console tests edit the CapEx flag's entry where
+  they edited the Prepaid one's, and check that lowering the Prepaid threshold marks more.
+
 ## Unreleased: September data fixes
 
 - **P&L Flux**: a run whose GL exports hold no same month last year builds, with YoY shown as

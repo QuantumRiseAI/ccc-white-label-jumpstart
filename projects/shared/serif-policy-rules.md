@@ -20,13 +20,23 @@ change it silently in one place.
 | Post-close quarterly adjustment | **$100,000** | Global Finance Threshold Policy |
 | Accrual, per vendor per good or service | **$5,000** | Global Accrued Expense Policy |
 | Payroll accrual, per liability | **$5,000** | Global Accrued Expense Policy |
-| Prepaid, aggregated per good or service | **$10,000** | Global Prepaid Expense Policy |
+| Prepaid, aggregated per good or service | **$25,000** | Serif, Mike's write-up of 12 Oct 2026 |
 | Prepaid impairment review, quarterly | **$50,000** | Global Prepaid Expense Policy |
-| Fixed asset capitalization | **no threshold, by design** | Global Tangible & Intangible Asset Policy |
+| Fixed asset (PP&E) capitalization | **$5,000** | Serif, Mike's write-up of 12 Oct 2026 |
 
-The fixed-asset line is not an omission. The policy states thresholds deliberately do not
-exist, so that purchasing decisions are not distorted by capitalize-versus-expense
-treatment. **Never apply a dollar threshold to fixed assets.**
+The prepaid and PP&E figures are Serif's own, from Mike's write-up of 12 Oct 2026. They
+replace the $10,000 the draft Global Prepaid Expense Policy had been read as, and the draft
+Tangible & Intangible Asset Policy's "no threshold, by design". The flux engine carries
+both (`PREPAID_THRESHOLD`, `CAPITALIZATION_THRESHOLD`); the coding engine's constants of the
+same names are not used, because prepaid and fixed-asset tests are outside its scope. The
+prepaid and capital screens list from the **$2,500** reporting floor, so a reviewer can look
+below the line; a flag under its threshold says it stays expense, and the P&L Flux proposes
+no prepaid entry under $25,000 and no capital entry under $5,000.
+
+The GL Coding Review gives each review screen its own threshold, in Settings: CapEx at
+**$5,000**, Prepaid at **$25,000**, the others at **$2,500**. Department flags have none:
+every line off Non-Specific is recoded, whatever its size. The P&L Flux commentary threshold
+is a separate question, still open with Serif.
 
 ## Data Entry Policy: the Coding Rulebook
 
@@ -80,8 +90,9 @@ Accrual accounts under `2200000`:
 ## Prepaid Expense Policy
 
 * A prepaid is cash paid in advance of the good or service being received.
-* Threshold **$10,000**, with related charges for the same good or service **aggregated
-  before** testing.
+* Threshold **$25,000** (Mike's write-up, 12 Oct 2026; the draft policy had been read as
+  $10,000), with related charges for the same good or service **aggregated before**
+  testing.
 * Amortize as the benefit is received: straight-line for subscriptions and
   support/maintenance; events expensed when the event occurs; collateral as distributed.
 * Amortization is coded to the subsidiary, department, project and account where the
@@ -95,8 +106,9 @@ Prepaid accounts: `1305000` Rent · `1310000` Insurance · `1315000` Other · `1
 
 ## Tangible and Intangible Asset Policy
 
-* **No dollar threshold, by design.** Capitalization turns on asset category and useful
-  life, not amount.
+* Capitalization threshold **$5,000** (Mike's write-up, 12 Oct 2026). The draft policy set
+  none, by design; Serif's figure replaces that. Below it a purchase is expense, unless it
+  is part of a larger asset. Above it, asset category and useful life decide.
 * Office furniture, fixtures and equipment: **5-year** useful life, **7-year** retirement
   and disposal life.
 * Placed in service: the invoice date, unless tied to a buildout, in which case it is the
@@ -105,10 +117,21 @@ Prepaid accounts: `1305000` Rent · `1310000` Insurance · `1315000` Other · `1
 * Disposal with no intent to sell goes to depreciation expense; with intent to sell,
   consider held-for-sale guidance.
 
-Asset accounts: `1505000` Capital in Process · `1510000` Lab Equipment, New ·
-`1530000` Computers & Software · `1590000` Finance Lease ROU Asset.
+Asset accounts: `1505000` Capital in Process · `1510000` Lab Equipment - New ·
+`1530000` Computers & Software · `1550000` Leasehold Improvements · `1590000` Finance Lease
+Right of Use Asset.
 Candidate source accounts to review for capitalization: `6415000`, `6815000`, `6416000`,
 `6816000`, their names assert non-capital treatment, and the review is whether that holds.
+
+**Capital in Process or a fixed asset account.** `1505000` Capital in Process holds
+build-out work and assets bought but not yet placed in service. An asset in service goes to
+its fixed asset account: lab equipment to `1510000` Lab Equipment - New, computers and
+software to `1530000` Computers & Software. When it is placed in service, Capital in Process
+moves to that account (Serif did this for the KR2i TFF system in Nov 2025). The chart has
+no fixed asset account for office furniture and equipment; until Serif names one, a
+furniture purchase in service is held in Capital in Process and the Controller is asked.
+Every capital recommendation says which applies and why, and asks for the in-service date,
+which the ledger does not carry, unless the line states it.
 
 ## Intercompany Policy: Applies to Flagship Counterparties
 

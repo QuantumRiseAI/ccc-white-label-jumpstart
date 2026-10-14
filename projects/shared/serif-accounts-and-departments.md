@@ -55,6 +55,16 @@ Coding-quality work should focus there.
 | `ProjectID: Name` | `00 Non-Specific` (41,421), `Internal CMC` (2,570), `*Other`, blank | Only `Internal CMC` is a live project code |
 | `Type` | Bill (32,506), Bill Payment (5,536), Journal (4,642), Expense Report (1,095), Bill Credit (145), Currency Revaluation (46), Deposit (19), Invoice (14), Payment (6), Credit Memo (4) | |
 
+On a proposed Journal Entry, both sides carry the posted line's Project and Program, so a reclass
+leaves no stray balance on either. A new balance sheet line (accounts 1xxxxxx to 3xxxxxx), such
+as a debit to `1505000 Capital in Process` or an accrual's credit to `2206000`, takes the
+`Non-Specific` department; only income statement lines carry one. The line that reverses the
+ledger line being corrected keeps that line's department, on a balance sheet account too, so
+it nets the original: a bill recoded off prepaid rent credits prepaid on `General R&D` when the
+bill was booked there. In Aug 2026, 123 of the 1,260 ledger lines on balance sheet accounts
+carry a department other than `Non-Specific`; whether those should be `Non-Specific` is an
+open question to Serif.
+
 The export contains two columns both named `ProjectID: Name`.
 The second one, at index 13, holds the real values.
 Any loader must address columns positionally, not by header name.

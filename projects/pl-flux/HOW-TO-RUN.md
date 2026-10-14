@@ -63,7 +63,7 @@ python3 serif_views.py out/sep2026/run.json \
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json \
   --gl netsuite_gl_*.xls* \
   --income-statement netsuite_income_statement_by_month_*.xls \
-  --out out/sep2026
+  --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 
 To carry the GL Coding Review's booked corrections into Actual vs. Actual (MoM), add the coding
@@ -373,8 +373,13 @@ not the ledger's. Payroll tax on the bonus needs the payroll register.
 * **Section A, accounting adjustments**: every proposed Journal Entry, with its P&L and
   balance sheet impact, the evidence and the policy. The entry is filled in and editable:
   **Approve** books it as proposed, **Reject** leaves the ledger as it is, and editing any
-  account, department or amount marks it **Modified**, which needs a note. The entry shows
-  whether it balances; **Reset** brings back the proposal. Entries Claude drafted are here too.
+  account, department, Project, Program or amount marks it **Modified**, which needs a note. The
+  entry shows whether it balances; **Reset** brings back the proposal. Entries Claude drafted are
+  here too. Both sides of an entry carry the Project and Program of the bill it corrects; an
+  accrual from Coupa receipts or a reclass staged in the forecast has no bill behind it and
+  leaves them to fill. A new balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the
+  `Non-Specific` department, as does a line moved to one; only income statement lines carry one.
+  The line that reverses the posted line keeps its department, so it nets the original.
 * **Section B, forecast revisions**: where the month's forecast and the ledger differ.
   **Acknowledge & Flag** sends it to FP&A; **No Action** leaves it.
 * **Section C, billed twice after a gap**: a vendor with two or more bills this month and none
@@ -383,8 +388,8 @@ not the ledger's. Payroll tax on the bonus needs the payroll register.
   so the commentary says whether last month needed one.
 
 **Download NetSuite JE CSV** holds every entry approved, or modified with a note, as edited:
-External ID, Date, Account, Department, Debit, Credit and Memo, with the note in the memo. An
-entry out of balance or unchanged is left out.
+External ID, Date, Account, Department, Project, Program, Debit, Credit and Memo, with the note in
+the memo. An entry out of balance or unchanged is left out.
 
 ### SOX & GAAP
 
