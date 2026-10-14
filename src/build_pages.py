@@ -684,8 +684,15 @@ def shell(title, product, sections, pages, data, js):
             + SETTINGS_SVG + '</button></div></header><div id="sharedbar" hidden></div><div id="tip"></div><div id="toast" role="status" hidden></div>'
             '<div id="ask" hidden><div class="askbox" role="dialog" aria-modal="true"><h3></h3><div class="askbody"></div><div class="acts">'
             '<button class="pill solid" data-askok>OK</button><button class="pill" data-askno>Cancel</button></div></div></div><main>' + "".join(pages)
-            + page("settings", '<div class="card"><h3>Settings</h3><div class="pad setcard"><label for="thr">Review threshold</label>'
-                   '<span>$</span><input class="f" id="thr" inputmode="numeric" style="width:9ch"></div></div>'
+            + page("settings", '<div class="card"><h3>Settings</h3>' + "".join(
+                       '<div class="pad setcard"><label for="%s"%s>%s</label><span>$</span><input class="f" id="%s" data-thrin="%s" inputmode="numeric" style="width:9ch">%s</div>'
+                       % (i, ' style="min-width:9.5rem"' if n else "", lab, i, k, n)
+                       for i, k, lab, n in ((("thr", "thr", "Review threshold", ""),) if data.get("kind") != "coding" else (
+                           ("thr", "thr", "Review threshold", '<span class="note">Dept &amp; Entity account recodes, and drafted entries</span>'),
+                           ("thrcapex", "thr_capex", "CapEx threshold", '<span class="note">CapEx Flags</span>'),
+                           ("thrprepaid", "thr_prepaid", "Prepaid threshold", '<span class="note">Prepaid Flags</span>'))))
+                   + ('<div class="pad setcard"><span class="note">Department flags have no threshold: each is marked Review, whatever its size.</span></div>'
+                      if data.get("kind") == "coding" else "") + "</div>"
                    '<div class="card"><h3>Decision record</h3><div class="pad acts"><button class="pill" data-recsave>Save decision record</button>'
                    '<button class="pill" data-recload>Load decision record</button><input type="file" id="recfile" accept=".json,application/json" hidden>'
                    '<button class="pill" data-carry hidden>Bring in the earlier run&rsquo;s decisions</button></div></div>')
@@ -701,7 +708,9 @@ const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySel
 const KEY = 'serif-console::' + DATA.kind + '::' + DATA.run;
 /* The review's state. Each of STORES is a map of item to value: decisions,
    commentary and notes, entry edits, the GAAP checklist, sign-off and the audit
-   log. The threshold is this browser's setting. */
+   log. The thresholds are this browser's settings: thr, and on the GL Coding Review
+   thr_capex and thr_prepaid, each falling back to the build's default, so a state saved
+   with thr alone keeps it and takes the CapEx and Prepaid defaults. */
 const STORES = ['dec', 'notes', 'je', 'jh', 'ck', 'sign', 'log'];
 const refOf = id => (DATA.ref || {})[id] || '';
 let S = {dec: {}, notes: {}, sign: {}, ck: {}, je: {}, jh: {}, log: {}, thr: DATA.thr};
@@ -887,7 +896,7 @@ const Shared = (function(){
   }
   /* A viewer cannot type into a field their access does not let them save. */
   document.addEventListener('beforeinput', ev => { if (!st.on || !st.ro) return; const t = ev.target;
-    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT') && t.id !== 'thr') ev.preventDefault(); }, true);
+    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT') && t.dataset.thrin === undefined) ev.preventDefault(); }, true);
   return {start: start, changed: changed, earlierRecord: earlierRecord,
           on: () => st.on, ro: () => st.on && st.ro, uid: () => st.on ? st.uid : null, name: nameOf};
 })();
@@ -1019,7 +1028,7 @@ document.addEventListener('input', ev => {
   const t = ev.target;
   if (t.dataset.note !== undefined){ S.notes[t.dataset.note] = t.value; save(); return; }
   if (t.dataset.jef || t.dataset.jeh){ editJE(t); return; }
-  if (t.id === 'thr'){ const v = Number(String(t.value).replace(/[^0-9.]/g, '')); if (isFinite(v) && v > 0){ S.thr = v; save(); refresh(); } }
+  if (t.dataset.thrin){ const v = Number(String(t.value).replace(/[^0-9.]/g, '')); if (isFinite(v) && v > 0){ S[t.dataset.thrin] = v; save(); refresh(); } }
 });
 /* tabs are announced as tabs, the selected one marked */
 $$('.tabs').forEach(tl => { tl.setAttribute('role', 'tablist');
@@ -1054,7 +1063,7 @@ function paintItems(){
       + (d.by_uid ? ' · ' + Shared.name(d.by_uid) : '') : 'Pending';
       st.className = 'stp' + (d ? (d.v === 'reject' || d.v === 'none' ? ' rej' : ' done') : ''); }
     el.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('on', !!d && d.v === b.dataset.v));
-    const nt = el.querySelector('textarea[data-note]'); if (nt){ nt.hidden = !(d && ['modify','recode','netsuite','reject','none'].indexOf(d.v) > -1) && !(S.notes[id]||'').trim();
+    const nt = el.querySelector('textarea[data-note]'); if (nt){ nt.hidden = nt.dataset.ask === undefined && !(d && ['modify','recode','netsuite','reject','none'].indexOf(d.v) > -1) && !(S.notes[id]||'').trim();
       if (document.activeElement !== nt) nt.value = S.notes[id] || ''; } });
   $$('textarea.c[data-note]').forEach(t => { if (!t.closest('[data-item]') && document.activeElement !== t) t.value = S.notes[t.dataset.note] || ''; });
   paintJE();
@@ -1170,8 +1179,13 @@ function checklist(){
 document.addEventListener('click', ev => { const r = ev.target.closest('tr[data-go]'); if (r) show(r.dataset.go); });
 document.addEventListener('click', ev => { const h = ev.target.closest('.item.foldable > .ih'); if (!h || ev.target.closest('a,button')) return;
   const el = h.parentElement; el.classList.toggle('unfold', el.classList.contains('folded')); paintItems(); });
-/* a line at or over the threshold is marked for review */
+/* a line at or over the threshold is marked for review; a card, at or over its screen's
+   (data-thr names it; "all" is always reviewed) */
+const thrOf = k => Number(S[k]) || DATA[k] || S.thr || DATA.thr;
 function marks(){
+  $$('.item[data-thr]').forEach(x => { const k = x.dataset.thr, hi = k === 'all' || Number(x.dataset.tamt || x.dataset.amt) >= thrOf(k);
+    x.classList.toggle('hi', hi); const g = x.querySelector(':scope > .ih > [data-rev]'); if (g) g.hidden = !hi; });
+  $$('[data-thrin]').forEach(t => { if (document.activeElement !== t) t.value = thrOf(t.dataset.thrin).toLocaleString('en-US'); });
   const thr = S.thr || DATA.thr;
   $$('tr[data-var]').forEach(tr => { const a = Math.abs(Number(tr.dataset.var) || 0);
     const k = a >= thr ? 'rev' : 'ok';
@@ -1179,7 +1193,6 @@ function marks(){
     const td = tr.cells[0]; let m = td.querySelector('.mk');
     if (!m){ m = document.createElement('span'); m.className = 'mk'; td.appendChild(m); }
     m.innerHTML = k === 'rev' ? '<span class="tag hi">Review</span>' : ''; });
-  const t = $('#thr'); if (t && document.activeElement !== t) t.value = (S.thr || DATA.thr).toLocaleString('en-US');
 }
 """
 
@@ -1893,6 +1906,11 @@ def coding():
     V = GLR["views"]
     G = {f["finding_id"]: f for f in GLR["findings"]}
     thr = 2500.0
+    # Each review screen's own line, set in Settings: CapEx at Serif's PP&E capitalization
+    # threshold, Prepaid at its prepaid threshold (12 Oct 2026), the rest at thr. A Department
+    # flag has none ("all"): every line off Non-Specific is recoded, whatever its size.
+    THR = {"thr": thr, "thr_capex": 5000.0, "thr_prepaid": 25000.0}
+    over = lambda k, a: k == "all" or (a or 0) >= THR[k]
     vend = next(t for t in V["tables"] if t["id"] == "vendors")
     vrows = [r for s in vend["sections"] for r in s["rows"]]
     billed = [r for r in vrows if round(r.get("amount") or 0)]
@@ -1929,7 +1947,7 @@ def coding():
         i = next((i for r in vrows if r["vendor"] == vname for i in (r.get("detail") or {}).get("items") or [] if i["document"] == d), None)
         return (i["type"] + " " + d) if i else d
 
-    def card(iid, vendor, amount, hi, cur, rec, doc, extra, why, pol, actions, lines="", more="", flag=True):
+    def card(iid, vendor, amount, hi, cur, rec, doc, extra, why, pol, actions, lines="", more="", flag=True, thr=None, tamt=None, ask=""):
         dl = doc_links(doc["document"]) if doc else ""
         if doc:
             nsdoc.setdefault(iid, doc["type"] + " " + doc["document"])
@@ -1940,13 +1958,21 @@ def coding():
             more = draft("ven:" + iid, txt(dv.get("note")), iid, iid if v_ else None, v_,
                          {"reject": "Coding stands: reject the recode.", "approve": "Approve the recode."}.get(v_, "Ask the owner.")) + more
         amts[iid] = amount or 0
-        return ('<div class="item%s" data-item="%s" data-amt="%s"%s><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span>%s</div><div class="ib"><div class="kv">'
+        # thr names the screen's threshold, which the console marks Review against as
+        # the reviewer changes it (tamt, when the test is on more than the card's
+        # amount); ask keeps the note open with its question as the placeholder.
+        if thr:
+            hi = over(thr, amount if tamt is None else tamt)
+        tag = ('<span class="tag hi" data-rev%s>Review</span>' % ("" if hi else " hidden") if thr else '<span class="tag hi">Review</span>' if hi else "")
+        return ('<div class="item%s" data-item="%s" data-amt="%s"%s%s><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span>%s</div><div class="ib"><div class="kv">'
                 '<div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Recommended</div><div class="x">%s</div></div>'
-                '<div><div class="l">Document / item</div><div class="x">%s%s</div></div>%s</div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
-                % (" hi" if hi else "", iid, round(amount or 0, 2), " data-flag" if flag else "", iid, e(vendor), money(amount, True), '<span class="tag hi">Review</span>' if hi else "", cur, rec,
+                '<div><div class="l">Document / item</div><div class="x">%s%s</div></div>%s</div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="%s"%s></textarea></div></div></div>'
+                % (" hi" if hi else "", iid, round(amount or 0, 2), " data-flag" if flag else "",
+                   (' data-thr="%s"' % thr + (' data-tamt="%s"' % round(tamt, 2) if tamt is not None else "")) if thr else "",
+                   iid, e(vendor), money(amount, True), tag, cur, rec,
                    (e(doc["type"] + " " + doc["document"]) + "<small>" + e(doc["text"]) + "</small>") if doc else "&ndash;", dl, extra,
                    ('<div class="why">' + why + "</div>") if why else "", ('<div class="pol">' + e(pol) + "</div>") if pol else "", more, lines,
-                   acts(iid, vendor, actions), iid))
+                   acts(iid, vendor, actions), iid, e(ask) if ask else "Note", " data-ask" if ask else " hidden"))
     coding_ = lambda a, d=None: "%s<small>%s%s</small>" % (e(a), e(acct_name(a)), (" / " + e(d)) if d else "")
     # A fix to an existing transaction is booked as a reclass (the CSV) or made by editing
     # the bill or Journal Entry in NetSuite while the period is open. An entry Claude
@@ -1964,26 +1990,49 @@ def coding():
             if fl.get("id") not in screen:
                 continue
             ms = fl.get("match") or [{}]
+            p0 = ms[0].get("placement") or {}
             for m in ms:
                 it = next((i for i in its if i["document"] == m.get("document") and i["account"] == m.get("account")), None)
                 to = re.search(r"\b(1\d{6})\b", fl.get("do") or "")
+                # The flag's words are its first bill's; a capital bill says where it goes in its own.
+                p = m.get("placement") or {}
+                why, do = fl.get("why") or "", fl.get("do") or ""
+                if p and p0 and p != p0:
+                    why, do = why.replace(p0["why"], p["why"]), (do.replace(p0["ask"], p["ask"]) if p0["ask"] else (do + " " + p["ask"]).strip())
                 screen[fl["id"]].append({"vendor": r["vendor"], "from_account": m.get("account") or (it or {}).get("account") or "",
-                                         "to_account": to.group(1) if to else "", "department": (it or {}).get("department") or "",
+                                         "to_account": m.get("to") or (to.group(1) if to else ""), "department": (it or {}).get("department") or "",
                                          "what": (it or {}).get("text") or "", "amount": (it or {}).get("amount") if len(ms) > 1 and it else fl["amount"],
-                                         "why": fl.get("why") or "", "do": fl.get("do") or "", "doc": it})
+                                         "total": m.get("total"), "placement": p, "why": why, "do": do, "doc": it})
     for k in screen:
         screen[k].sort(key=lambda x: -(x["amount"] or 0))
+    # A capital recode says where it goes and why: Capital in Process for build-out work and
+    # an asset not yet in service, the fixed asset account for one in service. The ledger has
+    # no in-service date, so the card asks for it unless the line states one.
+    PLACED = {"buildout": ("Capital in Process: build-out, until in use", "When employees begin using the space; ask the date"),
+              "not_in_service": ("Capital in Process: not yet in service", "Not yet; ask the date"),
+              "no_account": ("Capital in Process: the chart has no fixed asset account for it", "Invoice date, %s, by policy: confirm"),
+              "in_service": ("in service: fixed asset", "Invoice date, %s, by policy: confirm")}
     cap_cards, pre_cards = [], []
     for sec_id, prefix, bucket, typ in (("capital", "C", cap_cards, "CapEx missed"), ("prepaid", "P", pre_cards, "Prepaid missed")):
         for r in screen[sec_id]:
             iid = sid(prefix, r["vendor"], r["from_account"], r["to_account"], r.get("what"), r.get("department"))
             doc = r["doc"] or line_doc(r["vendor"], r["from_account"])
-            je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": doc["date"] if doc else "", "memo": "Recode %s %s from %s to %s" % (r["vendor"], r.get("what") or "", r["from_account"], r["to_account"]),
+            p = r["placement"]
+            memo, placed = PLACED.get(p.get("kind"), ("", ""))
+            if p.get("in_service"):
+                placed = "%s, as the line says" % p["in_service"]
+            elif "%s" in placed:
+                placed %= (doc or {}).get("date") or "not shown"
+            je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": doc["date"] if doc else "", "memo": "Recode %s %s from %s to %s%s" % (r["vendor"], r.get("what") or "", r["from_account"], r["to_account"], (", " + memo) if memo else ""),
                        "lines": je_lines([{"account": r["to_account"], "department": r["department"], "debit": r["amount"]}, {"account": r["from_account"], "department": r["department"], "credit": r["amount"]}])}
             items.append(("capex" if prefix == "C" else "prepaid", iid, typ, r["vendor"], r.get("what") or "", r["amount"], r["from_account"], r["to_account"]))
             bucket.append(card(iid, r["vendor"], r["amount"], True, coding_(r["from_account"], r["department"]), '<span class="arrow">&rarr;</span> ' + coding_(r["to_account"], r["department"]),
-                               doc, '<div><div class="l">Department</div><div class="x">' + e(r["department"]) + "</div></div>", en(r["why"]) + (" " + en(r["do"]) if r["do"] else ""), "",
-                               FLAG_ACTS, lines_html(r["vendor"], r["from_account"]), je_editor(iid, je[iid]["lines"]) + history(r["vendor"])))
+                               doc, '<div><div class="l">Department</div><div class="x">' + e(r["department"]) + "</div></div>"
+                               + ('<div><div class="l">Placed in service</div><div class="x" data-placed="%s">%s</div></div>' % (e(p.get("kind")), e(placed)) if p else ""),
+                               en(r["why"]) + (" " + en(r["do"]) if r["do"] else ""), "",
+                               FLAG_ACTS, lines_html(r["vendor"], r["from_account"]), je_editor(iid, je[iid]["lines"]) + history(r["vendor"]),
+                               thr="thr_capex" if prefix == "C" else "thr_prepaid", tamt=r.get("total"),
+                               ask="In-service date, and a note" if p and not p.get("in_service") else ""))
 
     # The other direction: bills posted to prepaid or fixed-asset accounts this month
     def usual_expense(vendor, dept):
@@ -2008,7 +2057,7 @@ def coding():
             out.append(card(iid, v, amt, amt >= thr, coding_(l["account_code"], l["department"]), "&ndash;", doc,
                             '<div><div class="l">Department</div><div class="x">' + e(l["department"] or "&ndash;") + "</div></div>", "", "",
                             (("confirm", "Confirm, Stays on Balance Sheet"), ("recode", "Recode to Expense"), ("netsuite", "Edited in NetSuite")), "",
-                            je_editor(iid, je[iid]["lines"], "recode") + history(v), flag=False))
+                            je_editor(iid, je[iid]["lines"], "recode") + history(v), flag=False, thr="thr_capex" if tag == "CB" else "thr_prepaid"))
         return out
     cap_booked, pre_booked = booked(("15",), "CB"), booked(("13",), "PB")
 
@@ -2019,7 +2068,7 @@ def coding():
         je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"]), "reverses": x.get("reverses")}
         items.append(("dept", iid, "Drafted by Claude", ", ".join(sorted({l["vendor"] for l in x["lines"] if l["vendor"]})) or x["memo"], x["memo"], x["debits"], "", ""))
         dcards.append(card(iid, x["memo"] or "Drafted Journal Entry", x["debits"], x["debits"] >= thr, "&ndash;", "&ndash;", None,
-                           '<div><div class="l">Type</div><div class="x">Drafted by Claude</div></div>', e(x["support"]), "", DRAFT_ACTS, "", je_editor(iid, je[iid]["lines"])))
+                           '<div><div class="l">Type</div><div class="x">Drafted by Claude</div></div>', e(x["support"]), "", DRAFT_ACTS, "", je_editor(iid, je[iid]["lines"]), thr="thr"))
     ents = {x["finding_id"]: x for x in V.get("entries") or []}
     drift = [f for f in GLR["findings"] if f["rule_id"] == "T4.ITEM_ACCOUNT_DRIFT"]
     COVER = ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")
@@ -2062,7 +2111,7 @@ def coding():
         dcards.append(card(iid, vname, f.get("amount_at_risk") or 0, (f.get("amount_at_risk") or 0) >= thr, cur, rec, doc,
                            '<div><div class="l">Type</div><div class="x">' + e(typ) + "</div></div>", en(f.get("recommendation") or ""), "", FLAG_ACTS,
                            lines_html(vname, docs=set(d for l in (x or {}).get("lines", []) for d in (l.get("documents") or [])) or None),
-                           (je_editor(iid, je[iid]["lines"]) if iid in je else "") + history(vname)))
+                           (je_editor(iid, je[iid]["lines"]) if iid in je else "") + history(vname), thr="all" if typ == "Department" else "thr"))
 
     # Reviewed & Cleared and New This Period: by department, then account
     def coding_of(r):
@@ -2196,7 +2245,9 @@ def coding():
         *([("Of which accepted exceptions", "%d items, %s" % (len(excepted), money(exc_amt, True)))] if excepted else []),
         ("Ledger balances", ("Pass: " if tie.get("passed") else "Fail: ") + e(tie.get("note") or "")), tuple(e(x) for x in tie_row([PERIOD])), ("Flags as subset of GL", "Pass: every flag is drawn from posted GL lines")])
     pol_rows = "".join('<tr><td>%s</td><td class="mono" style="text-align:right">%s</td></tr>' % (a, b) for a, b in [
-        ("Vendors billed this month", str(len(billed))), ("P&amp;L lines this month", format(pl_lines_now, ",")), ("CapEx flags", str(len(cap_cards))), ("Prepaid flags", str(len(pre_cards))),
+        ("Vendors billed this month", str(len(billed))), ("P&amp;L lines this month", format(pl_lines_now, ",")),
+        ("Review thresholds, by default", "CapEx %s &middot; Prepaid %s &middot; other %s &middot; department flags none" % (money(THR["thr_capex"]), money(THR["thr_prepaid"]), money(thr))),
+        ("CapEx flags", str(len(cap_cards))), ("Prepaid flags", str(len(pre_cards))),
         ("Department and account flags", str(len(dcards))), *([("Accepted exceptions", "%d items, %s" % (len(excepted), money(exc_amt, True)))] if excepted else []), ("Vendors with no flags", str(len(clear))), ("New vendors", str(len(news)))])
     sign = "".join('<div class="sign"><b>%s</b><input class="f" data-sname="%s" placeholder="Name, title"><input class="f" data-sdate="%s" placeholder="Date"><button class="pill" data-signbtn="%s">Sign</button></div>'
                    % (lab, k, k, k) for k, lab in (("prep", "Prepared by"), ("rev", "Reviewed by"), ("appr", "Approved by")))
@@ -2225,7 +2276,7 @@ def coding():
         j["memo"] = ref_memo(ref.get(iid), j["memo"])
     pages = [re.sub(r"\{ref:([\w-]+)\}", lambda m: '<span class="ref mono">%s</span>' % ref[m.group(1)] if m.group(1) in ref else m.group(0), x) for x in pages]
     CODING_BUILT.update(je=je_finish(je), items=items)
-    data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "je": je_finish(je), "ref": ref, "icons": {}, "drafts": DRAFTS}
+    data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "thr_capex": THR["thr_capex"], "thr_prepaid": THR["thr_prepaid"], "je":je_finish(je), "ref": ref, "icons": {}, "drafts": DRAFTS}
     js = r"""
 function refresh(){
   marks(); paintItems(); counts(); signs(); checklist();
