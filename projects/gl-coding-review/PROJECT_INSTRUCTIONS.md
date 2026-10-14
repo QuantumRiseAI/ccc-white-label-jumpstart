@@ -216,7 +216,7 @@ section opens its pages beside its title.
   Memo, Reversing Entry, Reversal Date; line fields: Account, Department, Debit, Credit, Line Memo).
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
   supplied, what each check found, the estimated cost of a run, the inputs and the build
-  record. Settings has the threshold, the decision record (save and load) and **Bring in the
+  record. Settings has the thresholds, the decision record (save and load) and **Bring in the
   earlier run's decisions**.
 
 Every flag and vendor card starts with its reference ID, numbered by screen within the close
@@ -232,8 +232,22 @@ has no Edited in NetSuite. Export lists the items edited in NetSuite and saves t
 HTML**; the decision record's `fixes` gives each agreed fix's path (Reclass or Edited in NetSuite),
 reference ID, document and, for a reclass, External ID.
 
-The threshold is in dollars only and defaults to **$2,500**. An item at or over it is marked
-Review.
+The thresholds are in dollars only, one per review screen, each set in Settings: **CapEx
+$5,000** and **Prepaid $25,000** (Serif's capitalization and prepaid thresholds, Mike's
+write-up of 12 Oct 2026), and **$2,500** for the rest, the account recodes on Dept & Entity
+and any entry you drafted. A Department flag has none: every line off Non-Specific is
+recoded, whatever its size, so each is marked Review. An item at or over its screen's
+threshold is marked Review. The booked lines on CapEx and Prepaid take their page's. CapEx
+and Prepaid list every flag from $2,500, so a lower threshold shows more; one under its
+threshold says it stays expense. Do not recommend booking a prepaid under $25,000 or
+capitalizing a purchase under $5,000 unless it is part of something larger that is over.
+
+Each CapEx card says whether the purchase goes to **`1505000` Capital in Process** (build-out
+work, or an asset bought but not yet in service) or to its fixed asset account (an asset in
+service), and why, on the card and in its Journal Entry Memo. The ledger has no in-service
+date: unless the line states one, the card asks the reviewer for it, in the note. Office
+furniture and equipment has no fixed asset account in Serif's chart; the entry holds it in
+Capital in Process and asks the Controller which account to use. Never invent one.
 
 ## What You Write
 
@@ -290,7 +304,7 @@ Read from `out/<period>/run.json`:
 
 ### 1. Vendor Notes
 
-For each flagged vendor whose largest flag clears the threshold, largest first:
+For each flagged vendor whose largest flag clears its screen's threshold, largest first:
 
 1. Say what was bought, in plain words, from the line descriptions. If an item is unfamiliar,
    say what it is and what it is used for. If you are not sure, say so. Do not guess.
@@ -333,7 +347,9 @@ Draft an entry where the coding is wrong and no proposed entry in `views.entries
   `Long column holder recoded to lab supplies | Aug'26`. Leave out the reference ID: the build
   puts the card's in front, `DRAFT-01 | Long column holder recoded to lab supplies | Aug'26`.
 * Prepaid and capital flags move the bill to the balance sheet. The accounts are in
-  [`GL_CODING_REVIEW_SKILL.md`](GL_CODING_REVIEW_SKILL.md).
+  [`GL_CODING_REVIEW_SKILL.md`](GL_CODING_REVIEW_SKILL.md). A capital entry says in its Memo
+  and reason whether it goes to Capital in Process or the fixed asset account, and why, and
+  the reason gives the in-service date or says it is not known.
 * Check that debits equal credits before you write the entry.
 
 The entry joins Dept & Entity as `SERIF-DRAFT-1` and on, marked "Drafted by Claude". Once the
@@ -594,7 +610,9 @@ runs in a Project.
    repair an export into a file for the scripts to read.
 3. Serif has one legal entity. Never flag an entity mismatch.
 4. Coupa and the ledger join by supplier name only. Never claim a line-level PO match.
-5. Never apply a dollar threshold to fixed assets. Serif's policy sets none.
+5. Apply Serif's thresholds of 12 Oct 2026: $5,000 to capitalize a fixed asset, $25,000 for a
+   prepaid. They replace the draft asset policy's none and the $10,000 the prepaid policy
+   was read as. Never apply the draft figures.
 6. Every figure cites period, document number, vendor and amount.
 7. When you report results, name every check that did not run and what it needs. A check that
    did not run is not a clean result.

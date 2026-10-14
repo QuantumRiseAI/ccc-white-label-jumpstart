@@ -47,8 +47,8 @@ from collections import defaultdict
 
 import serif_sources as sources
 
-ENGINE_VERSION = "0.7.1"
-RULESET_VERSION = "2026.09-uc2-flux-account-level"
+ENGINE_VERSION = "0.8.0"
+RULESET_VERSION = "2026.10-uc2-flux-serif-thresholds"
 ENTITY = "FL87 Serif Biomedicines, Inc."
 
 # THE TWO LAYERS
@@ -78,12 +78,18 @@ ACCRUAL_THRESHOLD = 5_000.0       # Global Accrued Expense Accounting Policy
 # be totalled instead of being invisible.
 REPORTING_FLOOR = 2_500.0
 
-PREPAID_THRESHOLD = 10_000.0      # Global Prepaid Expense Policy, aggregated per good or service
+# Serif's prepaid and PP&E thresholds, from Mike's write-up of 12 Oct 2026. They replace
+# the $10,000 the draft prepaid policy was read as, and the draft asset policy's none.
+# Both screens list from the reporting floor, so the reviewer can lower either line;
+# these are the review defaults, and a prepaid or capital purchase under its
+# threshold is not proposed for booking (serif_views.py).
+PREPAID_THRESHOLD = 25_000.0      # aggregated per good or service
+CAPITALIZATION_THRESHOLD = 5_000.0
 
 POLICY_PREPAID = ("Global Prepaid Expense Policy (DRAFT, unapproved) "
-                  ": $10,000, related charges aggregated before testing")
+                  ": $25,000 (Serif, 12 Oct 2026), related charges aggregated before testing")
 POLICY_ASSET = ("Global Tangible & Intangible Asset Policy (DRAFT, unapproved) "
-                ": no capitalization threshold, by design; category and useful life decide")
+                ": $5,000 capitalization threshold (Serif, 12 Oct 2026); category and useful life decide")
 POLICY_DATA_ENTRY = ("Global Data Entry Policy (DRAFT, unapproved) "
                      ": every entry names its counterparty")
 POLICY_THRESHOLD = ("Global Finance Threshold Policy (DRAFT, unapproved) "
@@ -152,16 +158,91 @@ def names_a_term(text):
     return False
 
 # The accounts the asset policy names for capitalization review: their names
-# assert non-capital treatment, and the review is whether that holds.
+# assert non-capital treatment, and the review is whether that holds. Each maps to
+# the fixed asset account an asset in service goes to. Office furniture and
+# equipment has none in Serif's chart: computers go to Computers & Software, and
+# for the rest the entry holds the purchase in Capital in Process and asks.
 CAPEX_REVIEW = {
     "6415000": ("1510000", "Lab Equipment - New"),
     # Repairs and maintenance: a repair is expense, a replacement unit is an asset.
     # Service contracts on this account are read by the prepaid rule instead.
     "6435000": ("1510000", "Lab Equipment - New"),
-    "6815000": ("1505000", "Capital in Process"),
+    "6815000": None,
     "6416000": ("1530000", "Computers & Software"),
     "6816000": ("1530000", "Computers & Software"),
 }
+CAPITAL_IN_PROCESS = ("1505000", "Capital in Process")
+COMPUTER_WORDS = re.compile(
+    r"laptop|notebook|macbook|computer|workstation|thinkstation|desktop|\bpc\b|"
+    r"monitor|tablet|\bsurface\b|server|ipad", re.IGNORECASE)
+# Capital in Process holds build-out work and assets bought but not yet placed in
+# service. The policy places an asset in service at the invoice date or, for a
+# build-out, when employees begin using the space. The ledger has no in-service
+# date, so the reviewer is asked for it unless the line states one.
+# An expansion counts only of a space ("Office Desk Expansion"): a lab buys cell
+# expansion kits.
+BUILDOUT_WORDS = re.compile(
+    r"build[- ]?out|fit[- ]?out|construction|renovat\w*|tenant improvement|"
+    r"leasehold improvement|(?:office|space|desk|floor|suite|facility)\s+(?:\w+\s+)?expansion|"
+    r"\bphase\s*\d+", re.IGNORECASE)
+NOT_IN_SERVICE_WORDS = re.compile(
+    r"\bdeposit\b|down ?payment|progress (?:payment|billing)|milestone|"
+    r"not yet (?:installed|delivered|in service)|pending install\w*", re.IGNORECASE)
+IN_SERVICE_DATE = re.compile(
+    r"(?:placed in service|in service|installed|go[- ]live)\s*(?:on\s*)?"
+    r"(\d{1,2}/\d{1,2}/\d{2,4}|\d{4}-\d{2}-\d{2})", re.IGNORECASE)
+
+
+def capex_placement(code, text, invoice_date=""):
+    """Where a purchase on a capitalization-review account goes if it is capital,
+    and why: Capital in Process for build-out work or an asset not yet in service,
+    the fixed asset account for an asset in service. Returns {"to", "to_name",
+    "kind" (buildout, not_in_service, in_service or no_account), "asset" (the fixed
+    asset account it goes to once in service, or ""), "in_service" (the date the
+    line states, or ""), "why", "ask"}."""
+    text = text or ""
+    asset = CAPEX_REVIEW.get(code)
+    if code == "6815000" and COMPUTER_WORDS.search(text):
+        asset = ("1530000", "Computers & Software")
+    asset_s = "{} {}".format(*asset) if asset else ""
+    then = asset_s or ("its fixed asset account. The chart has none for office furniture "
+                       "and equipment: ask the Controller which account to use")
+    m = IN_SERVICE_DATE.search(text)
+    in_service = m.group(1) if m else ""
+    cip = "{} {}".format(*CAPITAL_IN_PROCESS)
+    b, n = BUILDOUT_WORDS.search(text), NOT_IN_SERVICE_WORDS.search(text)
+    if b or n:
+        kind = "buildout" if b else "not_in_service"
+        why = ('The description names build-out work ("{}"). Build-out work stays in {} until '
+               "employees begin using the space.".format(b.group(0), cip) if b else
+               'The description says it is not yet in service ("{}"). An asset bought but not '
+               "yet in service stays in {}.".format(n.group(0), cip))
+        ask = ("The line says it went into service on {}: move it to {} at that date.".format(in_service, then)
+               if in_service else
+               "Ask the date {}, and put it in the note. On that date, move it to {}.".format(
+                   "employees began, or will begin, using the space" if b else "it went, or will go, into use", then))
+        return {"to": CAPITAL_IN_PROCESS[0], "to_name": CAPITAL_IN_PROCESS[1], "kind": kind,
+                "asset": asset_s, "in_service": in_service, "why": why, "ask": ask}
+    placed = ("on {}, as the line says".format(in_service) if in_service else
+              "at the invoice date{}".format(", " + invoice_date if invoice_date else ""))
+    ask = ("" if in_service else
+           "The ledger has no in-service date. Ask when it went into use, and put the date in the "
+           "note. If it is not in use yet, book it to {} instead.".format(cip))
+    if not asset:
+        return {"to": CAPITAL_IN_PROCESS[0], "to_name": CAPITAL_IN_PROCESS[1], "kind": "no_account",
+                "asset": "", "in_service": in_service,
+                "why": ("Nothing on the line says it is build-out work or not yet in service, so the "
+                        "policy places it in service {}. An asset in service goes to its fixed asset "
+                        "account, and the chart has none for office furniture and equipment, so the "
+                        "entry holds it in {}.".format(placed, cip)),
+                "ask": ("Ask the Controller which fixed asset account to use, and edit the entry. "
+                        + ask).strip()}
+    return {"to": asset[0], "to_name": asset[1], "kind": "in_service", "asset": asset_s,
+            "in_service": in_service,
+            "why": ("Nothing on the line says it is build-out work or not yet in service, so the "
+                    "policy places it in service {}. An asset in service goes to its fixed asset "
+                    "account, {}.".format(placed, asset_s)),
+            "ask": ask}
 
 # Documents a customer receives. Posted to an expense account, they net income
 # against cost.
@@ -924,7 +1005,8 @@ def vendor_dropped_findings(gl_lines, history, leaves, period, seq):
 
 def prepaid_findings(gl_lines, history, leaves, period, seq):
     """A charge that pays for months ahead, expensed in one. Related charges for
-    the same good or service are aggregated before the $10,000 test, per policy.
+    the same good or service are aggregated, per policy, and listed from the
+    reporting floor; the $25,000 prepaid threshold is the reviewer's default line.
 
     A charge qualifies when its wording names a term (a service contract, a
     subscription, a renewal, a date range), or when it sits on a term account and
@@ -939,7 +1021,7 @@ def prepaid_findings(gl_lines, history, leaves, period, seq):
     findings = []
     for (vendor, code), lines in sorted(groups.items()):
         total = sum(num(t["amount"]) for t in lines)
-        if total < PREPAID_THRESHOLD:
+        if total < REPORTING_FLOOR:
             continue
         worded = [t for t in lines if names_a_term(t.get("description"))
                   or names_a_term(t.get("memo"))]
@@ -979,7 +1061,7 @@ def prepaid_findings(gl_lines, history, leaves, period, seq):
                  prepaid, prepaid_name, code, leaf, money(total))),
             {"observed": "{} across {} bill line(s){}".format(
                 money(total), len(lines), (": " + text) if text else ""),
-             "expected": "charges over $10,000 that cover future months recorded as prepaid",
+             "expected": "charges of $25,000 or more that cover future months recorded as prepaid",
              "basis": "Billed on this account in {} of the last {} months".format(billed, len(months))},
             sorted(lines, key=lambda t: -abs(num(t["amount"])))))
     return findings
@@ -987,9 +1069,10 @@ def prepaid_findings(gl_lines, history, leaves, period, seq):
 
 def capex_findings(gl_lines, leaves, period, seq):
     """Purchases on the accounts the asset policy names for capitalization review.
-    The policy sets no dollar threshold, so every document on those accounts from
-    the reporting floor up is listed, and the reviewer's threshold decides the
-    queue."""
+    Every document on those accounts from the reporting floor up is listed, and the
+    reviewer's CapEx threshold (the $5,000 capitalization threshold by default)
+    decides the queue. Each says whether it goes to Capital in Process or to its
+    fixed asset account, and why (capex_placement)."""
     docs = defaultdict(list)
     for t in gl_lines:
         if t.get("txn_type") == "Bill" and t["account_code"] in CAPEX_REVIEW:
@@ -1005,7 +1088,9 @@ def capex_findings(gl_lines, leaves, period, seq):
                                  if (t.get("description") or "").strip()}))[:200]
         if names_a_term(text):
             continue
-        asset, asset_name = CAPEX_REVIEW[code]
+        words = " ".join((t.get("description") or "") + " " + (t.get("memo") or "") for t in lines)
+        place = capex_placement(code, words, lines[0].get("date", ""))
+        asset, asset_name = place["to"], place["to_name"]
         leaf = leaves.get(code, code)
         dept = lines[0]["department"]
         findings.append(_finding(
@@ -1019,10 +1104,11 @@ def capex_findings(gl_lines, leaves, period, seq):
              "proposed_label": "If capital", "proposed": "{} {}".format(asset, asset_name),
              "entry": "Dr {} {} / Cr {} {} / {} for {}".format(
                  asset, asset_name, code, leaf, dept, money(total)),
-             "pl_impact": None},
+             "placement": place, "pl_impact": None},
             ("Read bill {}. If it buys equipment or furniture with a useful life past a "
-             "year, capitalize it to {} {} and depreciate from the invoice date "
-             "(office furniture and equipment: five years).".format(doc, asset, asset_name)),
+             "year, capitalize it to {} {} and depreciate from the date it is placed in service "
+             "(office furniture and equipment: five years). {} {}".format(
+                 doc, asset, asset_name, place["why"], place["ask"]).strip()),
             {"observed": "bill {} for {}{}".format(doc, money(total), (": " + text) if text else ""),
              "expected": "a capitalization decision recorded for each purchase on this account",
              "basis": "The account name asserts non-capital treatment; the policy asks whether that holds"},
