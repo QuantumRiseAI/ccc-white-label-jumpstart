@@ -70,6 +70,14 @@ AP_ACCOUNT = "2000100"
 # The ten department names the ledger uses.
 GL_DEPARTMENTS = {"Non-Specific", "Platform", "General R&D", "Production", "General G&A",
                   "Biology", "Chemistry", "In Vivo", "Finance", "Computational Sciences"}
+# A balance sheet line on a proposed Journal Entry takes this department; only income
+# statement lines carry one. Balance sheet accounts are 1xxxxxx to 3xxxxxx.
+BS_DEPARTMENT = "Non-Specific"
+
+
+def is_bs(code):
+    return bool(code) and code[0] in "123"
+
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -181,6 +189,8 @@ def load_gl(rows):
             "account_leaf": (row.get("account_leaf") or "").strip(),
             "account_path": (row.get("account_path") or "").strip(),
             "department": (row.get("department") or "").strip(),
+            "project": (row.get("project") or "").strip(),
+            "program": (row.get("program") or "").strip(),
             "description": (row.get("description") or "").strip(),
             "memo": (row.get("memo") or "").strip(),
             "amount": amount,
@@ -322,6 +332,7 @@ def lines_for(lines, vendor=None, account=None, department=None, cap=12, blank=F
     out = {"count": len(picked), "items": [{
         "date": l["date"], "document": l["document_number"], "type": l["txn_type"],
         "vendor": l["vendor"], "account": l["account_code"], "department": l["department"],
+        "project": l.get("project", ""), "program": l.get("program", ""),
         "text": EMAIL.sub("[email removed]", l.get("description") or l.get("memo") or "").strip()[:140],
         "amount": r2(l["amount"])} for l in picked[:cap]]}
     if blank:
@@ -1289,13 +1300,46 @@ def txns_of(f):
     return f.get("transactions") or ([f["transaction"]] if f.get("transaction") else [])
 
 
+def gl_dims(lines):
+    """(document, account) -> (Project, Program) from the ledger lines, for a finding
+    whose transactions do not carry them. A document whose lines on one account
+    disagree gives blanks, for the reviewer to fill."""
+    out = {}
+    for l in lines:
+        k = ((l.get("document_number") or "").strip(), (l.get("account_code") or "").strip())
+        v = ((l.get("project") or "").strip(), (l.get("program") or "").strip())
+        out[k] = v if out.get(k, v) == v else ("", "")
+    return out
+
+
+def dims(t, lookup):
+    """A transaction's Project and Program: its own, else the ledger line's."""
+    if "project" in t or "program" in t:
+        return {"project": (t.get("project") or "").strip(), "program": (t.get("program") or "").strip()}
+    p = lookup.get(((t.get("document_number") or "").strip(), (t.get("account_code") or "").strip()), ("", ""))
+    return {"project": p[0], "program": p[1]}
+
+
+def bs_department(lines):
+    """Balance sheet lines take Non-Specific; only income statement lines carry a
+    department. A recode to Capital in Process does not keep the expense's."""
+    for l in lines:
+        l.setdefault("project", "")
+        l.setdefault("program", "")
+        if is_bs(l.get("account")):
+            l["department"] = BS_DEPARTMENT
+    return lines
+
+
 def collapse(lines):
-    """One line per account, department, vendor and side, carrying the documents
-    it covers. A 26-line reclass reads as two lines, with its support attached."""
+    """One line per account, department, Project, Program, vendor and side, carrying
+    the documents it covers. A 26-line reclass reads as two lines, with its support
+    attached."""
     out, order = {}, []
     for line in lines:
         side = "Dr" if line["debit"] else "Cr"
-        key = (line["account"], line["department"], line.get("vendor", ""), side)
+        key = (line["account"], line["department"], line.get("project", ""), line.get("program", ""),
+               line.get("vendor", ""), side)
         if key not in out:
             out[key] = dict(line, documents=[], debit=0.0, credit=0.0)
             out[key].pop("document", None)
@@ -1314,11 +1358,15 @@ def collapse(lines):
     return sorted(result, key=lambda l: 0 if l["debit"] else 1)
 
 
-def entries(findings, period, accrual_depts=None):
+def entries(findings, period, accrual_depts=None, lookup=None):
     """One proposed Journal Entry per finding that proposes a correction. Rules
     that ask for a confirmation rather than a correction (posting lag, tax
-    screens, variances) produce none."""
+    screens, variances) produce none. Both sides of a reclass carry the original
+    line's Project and Program (from `lookup`, the ledger's, when the finding's
+    transactions do not carry them); an entry with no ledger line behind it (an
+    accrual from Coupa receipts, a reclass staged in the forecast) leaves them blank."""
     accrual_depts = accrual_depts or {}
+    lookup = lookup or {}
     out = []
     date = period_end(period)
     for f in findings:
@@ -1330,15 +1378,15 @@ def entries(findings, period, accrual_depts=None):
             kind = "Department reclass"
             for t in txns_of(f):
                 amt = num(t.get("amount"))
-                lines.append({"account": t.get("account_code", ""), "department": to_dept,
-                              "vendor": t.get("vendor_or_name", ""),
-                              "debit": r2(max(amt, 0)), "credit": r2(max(-amt, 0)),
-                              "document": t.get("document_number", "")})
-                lines.append({"account": t.get("account_code", ""),
-                              "department": t.get("department", ""),
-                              "vendor": t.get("vendor_or_name", ""),
-                              "debit": r2(max(-amt, 0)), "credit": r2(max(amt, 0)),
-                              "document": t.get("document_number", "")})
+                lines.append(dict({"account": t.get("account_code", ""), "department": to_dept,
+                                   "vendor": t.get("vendor_or_name", ""),
+                                   "debit": r2(max(amt, 0)), "credit": r2(max(-amt, 0)),
+                                   "document": t.get("document_number", "")}, **dims(t, lookup)))
+                lines.append(dict({"account": t.get("account_code", ""),
+                                   "department": t.get("department", ""),
+                                   "vendor": t.get("vendor_or_name", ""),
+                                   "debit": r2(max(-amt, 0)), "credit": r2(max(amt, 0)),
+                                   "document": t.get("document_number", "")}, **dims(t, lookup)))
             vendor = (txns_of(f) or [{}])[0].get("vendor_or_name", "")
             memo = "Reclass %s from %s to %s" % (vendor, (txns_of(f) or [{}])[0].get("department", ""), to_dept)
         elif rule == "T4.PO_ACCOUNT_MISMATCH":
@@ -1347,15 +1395,15 @@ def entries(findings, period, accrual_depts=None):
             kind = "Account reclass to the PO-approved account"
             for t in txns_of(f):
                 amt = num(t.get("amount"))
-                lines.append({"account": to_acct, "department": t.get("department", ""),
-                              "vendor": t.get("vendor_or_name", ""),
-                              "debit": r2(max(amt, 0)), "credit": r2(max(-amt, 0)),
-                              "document": t.get("document_number", "")})
-                lines.append({"account": t.get("account_code", ""),
-                              "department": t.get("department", ""),
-                              "vendor": t.get("vendor_or_name", ""),
-                              "debit": r2(max(-amt, 0)), "credit": r2(max(amt, 0)),
-                              "document": t.get("document_number", "")})
+                lines.append(dict({"account": to_acct, "department": t.get("department", ""),
+                                   "vendor": t.get("vendor_or_name", ""),
+                                   "debit": r2(max(amt, 0)), "credit": r2(max(-amt, 0)),
+                                   "document": t.get("document_number", "")}, **dims(t, lookup)))
+                lines.append(dict({"account": t.get("account_code", ""),
+                                   "department": t.get("department", ""),
+                                   "vendor": t.get("vendor_or_name", ""),
+                                   "debit": r2(max(-amt, 0)), "credit": r2(max(amt, 0)),
+                                   "document": t.get("document_number", "")}, **dims(t, lookup)))
             vendor = (txns_of(f) or [{}])[0].get("vendor_or_name", "")
             froms = sorted({t.get("account_code", "") for t in txns_of(f)} - {""})
             memo = "Reclass %s from %s to %s" % (vendor, ", ".join(froms), to_acct)
@@ -1366,16 +1414,16 @@ def entries(findings, period, accrual_depts=None):
             kind = "Reverse duplicate posting"
             first = txns[0]
             repeat = sum(num(t.get("amount")) for t in txns[1:])
-            lines.append({"account": first.get("account_code", ""),
-                          "department": first.get("department", ""),
-                          "vendor": first.get("vendor_or_name", ""),
-                          "debit": r2(max(-repeat, 0)), "credit": r2(max(repeat, 0)),
-                          "document": first.get("document_number", "")})
+            lines.append(dict({"account": first.get("account_code", ""),
+                               "department": first.get("department", ""),
+                               "vendor": first.get("vendor_or_name", ""),
+                               "debit": r2(max(-repeat, 0)), "credit": r2(max(repeat, 0)),
+                               "document": first.get("document_number", "")}, **dims(first, lookup)))
             if first.get("txn_type") == "Bill":
-                lines.append({"account": AP_ACCOUNT, "department": "",
-                              "vendor": first.get("vendor_or_name", ""),
-                              "debit": r2(max(repeat, 0)), "credit": r2(max(-repeat, 0)),
-                              "document": first.get("document_number", "")})
+                lines.append(dict({"account": AP_ACCOUNT, "department": "",
+                                   "vendor": first.get("vendor_or_name", ""),
+                                   "debit": r2(max(repeat, 0)), "credit": r2(max(-repeat, 0)),
+                                   "document": first.get("document_number", "")}, **dims(first, lookup)))
             memo = "Reverse %d repeat posting(s) of %s" % (len(txns) - 1,
                                                              first.get("document_number", ""))
         elif rule == "F5.MODEL_TIE":
@@ -1390,9 +1438,14 @@ def entries(findings, period, accrual_depts=None):
             vendor = (f.get("title") or "").split(":")[0].strip() if rule in (
                 "F3.ACCRUAL_RECEIPT", "F6.ACCRUAL_PATTERN", "F7.REVENUE_IN_EXPENSE",
                 "F9.PREPAID", "F10.CAPITALIZE") else ""
+            # One Project and Program for the entry: its lines' own when they agree,
+            # else blank, for the reviewer to fill.
+            both = {tuple(dims(t, lookup).values()) for t in txns_of(f)}
+            pp = both.pop() if len(both) == 1 else ("", "")
             for line in parsed:
                 line["vendor"] = vendor
                 line["document"] = ""
+                line["project"], line["program"] = pp
                 if line["debit"] and not line["department"]:
                     line["department"] = accrual_depts.get(f["finding_id"], "")
             lines = parsed
@@ -1406,7 +1459,7 @@ def entries(findings, period, accrual_depts=None):
                     }.get(rule, "Correction proposed by " + rule)
         else:
             continue
-        lines = collapse([l for l in lines if l["debit"] or l["credit"]])
+        lines = collapse(bs_department([l for l in lines if l["debit"] or l["credit"]]))
         if not lines:
             continue
         debits = r2(sum(l["debit"] for l in lines))
@@ -1426,7 +1479,10 @@ def entries(findings, period, accrual_depts=None):
             "balanced": abs(debits - credits) < 0.005,
             "support": ev.get("basis", ""),
         })
-    return out + forecast_pairs(findings, period)
+    pairs = forecast_pairs(findings, period)
+    for x in pairs:
+        bs_department(x["lines"])
+    return out + pairs
 
 
 WITHHELD = "Employee paid through AP (name withheld)"
@@ -1823,7 +1879,8 @@ def build_views(run, args):
     js_entries = entries(findings, period, {
         r["finding_id"]: r["department"]
         for t in tables if t["id"] == "accrual"
-        for s in t["sections"] for r in s["rows"] if r["department"]})
+        for s in t["sections"] for r in s["rows"] if r["department"]},
+        gl_dims(t for lines in gl.values() for t in lines))
     if people and not getattr(args, "keep_names", False):
         withhold(tables, js_entries, people)
 

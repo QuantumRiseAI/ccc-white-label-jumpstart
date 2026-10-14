@@ -148,6 +148,10 @@ if TIE and not TIE["passed"]:
         sys.exit("Stopped: the ledger does not tie to the Income Statement, so no console was built. Export the GL and "
                  "the Income Statement again from NetSuite, or build with --allow-tie-differences to put the differences at the top.")
 PNL = lambda c: c[:1] in "678"
+# A balance sheet account, 1xxxxxx to 3xxxxxx. On a proposed Journal Entry its line takes
+# BS_DEPARTMENT: only income statement lines carry a department.
+BS = lambda c: bool(c) and c[0] in "123"
+BS_DEPARTMENT = "Non-Specific"
 gl_now, gl_prior = by_period.get(PERIOD, []), by_period.get(PRIOR, [])
 dept_acct_vendor = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))
 for i, lines in enumerate((gl_now, gl_prior)):
@@ -159,6 +163,8 @@ ytd = sum(l["amount"] for p, ls in by_period.items() if p.endswith(PERIOD[-4:]) 
 gl_6x = sum(l["amount"] for l in gl_now if l["account_code"][:1] == "6")
 pl_lines_now = sum(1 for l in gl_now if PNL(l["account_code"]))
 DEPTS = sorted({l["department"] for ls in by_period.values() for l in ls if l.get("department")})
+PROJECTS = sorted({l["project"] for ls in by_period.values() for l in ls if l.get("project")})
+PROGRAMS = sorted({l["program"] for ls in by_period.values() for l in ls if l.get("program")})
 for _ls in by_period.values():
     for _l in _ls:
         if not ACC.get(_l["account_code"]) and _l.get("account_leaf"):
@@ -236,10 +242,12 @@ def je_editor(iid, lines, when=None, label=None):
     """A proposed Journal Entry, filled in and editable. The page fills the values."""
     rows = "".join('<tr><td><input class="f mono" data-jef="%s|%d|account" list="accts" size="9" aria-label="Account, line %d"><small data-jean="%s|%d"></small></td>'
                    '<td><input class="f" data-jef="%s|%d|department" list="depts" aria-label="Department, line %d"></td>'
+                   '<td><input class="f" data-jef="%s|%d|project" list="projs" aria-label="Project, line %d"></td>'
+                   '<td><input class="f" data-jef="%s|%d|program" list="progs" aria-label="Program, line %d"></td>'
                    '<td class="n2"><input class="f num" data-jef="%s|%d|debit" inputmode="decimal" aria-label="Debit, line %d"></td>'
                    '<td class="n2"><input class="f num" data-jef="%s|%d|credit" inputmode="decimal" aria-label="Credit, line %d"></td>'
                    '<td><input class="f wide" data-jef="%s|%d|memo" aria-label="Line Memo, line %d"></td></tr>'
-                   % (iid, i, i + 1, iid, i, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1) for i in range(len(lines)))
+                   % (iid, i, i + 1, iid, i, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1) for i in range(len(lines)))
     head = ('<div class="jf"><label>Subsidiary<span>%s</span></label><label>Currency<span>%s</span></label><label>Exchange Rate<span>%s</span></label>'
             '<label>Journal Date<input class="f" type="date" data-jeh="%s|date"></label><label>Posting Period<input class="f" data-jeh="%s|period"></label>'
             '<label>Reversing Entry<select class="f" data-jeh="%s|reversing"><option>N</option><option>Y</option></select></label>'
@@ -247,7 +255,7 @@ def je_editor(iid, lines, when=None, label=None):
             '<label class="memo">Memo<input class="f" data-jeh="%s|memo"></label></div>' % (e(JE_SUBSIDIARY), JE_CURRENCY, JE_RATE, iid, iid, iid, iid, iid))
     return ('<div class="jee" data-je="%s"%s%s><div class="jh"><span class="l">Journal Entry</span><span data-jebal></span>'
             '<button class="lk" data-jereset="%s" hidden>Reset</button></div>%s<div class="tw"><table><thead><tr><th>Account</th><th>Department</th>'
-            '<th class="n2">Debit</th><th class="n2">Credit</th><th>Line Memo</th></tr></thead><tbody>%s</tbody></table></div></div>'
+            '<th>Project</th><th>Program</th><th class="n2">Debit</th><th class="n2">Credit</th><th>Line Memo</th></tr></thead><tbody>%s</tbody></table></div></div>'
             % (iid, (' data-when="%s" hidden' % when) if when else "", (' data-label="%s"' % e(label)) if label else "", iid, head, rows))
 
 
@@ -286,6 +294,7 @@ def drafted_entries(fids_ok=None):
     out = []
     for i, x in enumerate(RAW_DRAFTS.get("entries") or [], 1):
         lines = [{"account": txt(l.get("account")), "department": txt(l.get("department")), "vendor": txt(l.get("vendor")),
+                  "project": txt(l.get("project")), "program": txt(l.get("program")),
                   "debit": round(float(l.get("debit") or 0), 2), "credit": round(float(l.get("credit") or 0), 2),
                   "documents": [txt(d) for d in (l.get("documents") or [])]} for l in x.get("lines") or []]
         dr, cr = round(sum(l["debit"] for l in lines), 2), round(sum(l["credit"] for l in lines), 2)
@@ -301,8 +310,19 @@ def count(n, word):
     return "%d %s%s" % (n, word, "" if n == 1 else "s")
 
 
-def je_lines(lines):
-    return [{"account": l["account"], "department": l.get("department") or "", "debit": round(l.get("debit") or 0, 2), "credit": round(l.get("credit") or 0, 2)} for l in lines]
+def je_lines(lines, src=None):
+    """A proposed entry's lines. Each carries the Project and Program of `src`, the line it
+    corrects, unless it names its own, so both sides of a reclass keep them. A balance sheet
+    line takes BS_DEPARTMENT; only income statement lines carry a department."""
+    src = src or {}
+    return [{"account": l["account"], "department": BS_DEPARTMENT if BS(l["account"]) else l.get("department") or "",
+             "project": l.get("project", src.get("project")) or "", "program": l.get("program", src.get("program")) or "",
+             "debit": round(l.get("debit") or 0, 2), "credit": round(l.get("credit") or 0, 2)} for l in lines]
+
+
+def proj_prog(x):
+    """A line's Project, with its Program under it, as NetSuite names them."""
+    return "%s<small>%s</small>" % (e(x.get("project") or "") or "&ndash;", e(x.get("program") or "") or "&ndash;")
 
 
 def je_finish(je):
@@ -691,6 +711,8 @@ def shell(title, product, sections, pages, data, js):
                    '<button class="pill" data-carry hidden>Bring in the earlier run&rsquo;s decisions</button></div></div>')
             + '<datalist id="accts">' + "".join('<option value="%s">%s</option>' % (e(k), e(v)) for k, v in sorted(ACC.items()) if v) + "</datalist>"
             + '<datalist id="depts">' + "".join('<option value="%s">' % e(d) for d in DEPTS) + "</datalist>"
+            + '<datalist id="projs">' + "".join('<option value="%s">' % e(d) for d in PROJECTS) + "</datalist>"
+            + '<datalist id="progs">' + "".join('<option value="%s">' % e(d) for d in PROGRAMS) + "</datalist>"
             + "<footer>Serif Biomedicines, Inc. (FL87) &middot; " + e(product) + " &middot; " + e(PERIOD) + "</footer></main><script>window.DATA="
             + json.dumps(dict(data, acct={k: v for k, v in ACC.items() if v}, period=PERIOD, version=VERSION), ensure_ascii=False).replace("</", "<\\/")
             + ";</script><script>" + COMMON_JS + js + "\nShared.start();</script></body></html>")
@@ -1089,9 +1111,12 @@ const csv = rows => rows.map(r => r.map(c => { const s = String(c == null ? '' :
 /* Proposed Journal Entries: filled in from the run, edited in place. An edit
    is kept in S.je and marks the item Modified (Recode on a vendor line). */
 const jeOf = id => { const b = DATA.je[id], j = Object.assign({}, b, S.jh[id] || {});   // S.je holds the lines, S.jh the header fields edited
-  j.lines = (S.je[id] || b.lines).map(l => l.memo == null ? Object.assign({}, l, {memo: j.memo}) : l); return j; };
+  /* lines saved before Project and Program were carried take the run's */
+  j.lines = (S.je[id] || b.lines).map((l, i) => { const o = b.lines[i] || {}, x = l.memo == null ? Object.assign({}, l, {memo: j.memo}) : l;
+    return x.project == null || x.program == null ? Object.assign({}, x, {project: x.project == null ? o.project || '' : x.project, program: x.program == null ? o.program || '' : x.program}) : x; });
+  return j; };
 const jeBal = j => Math.round(j.lines.reduce((a, l) => a + (Number(l.debit) || 0) - (Number(l.credit) || 0), 0) * 100) / 100;
-const jeNoop = j => { const m = {}; j.lines.forEach(l => { const k = (l.account || '') + '|' + (l.department || ''); m[k] = (m[k] || 0) + (Number(l.debit) || 0) - (Number(l.credit) || 0); });
+const jeNoop = j => { const m = {}; j.lines.forEach(l => { const k = [l.account, l.department, l.project, l.program].map(v => v || '').join('|'); m[k] = (m[k] || 0) + (Number(l.debit) || 0) - (Number(l.credit) || 0); });
   return Object.values(m).every(v => Math.abs(v) < 0.005); };
 const jeEdited = id => !!(S.je[id] || S.jh[id]);
 const jeLive = id => { const d = S.dec[id]; return !!d && ['approve', 'modify', 'recode'].indexOf(d.v) > -1 && !!DATA.je[id] && (!DATA.je[id].proposal || jeEdited(id)); };
@@ -1110,7 +1135,9 @@ function editJE(t){
   if (t.dataset.jeh){ const H = S.jh[id] || (S.jh[id] = {}), old = jeOf(id).memo; H[i] = t.value.trim();
     if (i === 'memo'){ if (!S.je[id]) S.je[id] = JSON.parse(JSON.stringify(jeOf(id).lines)); S.je[id].forEach(l => { if (l.memo == null || l.memo === old) l.memo = H.memo; }); } }
   else { if (!S.je[id]) S.je[id] = JSON.parse(JSON.stringify(DATA.je[id].lines));
-    S.je[id][i][f] = f === 'debit' || f === 'credit' ? (Number(String(t.value).replace(/[^0-9.]/g, '')) || 0) : t.value.trim(); }
+    S.je[id][i][f] = f === 'debit' || f === 'credit' ? (Number(String(t.value).replace(/[^0-9.]/g, '')) || 0) : t.value.trim();
+    /* a balance sheet account takes the Non-Specific department; the reviewer can still change it */
+    if (f === 'account' && /^[123]\d{6}$/.test(S.je[id][i].account)) S.je[id][i].department = 'Non-Specific'; }
   const box = t.closest('[data-je]'), v = box.dataset.when || 'modify', d = S.dec[id];
   /* an item edited in NetSuite stays so: its entry then shows what was changed there */
   if (!d || (d.v !== v && d.v !== 'netsuite')){ const it = t.closest('[data-item]'), lb = it && it.querySelector('[data-d]');
@@ -1136,11 +1163,11 @@ function paintJE(){
 /* NetSuite rejects a Memo over 999 characters; a reviewer's note or edit can take one past it */
 const memoCut = m => m.length > 999 ? m.slice(0, 996).trimEnd() + '...' : m;
 function exportCSV(){
-  const rows = [['External ID', 'Subsidiary', 'Journal Date', 'Posting Period', 'Currency', 'Exchange Rate', 'Memo', 'Reversing Entry', 'Reversal Date', 'Account', 'Department', 'Debit', 'Credit', 'Line Memo']];
+  const rows = [['External ID', 'Subsidiary', 'Journal Date', 'Posting Period', 'Currency', 'Exchange Rate', 'Memo', 'Reversing Entry', 'Reversal Date', 'Account', 'Department', 'Project', 'Program', 'Debit', 'Credit', 'Line Memo']];
   const held = Object.keys(DATA.je).filter(id => jeLive(id) && !jeReady(id)).map(id => jeOf(id).memo.slice(0, 60) + ': ' + jeWhy(id)).join('; ');
   Object.keys(DATA.je).forEach(id => { if (!jeReady(id)) return;
     const j = jeOf(id); j.lines.forEach(l => rows.push([j.id, j.subsidiary, j.date, j.period, j.currency, j.rate, memoCut(j.memo + (S.notes[id] ? ' | ' + S.notes[id] : '')), j.reversing,
-      j.reversing === 'Y' ? j.reversal_date : '', l.account, l.department || '', l.debit || '', l.credit || '', memoCut(l.memo || '')])); });
+      j.reversing === 'Y' ? j.reversal_date : '', l.account, l.department || '', l.project || '', l.program || '', l.debit || '', l.credit || '', memoCut(l.memo || '')])); });
   const ns = nsIds().length, edited = ns ? plural(ns, 'item') + ' edited in NetSuite, not in the import: the CSV holds only the reclasses to book' : '';
   const said = [held ? 'Left out: ' + held : '', edited].filter(Boolean).join('. ');
   if (rows.length === 1){ alertBox(said ? said + '.' : 'Approve an entry first: only approved entries go into the import.'); return; }
@@ -1730,7 +1757,7 @@ def flux():
                        % (" hi" if hi else "", aid, round(x["debits"], 2), e(x.get("kind") or ""), en(x["memo"]), "", e(acct["account"]), e(acct_name(acct["account"])), money(x["debits"], True),
                           fav(imp, ("&#9660; Favorable " if imp > 0 else "&#9650; Unfavorable " if imp < 0 else "No P&amp;L impact") + (money(abs(imp), True) if round(imp) else "")),
                           e(", ".join(vend) or "&ndash;"), e(", ".join("%s %s %s" % (l["account"], acct_name(l["account"]), money((l.get("debit") or 0) - (l.get("credit") or 0), True).replace("&ndash;", "-")) for l in bsl)) or "&ndash;",
-                          e(", ".join(sorted({l.get("department") for l in x["lines"] if l.get("department")})) or "&ndash;"),
+                          e(", ".join(sorted({l.get("department") for l in x["lines"] if l.get("department") and not BS(l["account"])})) or "&ndash;"),
                           en(f.get("recommendation") or x.get("support") or x["memo"]), (" " + " ".join(doc_links(d) for d in docs)) if docs else "", en(f.get("policy_basis") or ""), je_editor(aid, je[aid]["lines"]) + dhtml,
                           aid, e(x["memo"]), aid, e(x["memo"]), aid, e(x["memo"]), aid))
     for r in revs:
@@ -1912,12 +1939,12 @@ def coding():
                if (not account or i["account"] == account) and (not docs or i["document"] in docs)]
         if not its:
             return ""
-        rows = "".join('<tr><td class="mono">%s</td><td>%s %s%s</td><td>%s</td><td><span class="mono">%s</span><small>%s</small></td><td>%s</td><td class="n2">%s</td></tr>'
-                       % (e(i["date"]), e(i["type"]), e(i["document"]), doc_links(i["document"]), e(i["text"]), e(i["account"]), e(acct_name(i["account"])), e(i.get("department") or ""), money(i["amount"], True))
+        rows = "".join('<tr><td class="mono">%s</td><td>%s %s%s</td><td>%s</td><td><span class="mono">%s</span><small>%s</small></td><td>%s</td><td>%s</td><td class="n2">%s</td></tr>'
+                       % (e(i["date"]), e(i["type"]), e(i["document"]), doc_links(i["document"]), e(i["text"]), e(i["account"]), e(acct_name(i["account"])), e(i.get("department") or ""), proj_prog(i), money(i["amount"], True))
                        for i in sorted(its, key=lambda i: -abs(i["amount"])))
         more = (((r or {}).get("detail") or {}).get("count") or len(its)) - len(its) if not account and not docs else 0
         return ('<details class="lines"><summary>Lines (%d)</summary><div class="tw"><table><thead><tr><th>Date</th><th>Document</th><th>Description</th><th>Account</th><th>Department</th>'
-                '<th class="n2">Amount</th></tr></thead><tbody>%s</tbody></table></div>%s</details>' % (len(its), rows, ('<p class="note">%d more lines in NetSuite.</p>' % more) if more > 0 else ""))
+                '<th>Project / Program</th><th class="n2">Amount</th></tr></thead><tbody>%s</tbody></table></div>%s</details>' % (len(its), rows, ('<p class="note">%d more lines in NetSuite.</p>' % more) if more > 0 else ""))
 
     def acts(iid, label, actions):
         return "".join('<button class="pill" data-d="%s" data-v="%s" data-label="%s">%s</button>' % (iid, v, e(label), lab) for v, lab in actions)
@@ -1979,9 +2006,9 @@ def coding():
             iid = sid(prefix, r["vendor"], r["from_account"], r["to_account"], r.get("what"), r.get("department"))
             doc = r["doc"] or line_doc(r["vendor"], r["from_account"])
             je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": doc["date"] if doc else "", "memo": "Recode %s %s from %s to %s" % (r["vendor"], r.get("what") or "", r["from_account"], r["to_account"]),
-                       "lines": je_lines([{"account": r["to_account"], "department": r["department"], "debit": r["amount"]}, {"account": r["from_account"], "department": r["department"], "credit": r["amount"]}])}
+                       "lines": je_lines([{"account": r["to_account"], "department": r["department"], "debit": r["amount"]}, {"account": r["from_account"], "department": r["department"], "credit": r["amount"]}], doc)}
             items.append(("capex" if prefix == "C" else "prepaid", iid, typ, r["vendor"], r.get("what") or "", r["amount"], r["from_account"], r["to_account"]))
-            bucket.append(card(iid, r["vendor"], r["amount"], True, coding_(r["from_account"], r["department"]), '<span class="arrow">&rarr;</span> ' + coding_(r["to_account"], r["department"]),
+            bucket.append(card(iid, r["vendor"], r["amount"], True, coding_(r["from_account"], r["department"]), '<span class="arrow">&rarr;</span> ' + coding_(r["to_account"], je[iid]["lines"][0]["department"]),
                                doc, '<div><div class="l">Department</div><div class="x">' + e(r["department"]) + "</div></div>", en(r["why"]) + (" " + en(r["do"]) if r["do"] else ""), "",
                                FLAG_ACTS, lines_html(r["vendor"], r["from_account"]), je_editor(iid, je[iid]["lines"]) + history(r["vendor"])))
 
@@ -2003,10 +2030,11 @@ def coding():
             ea, ed = usual_expense(v, l["department"] or "")
             amt = round(l["amount"], 2)
             je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": l["date"], "memo": "Recode %s %s from %s to expense" % (v, desc(l), l["account_code"]),
-                       "lines": je_lines([{"account": ea, "department": ed, "debit": amt}, {"account": l["account_code"], "department": l["department"], "credit": amt}]), "when": "recode"}
+                       "lines": je_lines([{"account": ea, "department": ed, "debit": amt}, {"account": l["account_code"], "department": l["department"], "credit": amt}], l), "when": "recode"}
             doc = {"type": l["txn_type"], "document": l["document_number"], "text": desc(l), "date": l["date"]}
             out.append(card(iid, v, amt, amt >= thr, coding_(l["account_code"], l["department"]), "&ndash;", doc,
-                            '<div><div class="l">Department</div><div class="x">' + e(l["department"] or "&ndash;") + "</div></div>", "", "",
+                            '<div><div class="l">Department</div><div class="x">' + e(l["department"] or "&ndash;") + "</div></div>"
+                            '<div><div class="l">Project / Program</div><div class="x">' + proj_prog(l) + "</div></div>", "", "",
                             (("confirm", "Confirm, Stays on Balance Sheet"), ("recode", "Recode to Expense"), ("netsuite", "Edited in NetSuite")), "",
                             je_editor(iid, je[iid]["lines"], "recode") + history(v), flag=False))
         return out
@@ -2082,8 +2110,11 @@ def coding():
         if doc:
             nsdoc[iid] = doc["type"] + " " + doc["document"]
         cur = "<br>".join(coding_(c["account"], c.get("department")) for c in (r.get("by_coding") or []) if round(c.get("current") or 0)) or coding_(a)
+        pp = {(i.get("project") or "", i.get("program") or "") for i in (r.get("detail") or {}).get("items") or []
+              if i["account"] == a and (i.get("department") or "Non-Specific") == dept}
         je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": (doc or {}).get("date") or "", "memo": "Recode %s from %s %s" % (r["vendor"], a, dept),
-                   "lines": je_lines([{"account": a, "department": dept, "debit": camt}, {"account": a, "department": dept, "credit": camt}]), "when": "recode"}
+                   "lines": je_lines([{"account": a, "department": dept, "debit": camt}, {"account": a, "department": dept, "credit": camt}],
+                                     dict(zip(("project", "program"), pp.pop())) if len(pp) == 1 else None), "when": "recode"}
         amts[iid] = r["amount"] or 0
         return ('<div class="item" data-item="%s" data-amt="%s"><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span><span class="tag%s">%s</span></div>'
                 '<div class="ib"><div class="kv"><div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Document / item</div><div class="x">%s%s</div></div>'
@@ -2206,7 +2237,7 @@ def coding():
                       + '<div class="card"><div class="ch">Management Review &amp; Sign-Off</div><div class="pad">' + sign + "</div></div>"))
     pages.append(page("export", '<div class="card"><div class="ch">Export to NetSuite<button class="pill r" data-wpsave>Work paper, HTML</button><button class="pill solid" data-export>Export to NetSuite, CSV</button></div>'
                       '<div class="sumline" data-fixsum></div>'
-                      '<div class="tw"><table><thead><tr><th>Memo</th><th>Account</th><th>Department</th><th class="n2">Debit</th><th class="n2">Credit</th><th>Status</th></tr></thead><tbody data-exportrows></tbody></table></div></div>'
+                      '<div class="tw"><table><thead><tr><th>Memo</th><th>Account</th><th>Department</th><th>Project / Program</th><th class="n2">Debit</th><th class="n2">Credit</th><th>Status</th></tr></thead><tbody data-exportrows></tbody></table></div></div>'
                       '<div class="card"><div class="ch">Edited in NetSuite<span class="r note">Fixed on the bill or Journal Entry itself; resolved, and not in the CSV</span></div>'
                       '<div class="tw"><table><thead><tr><th>Ref ID</th><th>Item</th><th>Document</th><th class="n2">Amount</th><th>Note</th><th>Decided</th></tr></thead><tbody data-nsrows></tbody></table></div></div>'))
     sections = [("Overview", [("ov", "Overview")]),
@@ -2247,9 +2278,9 @@ function refresh(){
     '</td><td>' + esc(LABEL[l.v] || 'Cleared') + '</td><td>' + esc(l.by_uid ? Shared.name(l.by_uid) : '') + '</td><td>' + esc(l.note || '') + '</td></tr>').join('') : '<tr><td colspan="5" class="note">No decisions recorded yet.</td></tr>';
   const ex = $('[data-exportrows]'); if (ex){ const r = [];
     Object.keys(DATA.je).forEach(id => { if (!jeLive(id)) return; const j = jeOf(id), ok = jeReady(id);
-      j.lines.forEach((l, i) => r.push('<tr><td>' + (i ? '' : named(j.memo)) + '</td><td><span class="mono">' + esc(l.account) + '</span><small>' + esc(DATA.acct[(l.account || '').trim()] || '') + '</small></td><td>' + esc(l.department || '') + '</td><td class="n2">' + (Number(l.debit) ? money(l.debit) : '') +
+      j.lines.forEach((l, i) => r.push('<tr><td>' + (i ? '' : named(j.memo)) + '</td><td><span class="mono">' + esc(l.account) + '</span><small>' + esc(DATA.acct[(l.account || '').trim()] || '') + '</small></td><td>' + esc(l.department || '') + '</td><td>' + (esc(l.project || '') || '&ndash;') + '<small>' + (esc(l.program || '') || '&ndash;') + '</small></td><td class="n2">' + (Number(l.debit) ? money(l.debit) : '') +
         '</td><td class="n2">' + (Number(l.credit) ? money(l.credit) : '') + '</td><td>' + (i ? '' : ok ? 'Ready' : '<span class="unf">' + jeWhy(id).replace(/^./, c => c.toUpperCase()) + '</span>') + '</td></tr>')); });
-    ex.innerHTML = r.length ? r.join('') : '<tr><td colspan="6" class="note">No approved entries yet.</td></tr>'; }
+    ex.innerHTML = r.length ? r.join('') : '<tr><td colspan="7" class="note">No approved entries yet.</td></tr>'; }
 }
 /* The work paper: every decision, with its reference ID, the path an agreed fix took and
    the document it changed; the reclasses in the import; the sign-off. One page for the
@@ -2268,7 +2299,7 @@ function workPaper(){
       + td(S.notes[id] || '') + td(d.by_uid ? Shared.name(d.by_uid) : '') + td(String(d.at || '').slice(0, 16).replace('T', ' '), 'm') + '</tr>'; });
   const lines = [];
   Object.keys(DATA.je).filter(jeReady).forEach(id => { const j = jeOf(id);
-    j.lines.forEach((l, i) => lines.push('<tr>' + td(i ? '' : refOf(id), 'm') + td(i ? '' : j.id, 'm') + td(i ? '' : j.memo) + td(l.account, 'm') + td(l.department || '')
+    j.lines.forEach((l, i) => lines.push('<tr>' + td(i ? '' : refOf(id), 'm') + td(i ? '' : j.id, 'm') + td(i ? '' : j.memo) + td(l.account, 'm') + td(l.department || '') + td(l.project || '') + td(l.program || '')
       + td(Number(l.debit) ? usd(l.debit) : '', 'n') + td(Number(l.credit) ? usd(l.credit) : '', 'n') + '</tr>')); });
   const signs = Object.keys(S.sign).map(r => { const s = S.sign[r], lb = $('[data-sname="' + r + '"]'); return '<tr>' + td(lb ? lb.closest('.sign').querySelector('b').textContent : r) + td(s.name) + td(s.date) + '</tr>'; });
   const table = (head, rows, none) => '<table><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + (rows.join('') || '<tr><td colspan="' + head.length + '">' + none + '</td></tr>') + '</tbody></table>';
@@ -2280,7 +2311,7 @@ function workPaper(){
     + '<p>' + items.length + ' items, ' + (items.length - open.length) + ' decided, ' + open.length + ' open. Agreed fixes: ' + fx.length + '; ' + rc.length + ' booked as reclasses (' + rc.filter(f => f.in_import).length
     + ' in the import), ' + (fx.length - rc.length) + ' edited in NetSuite, not in the import.</p>'
     + '<h2>Decisions</h2>' + table(['Ref ID', 'Page', 'Item', 'Amount', 'Decision', 'Path', 'Document', 'External ID', 'Change', 'Note', 'Decided by', 'When (UTC)'], dec, 'No decisions recorded.')
-    + '<h2>Reclasses in the NetSuite import</h2>' + table(['Ref ID', 'External ID', 'Memo', 'Account', 'Department', 'Debit', 'Credit'], lines, 'None ready.')
+    + '<h2>Reclasses in the NetSuite import</h2>' + table(['Ref ID', 'External ID', 'Memo', 'Account', 'Department', 'Project', 'Program', 'Debit', 'Credit'], lines, 'None ready.')
     + '<h2>Sign-off</h2>' + table(['Role', 'Name', 'Date'], signs, 'Not signed.') + '</body></html>';
   download('serif-' + DATA.kind + '-work-paper-' + DATA.slug + '.html', html, 'text/html');
 }

@@ -213,7 +213,8 @@ section opens its pages beside its title.
 * **Documentation**: the **Audit Log** (who decided what and when), **SOX Documentation**
   (sources, the GL tie-out and the Income Statement tie, the policies applied and the sign-off), and **Export**, the
   NetSuite CSV (header fields: Subsidiary, Journal Date, Posting Period, Currency, Exchange Rate,
-  Memo, Reversing Entry, Reversal Date; line fields: Account, Department, Debit, Credit, Line Memo).
+  Memo, Reversing Entry, Reversal Date; line fields: Account, Department, Project, Program, Debit,
+  Credit, Line Memo).
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
   supplied, what each check found, the estimated cost of a run, the inputs and the build
   record. Settings has the threshold, the decision record (save and load) and **Bring in the
@@ -223,9 +224,12 @@ Every flag and vendor card starts with its reference ID, numbered by screen with
 (CAPEX-01, FA-01, PREPAID-01, PPD-01, DEPT-01, DRAFT-01, CLEAR-01, NEW-01), and the Memo of its
 Journal Entry starts with the same ID, so the entry in NetSuite ties back to the card. Use the ID
 when you name a card to the reviewer. Each card shows its document with NetSuite and Coupa links, the vendor's last
-three months by account and department with the line descriptions, and its lines. A flag's
+three months by account and department with the line descriptions, and its lines, each with its
+Project and Program. A flag's
 Journal Entry is filled in and editable: approve it, reject it, or edit it, which marks it
-Modified and needs a note. **Edited in NetSuite**, beside Approve Recode and Recode, records a fix
+Modified and needs a note. Both sides of an entry carry the Project and Program of the line it
+corrects; a balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the `Non-Specific`
+department, and only income statement lines carry one. **Edited in NetSuite**, beside Approve Recode and Recode, records a fix
 made on the bill or Journal Entry itself while the period is open: it settles the item, needs no
 note, and stays out of the CSV, which holds only the reclasses to book. A Journal Entry you drafted
 has no Edited in NetSuite. Export lists the items edited in NetSuite and saves the **Work paper,
@@ -266,8 +270,10 @@ reviewer the rebuilt file, and say in the chat what you drafted.
      "reason": "Why the entry is needed.",
      "vendor": "Global Life Sciences Solutions USA LLC",
      "lines": [
-       {"account": "6410000", "department": "Production", "vendor": "...", "debit": 2261.00, "documents": ["..."]},
-       {"account": "6504000", "department": "Production", "vendor": "...", "credit": 2261.00, "documents": ["..."]}
+       {"account": "6410000", "department": "Production", "project": "Internal CMC", "program": "00 Non-Specific",
+        "vendor": "...", "debit": 2261.00, "documents": ["..."]},
+       {"account": "6504000", "department": "Production", "project": "Internal CMC", "program": "00 Non-Specific",
+        "vendor": "...", "credit": 2261.00, "documents": ["..."]}
      ]}
   ]
 }
@@ -283,8 +289,8 @@ Read from `out/<period>/run.json`:
 * `views.tables`, the table with `id` `vendors`: one row per vendor. `flags` (label, amount,
   why, do, finding_ids, match), `by_coding`, `by_account` and `by_department` (prior2, prior,
   current), `planned`,
-  `owner`, and `detail.items`, the lines with date, document, text, account, department and
-  amount.
+  `owner`, and `detail.items`, the lines with date, document, text, account, department,
+  project, program and amount.
 * `findings`, and `views.explain` for each finding: why it was raised, what to do, its limit.
 * `views.entries`: the proposed Journal Entries, balanced, line by line.
 
@@ -328,7 +334,13 @@ Draft an entry where the coding is wrong and no proposed entry in `views.entries
   facilities | Aug'26`, and tell the reviewer it needs the controller's approval.
 * Credit each posted line's account and department. Debit the corrected account and
   department. The entry balances.
-* Each line carries the account code and name, department, vendor and document numbers.
+* Both sides carry the posted line's Project and Program (`project`, `program`, as in
+  `detail.items` or the GL), unless the correction is to the Project or Program itself. A
+  wrong Project or Program on a reclass leaves stray balances that surface a year later.
+* A balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the `Non-Specific` department; only
+  income statement lines carry a department. The build sets it on every entry.
+* Each line carries the account code and name, department, Project, Program, vendor and
+  document numbers.
 * Memo, per the Data Entry Policy: `Specific description | Mon'YY`, for example
   `Long column holder recoded to lab supplies | Aug'26`. Leave out the reference ID: the build
   puts the card's in front, `DRAFT-01 | Long column holder recoded to lab supplies | Aug'26`.
@@ -457,8 +469,10 @@ NetSuite."
 2. If an entry the reviewer wants is not in the console, draft it (What You Write, 4) and build
    the console again.
 3. When the reviewer attaches the exported file, check it with code: each External ID
-   balances, each Date is in the close month, and the entries match those approved in the
-   decision record. Report what does not. Change nothing in the file.
+   balances, and balances within each Project and Program unless the entry moves one, each
+   Date is in the close month, each balance sheet line's Department is `Non-Specific`, and the
+   entries match those approved in the decision record. Report what does not. Change nothing
+   in the file.
 4. A person imports it into NetSuite. You never post it.
 
 **Summarize the session.** "Summarize the session." "Write the hand-off." Ask for the
@@ -521,8 +535,8 @@ approved.
    attached. Ask for the posted entries: an export of the month's posted Journal Entries, or,
    with the NetSuite connector, read them by External ID. Say which, and when it was read.
 2. With code, match each entry in the CSV to its posted entry by External ID. Compare the
-   date and posting period, the subsidiary, each line's account, department, debit and
-   credit, and the memo. Check that each posted entry balances, and that its amount
+   date and posting period, the subsidiary, each line's account, department, Project,
+   Program, debit and credit, and the memo. Check that each posted entry balances, and that its amount
    agrees to the item it came from in the run.
 3. Report each entry as Matches, Differences found (with each difference) or Not found. List
    any posted entry for the month that carries a review memo but no External ID from the CSV.

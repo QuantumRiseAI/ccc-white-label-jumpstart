@@ -328,8 +328,9 @@ left on it. Run log and Settings are the icons at the right.
 
 Every flag and vendor is a card: its current coding (and the recommended one, on a flag), the
 document with its NetSuite and Coupa links, the vendor's last three months by account and
-department with the line descriptions, and its lines. Every account number shows its name. An
-item at or over the threshold is marked Review.
+department with the line descriptions, and its lines, each with its Project and Program (the
+GL's `ProjectID: Name` and `Program: Name`). Every account number shows its name. An item at or
+over the threshold is marked Review.
 
 Each card's header starts with its reference ID, numbered by screen within the close, largest
 amount first: CAPEX-01, FA-01 (booked to fixed assets), PREPAID-01, PPD-01 (booked to prepaid),
@@ -346,11 +347,18 @@ month's bills posted to fixed-asset (15xxxxx) or prepaid (13xxxxx) accounts. A b
 confirmed (it stays on the balance sheet) or recoded to expense, with a Journal Entry filled in
 from the vendor's usual expense account and department.
 
+On every proposed entry the balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the
+`Non-Specific` department; only income statement lines carry one. A recode to 1505000 Capital in
+Process debits it `Non-Specific`, not the expense line's department, and a bill recoded off
+prepaid credits the prepaid account `Non-Specific`. Both sides carry the original line's Project
+and Program.
+
 ### Settling an Item
 
 * **A flag** (CapEx, Prepaid, Dept & Entity) shows its Journal Entry, filled in. **Approve
   Recode** books it as proposed. **Reject** leaves the coding as it is. Editing any account,
-  department or amount marks it **Modified**, which needs a note. The entry shows whether it
+  department, Project, Program or amount marks it **Modified**, which needs a note. A line moved
+  to a balance sheet account takes `Non-Specific`, which can still be changed. The entry shows whether it
   balances; **Reset** brings back the proposal.
 * **A vendor** on Reviewed & Cleared or New This Period is **confirmed**, or **recoded**: the
   Journal Entry opens, filled in with its coding, to edit, with a note. A confirmed vendor
@@ -378,8 +386,10 @@ not in it; Export lists them, with the count of each path, and **Work paper, HTM
 decision with its reference ID, path and document, the reclasses in the import, and the
 sign-off, for the close file. Header columns: External ID, Subsidiary (Serif Biomedicines, Inc.),
 Journal Date, Posting Period (the close month), Currency (USD), Exchange Rate (1), Memo (with the
-note), Reversing Entry (Y/N) and Reversal Date. Line columns: Account, Department, Debit, Credit and
-Line Memo. Journal Date, Posting Period, Memo, Reversing Entry, Reversal Date and Line Memo are
+note), Reversing Entry (Y/N) and Reversal Date. Line columns: Account, Department, Project, Program,
+Debit, Credit and Line Memo. Project and Program are the line's ProjectID and Program segments, by
+name as the GL export shows them (`Internal CMC`, `00 Non-Specific`); map the two columns to them
+the first time the import is set up in NetSuite. Journal Date, Posting Period, Memo, Reversing Entry, Reversal Date and Line Memo are
 editable on the entry; Subsidiary, Currency and Exchange Rate are shown, not editable. Corrections
 are booked in the open close month: the Journal Date defaults to its last day and the
 transaction's own date goes in the Line Memo. The review reads the ledger by NetSuite
