@@ -1492,6 +1492,12 @@ def entries(findings, period, accrual_depts=None, lookup=None):
                     line["reverses_line"] = True
                 if line["debit"] and not line["department"]:
                     line["department"] = accrual_depts.get(f["finding_id"], "")
+            # NetSuite requires a department on every line. A P&L line still without one takes
+            # the department of the ledger lines behind the finding, when they share one.
+            depts = {(t.get("department") or "").strip() for t in txns_of(f)} - {""}
+            for line in parsed:
+                if not line["department"] and line["account"][:1] in ("4", "5", "6", "7", "8") and len(depts) == 1:
+                    line["department"] = next(iter(depts))
             lines = parsed
             # The memo says what the entry does, in words. The lines carry the
             # accounts and amounts, so the memo does not repeat them.

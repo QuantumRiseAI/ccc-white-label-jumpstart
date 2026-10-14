@@ -63,7 +63,7 @@ python3 serif_views.py out/sep2026/run.json \
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json \
   --gl netsuite_gl_*.xls* \
   --income-statement netsuite_income_statement_by_month_*.xls \
-  --out out/sep2026
+  --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 
 To carry the GL Coding Review's booked corrections into Actual vs. Actual (MoM), add the coding

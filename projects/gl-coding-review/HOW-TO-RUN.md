@@ -55,7 +55,7 @@ rolling forecast workbook whose prior cut is the plan; `--plan-vintage` names th
 ```sh
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
   --gl netsuite_gl_*.xls* --income-statement netsuite_income_statement_by_month_*.xls \
-  --out out/sep2026
+  --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 
 The build ties the ledger to the Income Statement as the first command does, and stops when an

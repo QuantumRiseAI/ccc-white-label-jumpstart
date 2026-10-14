@@ -34,6 +34,7 @@ name, or missing, and ask for any that are missing before you run anything.
 | NetSuite Income Statement by month report, `.xls`, by accounting period (a connector query grouped by transaction date does not tie) | The month and the month before. The ledger is tied to it by account before the console is built, and on SOX & GAAP |
 | UKG roster, `.csv` | The newest roster |
 | NetSuite link IDs, `.csv`, named `netsuite_link_ids_<month>.csv` | Optional, for links. The connector's result for `netsuite_link_ids.sql`; see NetSuite Link IDs |
+| NetSuite's lists, `.csv`: `netsuite_ref_accounts.csv`, `netsuite_ref_departments.csv`, `netsuite_ref_programs.csv` | Kept with the Project's files and replaced only when NetSuite's accounts, departments or programs change. The import CSV then carries NetSuite's internal IDs; see Importing into NetSuite |
 
 The scripts take every month they need from the exports. If a month is missing, they say
 which; ask the reviewer for that export. If there is no cut for the month, leave out
@@ -71,7 +72,8 @@ python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_*.xls* \
   --balance-sheet netsuite_balance_sheet_*.xls --keep-names
 
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_*.xls* \
-  --income-statement netsuite_income_statement_by_month_*.xls --out out/sep2026
+  --income-statement netsuite_income_statement_by_month_*.xls \
+  --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 
 When the reviewer attaches the GL Coding Review's run (`run.json`, from that Project) and its decision
@@ -167,6 +169,22 @@ Opened as a file, the console keeps the review in one browser.
   written to the shared state.
 * The decision record holds the shared state. In shared mode the reviewer still saves it
   from Settings for the close file and for a rerun.
+
+## Importing into NetSuite
+
+With NetSuite's lists passed to the build (`--netsuite-ref netsuite_ref_*.csv`), the import CSV
+carries internal IDs for Subsidiary (97), Account, Department and Program, the Journal Date and
+Reversal Date as M/D/YYYY, and Project by name. Its last four columns (Account Number, Department
+Name, Program Name, Reversing Entry) are for the reviewer. NetSuite requires a department on every
+line, so an entry with a line missing one, or with an account, department or program NetSuite does
+not hold, stays out of the CSV, and the export says which and why. Journal Entries need no
+approval at Serif: an import posts at once, so the console's decision and sign-off are the
+approval.
+
+In NetSuite: Setup > Import/Export > Import CSV Records, Transactions, Journal Entry, Add. On the
+mapping screen, map Subsidiary, Account, Department and Program by Internal ID, Project by Name,
+and leave the last four columns unmapped. Save the map for later months. A role that can import
+runs it; the AI read-only role cannot.
 
 ## NetSuite Link IDs
 
@@ -266,7 +284,7 @@ After the three scripts run, write `drafts.json` and build the console again wit
 
 ```sh
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_*.xls* \
-  --income-statement netsuite_income_statement_by_month_*.xls --out out/sep2026 --drafts drafts.json
+  --income-statement netsuite_income_statement_by_month_*.xls --netsuite-ref netsuite_ref_*.csv --out out/sep2026 --drafts drafts.json
 ```
 
 The build checks every draft against the run. An account that is not in the pack, a finding
