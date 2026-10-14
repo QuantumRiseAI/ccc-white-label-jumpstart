@@ -85,6 +85,9 @@ o = A.out or os.path.dirname(os.path.abspath(A.flux_run or A.coding_run))
 OUTS = {"flux": o, "coding": o}
 
 PERIOD, PRIOR, PY = M["period"], M["prior_period"], M["prior_year_period"]
+# With no export holding the same month last year, the run has no YoY: it is shown as not run.
+NO_PY = not PY
+PY = PY or SS.shift(PERIOD, -12)
 MON = PERIOD[:3]
 YEAR_END = "Dec " + str(int(PERIOD[-4:]) - 1)
 e = lambda s: html.escape("" if s is None else str(s))
@@ -1421,6 +1424,7 @@ def flux():
     wf = '<div class="wfx"><div class="axis">' + grid + '</div><div class="wf">' + "".join(body) + "</div></div>"
     tiles = [("Total OpEx", short(opex["actual"]), fav(-(opex["actual"] - opex["prior"]), ("&#9660; " if opex["actual"] < opex["prior"] else "&#9650; ") + short(abs(opex["actual"] - opex["prior"]))) + " vs. " + e(PRIOR)),
              ("Net Loss", short(-net["actual"]), fav(-(net["actual"] - net["prior"]), short(abs(net["actual"] - net["prior"])) + (" favorable" if net["actual"] < net["prior"] else " unfavorable")) + " MoM"),
+             ("YoY Net Loss", "&ndash;", "No " + e(PY) + " in the GL exports") if NO_PY else
              ("YoY Net Loss", short(-net["actual"]), fav(-(net["actual"] - net["prior_year"]), short(abs(net["actual"] - net["prior_year"])) + (" favorable" if net["actual"] < net["prior_year"] else " unfavorable")) + " vs. " + e(PY)),
              ("Adj Pending", '<span data-pending>' + str(len(ent) + len(revs)) + "</span>", "Review before close")]
     cards = [tile("R&amp;D Spend (" + MON + ")", short(rd[0]), fav(-(rd[0] - rd[1]), short(abs(rd[0] - rd[1]))) + " vs. " + e(PRIOR[:3])),
@@ -1508,10 +1512,10 @@ def flux():
     pages.append(page("ava", hero("Actual vs. Actual, MoM &amp; YoY".replace("&amp;", "&"), "", [
         ("Total OpEx " + MON, short(opex["actual"]), ""),
         ("vs. " + PRIOR, fav(-ch, ("&#9660; " if ch < 0 else "&#9650; ") + short(abs(ch))), fav(-ch, pct(-ch, opex["prior"]).lstrip("+") + (" favorable" if ch < 0 else " unfavorable"))),
-        ("vs. " + PY, fav(-chy, ("&#9660; " if chy < 0 else "&#9650; ") + short(abs(chy))), fav(-chy, pct(-chy, opex["prior_year"]).lstrip("+-") + (" favorable YoY" if chy < 0 else " unfavorable YoY"))),
+        ("vs. " + PY, "&ndash;", "Not in the GL exports") if NO_PY else ("vs. " + PY, fav(-chy, ("&#9660; " if chy < 0 else "&#9650; ") + short(abs(chy))), fav(-chy, pct(-chy, opex["prior_year"]).lstrip("+-") + (" favorable YoY" if chy < 0 else " unfavorable YoY"))),
         ("To Review (MoM)", '<span data-cm></span>', '<span data-cmn></span>')])
         + '<div class="card" data-tabbox><div class="tabs"><button class="on" data-tab="mom">MoM: ' + e(MON + " vs. " + PRIOR) + '</button><button data-tab="yoy">YoY: '
-        + e(MON + " " + PERIOD[-2:] + " vs. " + PY) + '</button></div><div data-pane="mom">' + var_table("mom") + '</div><div data-pane="yoy" data-alt hidden>' + var_table("yoy") + "</div></div>"))
+        + e(MON + " " + PERIOD[-2:] + " vs. " + PY) + '</button></div><div data-pane="mom">' + var_table("mom") + '</div><div data-pane="yoy" data-alt hidden>' + ('<p class="note pad">YoY did not run: the GL exports hold no ' + e(PY) + '.</p>' if NO_PY else var_table("yoy")) + "</div></div>"))
 
     if CODING_REC:
         lost = sorted(set(corr) - placed)
