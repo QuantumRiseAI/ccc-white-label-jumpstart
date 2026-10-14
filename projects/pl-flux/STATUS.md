@@ -17,16 +17,18 @@ Computed by `serif_uc2_flux.py`, reproducible run to run:
 * **Forecast-to-ledger reconciliation** against the cut FP&A saved after the month closed,
   when `--forecast` is passed
 * **Billing-pattern accruals**, the policy's Step B, for suppliers Coupa does not reach
-* **Prepaid candidates** at or over Serif's $25,000 prepaid threshold, and **capitalization
-  review** of the accounts the asset policy names plus repairs and maintenance, each saying
-  whether it goes to Capital in Process or its fixed asset account, and why
+* **Prepaid candidates** from $2,500, proposed for booking at or over Serif's $25,000 prepaid
+  threshold, and **capitalization review** of the accounts the asset policy names plus
+  repairs and maintenance, each saying whether it goes to Capital in Process or its fixed
+  asset account, and why
 * **Customer documents posted to expense**, and **journals that lost their vendor**
 
-Aug 2026: **98 findings, $7,876,426.90**. 27 in Adjustments: 12 forecast-to-ledger
-differences, 8 accruals (5 from Coupa receipts, 3 from the billing pattern), 3
-capitalization reviews, 1 customer document in expense, 3 prepaid releases with no
-vendor. No prepaid at $25,000: the one $16,746 service contract the $10,000 reading raised
-is under it. 71 in variance review: 39 accounts against the prior month, 32 against plan. Accrual population **$110,105**; open PO commitments
+Aug 2026: **101 findings, $7,905,284.90**. 30 in Adjustments: 12 forecast-to-ledger
+differences, 8 accruals (5 from Coupa receipts, 3 from the billing pattern), 3 prepaid
+candidates, 3 capitalization reviews, 1 customer document in expense, 3 prepaid releases
+with no vendor. The three prepaid candidates (service contracts of $16,746, $7,540 and
+$4,572) are under $25,000, so none is proposed for booking: 13 proposed Journal Entries. 71
+in variance review: 39 accounts against the prior month, 32 against plan. Accrual population **$110,105**; open PO commitments
 **$1,369,533** reported as a disclosure and not accrued.
 
 Every input is a system export as the system wrote it, read by `serif_sources.py`.

@@ -67,6 +67,10 @@ FLOOR = 2500.0
 # Serif's PP&E capitalization threshold (12 Oct 2026), the flux engine's
 # CAPITALIZATION_THRESHOLD. A capital flag under it says so.
 CAPITALIZATION = 5000.0
+# Serif's prepaid threshold (12 Oct 2026), the flux engine's PREPAID_THRESHOLD. The
+# prepaid screen lists from the reporting floor; a flag under this says so, and the
+# P&L Flux proposes no Journal Entry for it.
+PREPAID = 25000.0
 
 AP_ACCOUNT = "2000100"
 
@@ -1349,6 +1353,10 @@ def entries(findings, period, accrual_depts=None):
         rule = f.get("rule_id", "")
         ev = f.get("evidence") or {}
         lines, kind, memo = [], "", ""
+        # A prepaid under Serif's threshold is listed for the reviewer, not proposed for
+        # booking: the policy leaves it in expense.
+        if rule == "F9.PREPAID" and (f.get("amount_at_risk") or 0) < PREPAID:
+            continue
         if rule == "T1.DEPT_INCONSISTENCY":
             to_dept = quoted(ev.get("expected"), "department")
             kind = "Department reclass"
@@ -1701,6 +1709,9 @@ def explain(f, accounts, period):
             why.append("The vendor did not bill this account in the last %s months." % mm.group(2)
                        if mm.group(1) == "0" else
                        "The vendor billed this account in %s of the last %s months." % (mm.group(1), mm.group(2)))
+        if amt < PREPAID:
+            why.append("It is under the %s prepaid threshold, so it stays expense unless related "
+                       "charges for the same service bring it over." % "${:,.0f}".format(PREPAID))
         do = ["Read the invoice for the service period.",
               "If the service continues after %s, move the bill to %s and release it monthly over "
               "the service period." % (period, c.get("proposed", "")),

@@ -65,9 +65,14 @@ serif-pl-flux-aug2026-v1.8.2.html
   one. The card text, the Journal Entry Memo (`..., Capital in Process: build-out, until in use`;
   `..., in service: fixed asset`) and the P&L Flux's entry memo say which applies. A capital bill
   under $5,000 says it is under the threshold.
-- **Flux engine 0.8.0, ruleset 2026.10-uc2-flux-serif-thresholds; views 1.7.0.** F9.PREPAID tests
-  related charges at $25,000 (was $10,000). F10.CAPITALIZE still lists every bill from the $2,500
-  reporting floor, so a reviewer can lower the CapEx threshold; each finding's correction carries
+- **Prepaid lists like CapEx.** F9.PREPAID lists related charges from the $2,500 reporting floor
+  (it tested $10,000 before), so lowering the Prepaid threshold in Settings shows more; $25,000 is
+  the review default. A prepaid under $25,000 says it stays expense, and the P&L Flux proposes no
+  Journal Entry for it (`serif_views.entries`), so its adjustments do not fill with small prepaids:
+  the finding is in the run, not on a flux page.
+- **Flux engine 0.8.0, ruleset 2026.10-uc2-flux-serif-thresholds; views 1.7.0.** F9.PREPAID lists
+  from $2,500 and the views propose its entry from $25,000. F10.CAPITALIZE still lists every bill
+  from the $2,500 reporting floor, so a reviewer can lower the CapEx threshold; each finding's correction carries
   `placement` (`to`, `kind`: buildout, not_in_service, in_service or no_account, `asset`,
   `in_service`, `why`, `ask`), and its policy citation names the $5,000 threshold. The views put
   each bill's placement and its finding's total on the flag's `match`. The coding engine is
@@ -75,14 +80,16 @@ serif-pl-flux-aug2026-v1.8.2.html
 - **Aug 2026.** Coding: CapEx 3 flags, Review 3 before, 1 now (Red Thread Spaces, $38,590.70, to
   Capital in Process as build-out work, as Serif moved Phase 1 there on 31 Jul; Bay State IT
   $3,240.63 and Repligen $2,823.39 are under $5,000). Prepaid 1 flag before (Nova Biomedical,
-  $16,746.00 service contract), none now. Booked to prepaid: 7 lines, Review 7 before, 2 now.
-  Dept & Entity: 53 cards, Review 17 before, 41 now (every Department flag). The coding run id is
-  unchanged and every other card keeps its id. Flux: 99 findings, $7,893,172.90, to 98,
-  $7,876,426.90; proposed Journal Entries 14 to 13. A new flux ruleset means a new run id: bring
-  the earlier run's decisions in from Settings; the capital adjustment to Capital in Process has a
-  new memo, so a new item id.
-- New `tests/test_screens.py` in `make test`; the console tests use the CapEx flag where they
-  used the Prepaid one, which Aug 2026 no longer has.
+  $16,746.00 service contract, marked Review), 3 now, none marked Review at $25,000 (Nova; Beckman
+  Coulter, $7,540.00; Agilent, $4,572.00, all service contracts); at $5,000, 2 are. Booked to
+  prepaid: 7 lines, Review 7 before, 2 now. Dept & Entity: 53 cards, Review 17 before, 41 now
+  (every Department flag). The coding run id is unchanged and every card keeps its id. Flux: 99
+  findings, $7,893,172.90, to 101, $7,905,284.90 (two more prepaid candidates); proposed Journal
+  Entries 14 to 13 (the Nova prepaid entry is under $25,000). A new flux ruleset means a new run
+  id: bring the earlier run's decisions in from Settings; the capital adjustment to Capital in
+  Process has a new memo, so a new item id.
+- New `tests/test_screens.py` in `make test`. The console tests edit the CapEx flag's entry where
+  they edited the Prepaid one's, and check that lowering the Prepaid threshold marks more.
 
 ## Unreleased: the ledger tied to the Income Statement by account (SERIF-146)
 

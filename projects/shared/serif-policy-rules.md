@@ -26,9 +26,12 @@ change it silently in one place.
 
 The prepaid and PP&E figures are Serif's own, from Mike's write-up of 12 Oct 2026. They
 replace the $10,000 the draft Global Prepaid Expense Policy had been read as, and the draft
-Tangible & Intangible Asset Policy's "no threshold, by design". The flux engine applies
+Tangible & Intangible Asset Policy's "no threshold, by design". The flux engine carries
 both (`PREPAID_THRESHOLD`, `CAPITALIZATION_THRESHOLD`); the coding engine's constants of the
-same names are not used, because prepaid and fixed-asset tests are outside its scope.
+same names are not used, because prepaid and fixed-asset tests are outside its scope. The
+prepaid and capital screens list from the **$2,500** reporting floor, so a reviewer can look
+below the line; a flag under its threshold says it stays expense, and the P&L Flux proposes
+no prepaid entry under $25,000.
 
 The GL Coding Review gives each review screen its own threshold, in Settings: CapEx at
 **$5,000**, Prepaid at **$25,000**, the others at **$2,500**. Department flags have none:

@@ -237,7 +237,10 @@ $5,000** and **Prepaid $25,000** (Serif's capitalization and prepaid thresholds,
 write-up of 12 Oct 2026), and **$2,500** for the rest, the account recodes on Dept & Entity
 and any entry you drafted. A Department flag has none: every line off Non-Specific is
 recoded, whatever its size, so each is marked Review. An item at or over its screen's
-threshold is marked Review. The booked lines on CapEx and Prepaid take their page's.
+threshold is marked Review. The booked lines on CapEx and Prepaid take their page's. CapEx
+and Prepaid list every flag from $2,500, so a lower threshold shows more; one under its
+threshold says it stays expense. Do not recommend booking a prepaid under $25,000 or
+capitalizing a purchase under $5,000 unless it is part of something larger that is over.
 
 Each CapEx card says whether the purchase goes to **`1505000` Capital in Process** (build-out
 work, or an asset bought but not yet in service) or to its fixed asset account (an asset in

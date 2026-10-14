@@ -43,14 +43,15 @@ Flags the schedules step adds to vendor rows:
 | Coding changed | An account and department the vendor did not use in those months. Codings an engine finding covers are left to that finding. |
 | Coded off plan | The June forecast plans the vendor on other coding |
 | Requested by a department | People in another department raised the vendor's Coupa POs, by UKG department |
-| May be prepaid | Bills for one good or service that total $25,000 or more and name a service term, or sit on a term account the vendor does not bill most months |
+| May be prepaid | Bills for one good or service that total $2,500 or more and name a service term, or sit on a term account the vendor does not bill most months. Under the $25,000 prepaid threshold it says it stays expense |
 | May be capital | A bill of $2,500 or more on an account the asset policy names for review, or on repairs and maintenance, that does not name a service term. It says whether it goes to Capital in Process or to its fixed asset account, and why |
 
 The threshold that decides what needs a look is the reviewer's, in dollars, one per screen:
 CapEx $5,000 (Serif's capitalization threshold), Prepaid $25,000 (Serif's prepaid threshold),
 and $2,500 for the account recodes on Dept & Entity and drafted entries. Department flags
-have none: every line off Non-Specific is recoded, whatever its size. A capital bill under
-$5,000 is still listed, not marked Review, and says it is under the threshold.
+have none: every line off Non-Specific is recoded, whatever its size. Both screens list from
+$2,500, so a lower threshold shows more: a capital bill under $5,000, or a prepaid under
+$25,000, is still listed, not marked Review, and says it is under the threshold.
 
 ## Entry Patterns
 

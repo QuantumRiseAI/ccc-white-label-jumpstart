@@ -76,7 +76,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     p.on('pageerror', e => errs.push(k + ' standalone: ' + e.message));
     await p.goto('file://' + FILES[k]); await p.waitForTimeout(500);
     ok(await p.locator('#sharedbar').isHidden(), k + ': no shared banner');
-    // Aug 2026 has no prepaid flag at the $25,000 threshold (SERIF-142), so the GL Coding Review's first flag is CapEx
+    // The GL Coding Review's first flag is CapEx, whose Journal Entry is the one these tests edit
     const sel = k === 'gl' ? '#p-capex [data-flag]' : '#p-adj [data-item]';
     const id = await firstItem(p, sel);
     ok(/^[A-Z]+-[0-9a-f]{8}/.test(id), k + ': item id is built from the item (' + id + ')');
@@ -151,7 +151,8 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
         shown: (x.querySelector(':scope > .ih > .ref') || {}).textContent || '', ref: refOf(x.dataset.item)})));
       ok(refs.length > 0 && refs.length === await p.evaluate(() => Object.keys(DATA.ref).length) && refs.every(r => r.shown && r.shown === r.ref), 'gl: every card shows its reference ID in its header (' + refs.length + ')');
       ok(refs.every(r => /^(CAPEX|FA|PREPAID|PPD|DEPT|DRAFT|CLEAR|NEW)-\d{2,}$/.test(r.ref)) && new Set(refs.map(r => r.ref)).size === refs.length, 'gl: reference IDs are PREFIX-NN and unique');
-      ok(['CAPEX', 'PPD', 'DEPT'].every(s => refs.some(r => r.ref === s + '-01')) && refs.some(r => r.ref.startsWith('CAPEX-') && r.id.startsWith('C-')) && refs.some(r => r.ref.startsWith('PPD-') && r.id.startsWith('PB-'))
+      ok(['CAPEX', 'PREPAID', 'PPD', 'DEPT'].every(s => refs.some(r => r.ref === s + '-01')) && refs.some(r => r.ref.startsWith('CAPEX-') && r.id.startsWith('C-'))
+        && refs.some(r => r.ref.startsWith('PREPAID-') && r.id.startsWith('P-')) && refs.some(r => r.ref.startsWith('PPD-') && r.id.startsWith('PB-'))
         && refs.some(r => r.ref.startsWith('DEPT-') && r.id.startsWith('D-')), 'gl: CapEx, Prepaid and Dept & Entity cards are numbered by screen');
       ok(Object.values(refs.reduce((m, r) => { const [s, n] = r.ref.split('-'); (m[s] = m[s] || [])[Number(n) - 1] = r; return m; }, {}))
         .every(xs => Array.from(xs).every((r, i) => r && (!i || xs[i - 1].amt >= r.amt))), 'gl: within a screen, numbered from 01 with no gaps, largest amount first');
@@ -193,6 +194,11 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(dept[0] > 0 && (await marked('#p-dept [data-thr="all"]')).length === dept[0] && dept[1] > 0 && (await marked('#p-dept [data-thr="thr"]')).length === 0,
          'gl: at a $1,000,000 review threshold every Department flag is still Review (' + dept[0] + '); account recodes are not');
       ok(await same(CAP, 5000) && await same(PRE, 25000), 'gl: the review threshold does not move CapEx or Prepaid');
+      // the prepaid screen lists from the $2,500 reporting floor, as CapEx does: lowering the Prepaid threshold marks more
+      const PF = '#p-prepaid [data-flag]', pf = await p.locator(PF).count();
+      ok(pf > 0 && (await marked(PF)).length === (await over(PF, 25000)).length && (await over(PF, 2500)).length === pf, 'gl: prepaid flags are listed from $2,500 and marked Review from $25,000 (' + (await marked(PF)).length + ' of ' + pf + ')');
+      await p.fill('#thrprepaid', '5000');
+      ok(await same(PF, 5000) && (await marked(PF)).length > (await over(PF, 25000)).length, 'gl: lowering the Prepaid threshold to $5,000 marks more prepaid flags (' + (await marked(PF)).length + ')');
       await p.fill('#thrcapex', '3000'); await p.fill('#thrprepaid', '10000');
       ok(await same(CAP, 3000) && (await marked(CAP)).length === 2 && await same(PRE, 10000), 'gl: changing the CapEx and Prepaid thresholds marks their screens again');
       await p.reload(); await p.waitForTimeout(400);

@@ -417,11 +417,13 @@ kept in this browser with the review:
 | Screen | Default | Why |
 |---|---|---|
 | CapEx Flags | **$5,000** | Serif's PP&E capitalization threshold (Mike's write-up, 12 Oct 2026) |
-| Prepaid Flags | **$25,000** | Serif's prepaid threshold (same write-up); the prepaid screen lists only charges at or over it |
+| Prepaid Flags | **$25,000** | Serif's prepaid threshold (same write-up), on related charges together |
 | Dept & Entity, account recodes and drafted entries | **$2,500** | The review threshold |
 | Dept & Entity, Department flags | none | Every line off Non-Specific is recoded, whatever its size |
 
-The booked lines on CapEx and Prepaid take their page's threshold. A review saved before the
+CapEx and Prepaid list every flag from $2,500, so lowering either threshold marks more; a
+prepaid under $25,000 says it stays expense, as a capital bill under $5,000 does. The booked
+lines on CapEx and Prepaid take their page's threshold. A review saved before the
 CapEx and Prepaid thresholds existed keeps its one threshold and takes these defaults.
 
 ### The Run Log

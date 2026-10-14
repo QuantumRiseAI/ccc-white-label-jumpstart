@@ -30,21 +30,24 @@ LEAVES = {"6891000": "Package Insurance", "6435000": "Lab Equipment Repairs & Ma
           "6815000": "Office Non-Cap Equipment/Furniture", "6816000": "Office Non-Cap Software"}
 
 print("thresholds")
-ok(F.PREPAID_THRESHOLD == 25_000 and F.CAPITALIZATION_THRESHOLD == 5_000 and V.CAPITALIZATION == F.CAPITALIZATION_THRESHOLD,
+ok(F.PREPAID_THRESHOLD == 25_000 and F.CAPITALIZATION_THRESHOLD == 5_000 and V.CAPITALIZATION == F.CAPITALIZATION_THRESHOLD
+   and V.PREPAID == F.PREPAID_THRESHOLD,
    "prepaid $25,000 and PP&E $5,000, the views agreeing with the engine")
 ok("$25,000" in F.POLICY_PREPAID and "$5,000" in F.POLICY_ASSET and "no capitalization threshold" not in F.POLICY_ASSET,
    "the policy citations carry the new figures")
 ok(F.RULESET_VERSION != "2026.09-uc2-flux-account-level", "the ruleset version moved")
 
-print("prepaid at $25,000")
+print("prepaid: listed from $2,500, reviewed from $25,000")
 pre = lambda amt: F.prepaid_findings([bill("Acme Insurance", "6891000", amt, "Annual policy renewal")], {}, LEAVES, "Aug 2026", [0])
-ok(not pre(24_999.99), "a term charge under $25,000 is not flagged")
-ok(len(pre(25_000)) == 1, "a term charge of $25,000 is flagged")
+ok(not pre(2_499.99) and len(pre(2_500)) == 1, "a term charge is listed from the $2,500 reporting floor, as capital is")
 split = F.prepaid_findings([bill("Acme Insurance", "6891000", 15_000, "Annual policy renewal", doc="B1"),
                             bill("Acme Insurance", "6891000", 12_000, "Annual policy renewal", doc="B2")], {}, LEAVES, "Aug 2026", [0])
-ok(len(split) == 1 and split[0]["amount_at_risk"] == 27_000, "related charges are aggregated before the test")
-ok(not F.prepaid_findings([bill("Nova", "6435000", 16_746, "Osmotech Pro Service Contract")], {}, LEAVES, "Aug 2026", [0]),
-   "the Aug 2026 Osmotech service contract ($16,746) is under the threshold")
+ok(len(split) == 1 and split[0]["amount_at_risk"] == 27_000, "related charges are aggregated into one finding")
+small, big = pre(24_999.99)[0], pre(25_000)[0]
+ok("under the $25,000 prepaid threshold" in V.explain(small, {}, "Aug 2026")["why"] and "under the $25,000" not in V.explain(big, {}, "Aug 2026")["why"],
+   "a prepaid under $25,000 says it stays expense; one at $25,000 does not")
+ok(not V.entries([small], "Aug 2026") and len(V.entries([big], "Aug 2026")) == 1 and len(V.entries(split, "Aug 2026")) == 1,
+   "the P&L Flux proposes a prepaid entry only at or over $25,000, related charges together")
 
 print("capital: where it goes")
 p = F.capex_placement("6815000", "Office Desk Expansion (Phase 2)", "2026-08-25")

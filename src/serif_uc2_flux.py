@@ -80,6 +80,9 @@ REPORTING_FLOOR = 2_500.0
 
 # Serif's prepaid and PP&E thresholds, from Mike's write-up of 12 Oct 2026. They replace
 # the $10,000 the draft prepaid policy was read as, and the draft asset policy's none.
+# Both screens list from the reporting floor, so the reviewer can lower either line;
+# these are the review defaults, and a prepaid under its threshold is not proposed
+# for booking (serif_views.py).
 PREPAID_THRESHOLD = 25_000.0      # aggregated per good or service
 CAPITALIZATION_THRESHOLD = 5_000.0
 
@@ -1002,7 +1005,8 @@ def vendor_dropped_findings(gl_lines, history, leaves, period, seq):
 
 def prepaid_findings(gl_lines, history, leaves, period, seq):
     """A charge that pays for months ahead, expensed in one. Related charges for
-    the same good or service are aggregated before the $25,000 test, per policy.
+    the same good or service are aggregated, per policy, and listed from the
+    reporting floor; the $25,000 prepaid threshold is the reviewer's default line.
 
     A charge qualifies when its wording names a term (a service contract, a
     subscription, a renewal, a date range), or when it sits on a term account and
@@ -1017,7 +1021,7 @@ def prepaid_findings(gl_lines, history, leaves, period, seq):
     findings = []
     for (vendor, code), lines in sorted(groups.items()):
         total = sum(num(t["amount"]) for t in lines)
-        if total < PREPAID_THRESHOLD:
+        if total < REPORTING_FLOOR:
             continue
         worded = [t for t in lines if names_a_term(t.get("description"))
                   or names_a_term(t.get("memo"))]
