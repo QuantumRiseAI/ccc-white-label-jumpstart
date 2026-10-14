@@ -38,7 +38,7 @@ name, or missing, and ask for any that are missing before you run anything.
 The scripts take every month they need from the exports. If a month is missing, they say
 which; ask the reviewer for that export. If there is no cut for the month, leave out
 `--forecast` and report that Forecast vs. Actual did not run. Never build a file for the
-scripts to read.
+scripts to read; the connector's results, saved as the queries return them, are the one exception.
 
 If `coupa_coverage.columns_absent` in `run.json` lists columns, tell the reviewer before
 anything else: name them and the checks they feed (Supplier and Account: every check that

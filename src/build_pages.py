@@ -628,6 +628,9 @@ def runlog(run, kind, also=None, read=()):
 
 def gap_card():
     """Month-end entries the GL lacks: a sign it was pulled before the month closed."""
+    if GAPS is None:
+        return ('<div class="card tiebar none"><div class="pad"><b>Not checked whether the month is closed</b><span class="note">'
+                'The GL holds less than the three months before %s. Supply the earlier months to check for missing month-end entries.</span></div></div>' % e(PERIOD))
     if not GAPS:
         return ""
     rows = "".join('<tr><td><span class="code">%s</span>%s</td><td class="n2">%s</td></tr>' % (e(g["code"]), e(g["name"]), money(g["prior"], True))

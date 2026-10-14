@@ -25,13 +25,13 @@ name, or missing, and ask for any that are missing before you run anything.
 |---|---|
 | NetSuite Custom General Ledger saved search, `.xls` (or saved as `.xlsx`), named `netsuite_gl_<range>.xls`, or the connector's result for `netsuite_gl_detail.sql` (see The Month through the Connector) | One or more exports that together hold the month, the two months before it and the same month last year. Any date ranges, as long as no month is in two. |
 | Coupa PO line report, `.csv`: the export with all available columns, or the Coupa Data Pull (PO Lines) report | The export for the month's calendar year. The scripts list any column the report lacks or leaves empty under `coupa_coverage.columns_absent` in `run.json` |
-| NetSuite Income Statement by month report, `.xls`, by accounting period (a connector query grouped by transaction date does not tie), or the connector's result for `netsuite_income_statement.sql` (see The Month through the Connector), named `netsuite_income_statement_by_month_<range>.xls` | Through the month. The ledger is tied to it by account before the review is built |
+| NetSuite Income Statement by month report, `.xls`, by accounting period (a connector query grouped by transaction date does not tie), named `netsuite_income_statement_by_month_<range>.xls`, or the connector's result for `netsuite_income_statement.sql` (see The Month through the Connector) | Through the month. The ledger is tied to it by account before the review is built |
 | Rolling forecast workbook, `.xlsx` | The plan: `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
 | UKG roster, `.csv` | The newest roster |
 | NetSuite link IDs, `.csv`, named `netsuite_link_ids_<month>.csv` | Optional, for links. The connector's result for `netsuite_link_ids.sql`; see NetSuite Link IDs |
 
 The scripts take every month they need from the exports. If a month is missing, they say
-which; ask the reviewer for that export. Never build a file for the scripts to read.
+which; ask the reviewer for that export. Never build a file for the scripts to read; the connector's results, saved as the queries return them, are the one exception.
 
 If `coupa_coverage.columns_absent` in `run.json` lists columns, tell the reviewer before
 anything else: name them and the checks they feed (Supplier and Account: every check that

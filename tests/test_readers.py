@@ -164,6 +164,37 @@ with tempfile.TemporaryDirectory() as d:
     ok(exp[0]["internal_id"] == "77" and exp[0]["coupa_url"] == url and exp[0]["coupa_po"] == "FL087030260",
        "the internal ID and Coupa fields come with each line, for links")
 
+    print("GL, the connector's result: what the review of PR #23 found")
+    conn2 = os.path.join(d, "netsuite_gl_detail_oct2026.csv")
+    head2 = ("account_number,account_name,parent_number,parent_name,grandparent_number,grandparent_name,type,date,"
+             "document_number,name,debit,credit,period,department,program,project,subsidiary,description,memo,"
+             "internal_id,line_id,coupa_transaction_url,coupa_po_num\n")
+    lab = "6410000,Operating Expenses : Lab Expenses : Lab Supplies/Consumables,6400000,Operating Expenses : Lab Expenses,6000000,Operating Expenses"
+    open(conn2, "w").write(head2
+        + f"{lab},Journal,2026-10-31,JE-1,Jena Bioscience GmbH,30,,Oct 2026,Platform,,,{sub},,Reclass,88,1,,\n"
+        + f"{lab},Journal,2026-10-31,JE-1,,,30,Oct 2026,Platform,,,{sub},,Reclass,88,2,,\n"
+        + f"{lab},Journal,2026-10-31,JE-1,,40,,Oct 2026,Production,,,{sub},,Reclass,88,3,,\n"
+        + f"{lab},Journal,2026-10-31,JE-1,,,40,Oct 2026,Biology,,,{sub},,Reclass,88,4,,\n")
+    oct_ = S.read_gl([conn2, os.path.join(d, "netsuite_gl_detail.sql"), os.path.join(d, "netsuite_gl_detail_oct2026.json")])[0]["Oct 2026"]
+    ok(True, "a .sql query and a .json raw result picked up by netsuite_gl_* are passed over")
+    ok(all(l["vendor_or_name"] == "" for l in oct_), "a Journal's lines carry no name, as the saved search shows them")
+    ok(len([l for l in oct_ if l["department"] == "Platform"]) == 2,
+       "a debit and a credit that match on every other column stay two lines")
+    ok(oct_[0]["account_path"] == "6000000 - Operating Expenses:6400000 - Lab Expenses:6410000 - Lab Supplies/Consumables",
+       "the parent columns give the account's path, as the saved search writes it")
+    both = S.read_gl([aug, conn])[0]["Sep 2026"]
+    ok(next(l for l in both if l["account_code"] == "6410000")["account_path"]
+       == "6000000 - Operating Expenses:6410000 - Lab Supplies/Consumables",
+       "without them, an account takes its path from another export of the same account")
+    ss_csv = os.path.join(d, "netsuite_gl_saved.csv")
+    open(ss_csv, "w").write("Account,Type,Date,Document Number,Name,Debit,Credit\n" + ACCT + ",Bill,9/30/2026,B,X,\"1,234.56\",\n")
+    try:
+        S.read_gl([ss_csv])
+        ok(False, "the saved search saved as .csv is refused")
+    except SystemExit as e:
+        ok(".xls" in str(e), "the saved search saved as .csv is refused, asking for the .xls")
+    ok(S.month_end_gaps({"Sep 2026": []}, "Sep 2026") is None, "with less than three months before, the month-end check says it did not run")
+
     print("Is the month closed?")
     def je(m, day, code, amt):
         return {"txn_type": "Journal", "date": f"2026-{m:02d}-{day:02d}", "account_code": code,
