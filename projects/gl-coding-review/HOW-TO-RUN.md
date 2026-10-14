@@ -179,7 +179,7 @@ month, say so: it may belong in the console as a check.
 
 Other cuts to ask for: who requested the PO behind a line, and that person's department;
 how a vendor was coded by department, program and project over the last year; what a
-$5,000 threshold would catch next to the current one.
+$10,000 threshold would catch on a screen next to its current one.
 
 ### Connectors
 
@@ -330,7 +330,7 @@ Every flag and vendor is a card: its current coding (and the recommended one, on
 document with its NetSuite and Coupa links, the vendor's last three months by account and
 department with the line descriptions, and its lines, each with its Project and Program (the
 GL's `ProjectID: Name` and `Program: Name`). Every account number shows its name. An item at or
-over the threshold is marked Review.
+over its screen's threshold is marked Review; a Department flag always is.
 
 Each card's header starts with its reference ID, numbered by screen within the close, largest
 amount first: CAPEX-01, FA-01 (booked to fixed assets), PREPAID-01, PPD-01 (booked to prepaid),
@@ -346,6 +346,23 @@ Each page starts with the expense lines that may be capital or prepaid, then lis
 month's bills posted to fixed-asset (15xxxxx) or prepaid (13xxxxx) accounts. A bill there is
 confirmed (it stays on the balance sheet) or recoded to expense, with a Journal Entry filled in
 from the vendor's usual expense account and department.
+
+A CapEx card says where the purchase goes, and why, on the card (**Placed in service**), in its
+text and in its Journal Entry Memo:
+
+* **`1505000` Capital in Process**, for build-out work, or an asset bought but not yet in
+  service. It moves to the fixed asset account when the asset is placed in service; for a
+  build-out, when employees begin using the space.
+* **The fixed asset account**, for an asset in service: `1510000` Lab Equipment - New for lab
+  equipment, `1530000` Computers & Software for computers and software. The policy places it
+  in service at the invoice date.
+* Office furniture and equipment has no fixed asset account in Serif's chart. Until Serif
+  names one, the entry holds it in Capital in Process and the card says to ask the Controller
+  which account to use.
+
+The ledger has no in-service date, so the card asks for it, and its note stays open for the
+date. A capital purchase under the $5,000 capitalization threshold is listed, not marked
+Review, and says it is under the threshold.
 
 On every proposed entry a new balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the
 `Non-Specific` department; only income statement lines carry one. A recode to 1505000 Capital in
@@ -405,8 +422,20 @@ entry's status.
 ### The Threshold
 
 Nothing is graded high, medium and low. An item is either at or over the amount at which
-Serif corrects an exception, or under it. The threshold defaults to **$2,500**, set in
-Settings.
+Serif corrects an exception, or under it. Each review screen has its own, set in Settings and
+kept in this browser with the review:
+
+| Screen | Default | Why |
+|---|---|---|
+| CapEx Flags | **$5,000** | Serif's PP&E capitalization threshold (Mike's write-up, 12 Oct 2026) |
+| Prepaid Flags | **$25,000** | Serif's prepaid threshold (same write-up), on related charges together |
+| Dept & Entity, account recodes and drafted entries | **$2,500** | The review threshold |
+| Dept & Entity, Department flags | none | Every line off Non-Specific is recoded, whatever its size |
+
+CapEx and Prepaid list every flag from $2,500, so lowering either threshold marks more; a
+prepaid under $25,000 says it stays expense, as a capital bill under $5,000 does. The booked
+lines on CapEx and Prepaid take their page's threshold. A review saved before the
+CapEx and Prepaid thresholds existed keeps its one threshold and takes these defaults.
 
 ### The Run Log
 

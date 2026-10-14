@@ -145,10 +145,11 @@ with tempfile.TemporaryDirectory() as d:
     ok(len(e1) == 4 and all(sum(l["debit"] - l["credit"] for l in e1 if l["project"] == p) == 0
                             for p in ("Internal CMC", "00 Non-Specific")),
        "both sides of a reclass carry each line's Project, a line per Project")
-    cap = {"finding_id": "x2", "rule_id": "F10.CAPITALIZE", "title": "Fisher Scientific: may be capital",
-           "transactions": [{"document_number": "B-1", "account_code": "6410000", "amount": 100.5}],
+    cap = {"finding_id": "x2", "rule_id": "F10.CAPITALIZE", "title": "Fisher Scientific: may be capital", "amount_at_risk": 6100.5,
+           "transactions": [{"document_number": "B-1", "account_code": "6410000", "amount": 6100.5}],
            "correction": {"entry": "Dr 1505000 Capital in Process / Cr 6410000 Lab Supplies/Consumables"
-                                   " / Production for $100.50"}, "evidence": {}}
+                                   " / Production for $6,100.50"}, "evidence": {}}
+    # over the $5,000 capitalization threshold, under which no capital entry is proposed (SERIF-142)
     e2 = V.entries([cap], "Aug 2026", lookup=V.gl_dims(cur))[0]["lines"]
     bs, pl = [l for l in e2 if l["account"] == "1505000"], [l for l in e2 if l["account"] == "6410000"]
     ok(bs and bs[0]["department"] == "Non-Specific" and pl and pl[0]["department"] == "Production",

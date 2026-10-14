@@ -714,7 +714,9 @@ flux runs in a Project.
    cover payroll or depreciation.
 5. Never accrue an open PO commitment. Nothing has been received against it.
 6. Coupa and the ledger join by supplier name only. Never claim a line-level PO match.
-7. Never apply a dollar threshold to fixed assets. Serif's policy sets none.
+7. Apply Serif's thresholds of 12 Oct 2026: $5,000 to capitalize a fixed asset, $25,000 for a
+   prepaid. They replace the draft asset policy's none and the $10,000 the prepaid policy
+   was read as. They do not change the commentary threshold.
 8. Serif has one legal entity. Never report an entity or consolidation variance.
 9. Treat Flagship-named vendors and `6900000 FSP Operating Charges` as related party.
 10. When you report results, name every check that did not run and what it needs. A check that

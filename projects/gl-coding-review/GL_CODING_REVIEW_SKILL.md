@@ -43,10 +43,15 @@ Flags the schedules step adds to vendor rows:
 | Coding changed | An account and department the vendor did not use in those months. Codings an engine finding covers are left to that finding. |
 | Coded off plan | The June forecast plans the vendor on other coding |
 | Requested by a department | People in another department raised the vendor's Coupa POs, by UKG department |
-| May be prepaid | Bills for one good or service that total $10,000 or more and name a service term, or sit on a term account the vendor does not bill most months |
-| May be capital | A bill of $2,500 or more on an account the asset policy names for review, or on repairs and maintenance, that does not name a service term |
+| May be prepaid | Bills for one good or service that total $2,500 or more and name a service term, or sit on a term account the vendor does not bill most months. Under the $25,000 prepaid threshold it says it stays expense |
+| May be capital | A bill of $2,500 or more on an account the asset policy names for review, or on repairs and maintenance, that does not name a service term. It says whether it goes to Capital in Process or to its fixed asset account, and why |
 
-The threshold that decides what needs a look is the reviewer's, $2,500 by default, in dollars.
+The threshold that decides what needs a look is the reviewer's, in dollars, one per screen:
+CapEx $5,000 (Serif's capitalization threshold), Prepaid $25,000 (Serif's prepaid threshold),
+and $2,500 for the account recodes on Dept & Entity and drafted entries. Department flags
+have none: every line off Non-Specific is recoded, whatever its size. Both screens list from
+$2,500, so a lower threshold shows more: a capital bill under $5,000, or a prepaid under
+$25,000, is still listed, not marked Review, and says it is under the threshold.
 
 ## Entry Patterns
 
@@ -90,11 +95,28 @@ Placed in service at the invoice date, or first use if part of a buildout.
 Office furniture, fixtures and equipment: five-year life.
 ```
 
-| Expense account | Asset account |
+Capital in Process or a fixed asset account. Every capital recommendation says which, and why:
+
+* **`1505000 Capital in Process`** holds build-out work (the description names a build-out,
+  fit-out, construction, renovation, tenant improvement, a phase, or an office or space
+  expansion) and assets bought but not yet in service (a deposit, a down payment, a
+  progress or milestone payment). It moves to the fixed asset account when the asset is
+  placed in service; for a build-out, when employees begin using the space.
+* **An asset in service** goes to its fixed asset account, below. The policy places it in
+  service at the invoice date.
+* The ledger has no in-service date. Unless the line states one, the card asks the
+  reviewer for it, and the note holds it.
+
+| Expense account | Fixed asset account, in service |
 |---|---|
 | `6415000` Lab Non-Capital Equipment, `6435000` Lab Equipment Repairs & Maintenance | `1510000 Lab Equipment - New` |
-| `6815000` Office Non-Cap Equipment/Furniture | `1505000 Capital in Process` |
 | `6416000`, `6816000` software | `1530000 Computers & Software` |
+| `6815000` Office Non-Cap Equipment/Furniture, a computer | `1530000 Computers & Software` |
+| `6815000` Office Non-Cap Equipment/Furniture, anything else | None in the chart. The entry holds it in `1505000 Capital in Process`; ask the Controller which account to use |
+
+Aug 2026: Red Thread Spaces, "Office Desk Expansion (Phase 2)", goes to Capital in Process as
+build-out work, as Serif moved Phase 1 there on 31 Jul 2026. Ask when employees began, or
+will begin, using the space.
 
 ## Reading Serif's Lines
 
@@ -106,7 +128,7 @@ Office furniture, fixtures and equipment: five-year life.
   sequencing. `6415000 Lab Non-Capital Equipment` holds equipment under capital treatment.
 * **Repairs and maintenance** raise a capital question: a repair is expense, a replacement
   unit or a new instrument may be an asset. A service contract on the account is a prepaid
-  question once it reaches $10,000.
+  question once it reaches $25,000.
 * A vendor split across departments needs a reason. Ask why the spend is not on the
   department that used it.
 * Only the current month gets an entry. Earlier months are context.

@@ -13,8 +13,8 @@ file to explain a result, not to reproduce one.
 | `F5.MODEL_TIE` | Forecast vs. Actual | The closed months of the forecast cut after the month closed, against the ledger. A difference is an entry staged in one and not the other. |
 | `F3.ACCRUAL_RECEIPT` | Accrual Proposals | Goods received in Coupa and not invoiced, $5,000 or more per supplier and account |
 | `F6.ACCRUAL_PATTERN` | Accrual Proposals | A vendor that bills every month and billed nothing this month, at its three-month average |
-| `F9.PREPAID` | Prepaids and Capital | Bills for one good or service of $10,000 or more that name a service term, or sit on a term account the vendor does not bill most months |
-| `F10.CAPITALIZE` | Prepaids and Capital | Bills of $2,500 or more on an account the asset policy names for review, or on repairs and maintenance, that do not name a service term |
+| `F9.PREPAID` | Prepaids and Capital | Bills for one good or service of $2,500 or more that name a service term, or sit on a term account the vendor does not bill most months. Only those of $25,000 or more (Serif's prepaid threshold, related charges together) get a proposed Journal Entry; the rest stay expense |
+| `F10.CAPITALIZE` | Prepaids and Capital | Bills of $2,500 or more on an account the asset policy names for review, or on repairs and maintenance, that do not name a service term. Each says whether it goes to Capital in Process or its fixed asset account, and why. Only a bill of $5,000 or more (Serif's capitalization threshold, the bill's lines together) gets a proposed Journal Entry; under it, it says it stays expense |
 | `F7.REVENUE_IN_EXPENSE` | Reclassifications | A customer document posted to an expense account |
 | `F8.VENDOR_DROPPED` | Reclassifications | A journal with no vendor where the same account, department and amount carried one before, including prepaid releases |
 
@@ -73,18 +73,25 @@ Dr [prepaid account]                   [amount]
 | `6416000`, `6816000` software | `1320000 Prepaid Software` |
 | Any other | `1315000 Prepaid Other` |
 
-Capital, when the item lasts more than a year, placed in service at the invoice date:
+Capital, when the item lasts more than a year and costs $5,000 or more, placed in service at
+the invoice date, or for a build-out when employees begin using the space:
 
 ```
 Dr [asset account]                     [amount]
   Cr [expense account] / [department]  [amount]
 ```
 
-| Expense account | Asset account |
+`1505000 Capital in Process` holds build-out work and an asset bought but not yet in service,
+until it is placed in service. An asset in service goes to its fixed asset account:
+
+| Expense account | Fixed asset account, in service |
 |---|---|
 | `6415000` Lab Non-Capital Equipment, `6435000` Lab Equipment Repairs & Maintenance | `1510000 Lab Equipment - New` |
-| `6815000` Office Non-Cap Equipment/Furniture | `1505000 Capital in Process` |
-| `6416000`, `6816000` software | `1530000 Computers & Software` |
+| `6416000`, `6816000` software; a computer on `6815000` | `1530000 Computers & Software` |
+| `6815000` Office Non-Cap Equipment/Furniture, anything else | None in the chart: held in `1505000 Capital in Process`; ask the Controller |
+
+The ledger has no in-service date. Each capital finding says which applies and why, and asks
+for the date unless the line states it.
 
 Customer document in expense:
 

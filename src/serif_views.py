@@ -56,7 +56,7 @@ from collections import defaultdict
 
 import serif_sources as sources
 
-VIEWS_VERSION = "1.6.4"
+VIEWS_VERSION = "1.7.0"
 
 # The flux engine's definition, so the two agree on what counts as P&L.
 PL_PREFIXES = ("6", "7", "8")
@@ -64,6 +64,14 @@ PL_PREFIXES = ("6", "7", "8")
 # above this. Matches the engines' reporting floor. Which rows need action is
 # decided in the console, against the reviewer's own threshold.
 FLOOR = 2500.0
+# Serif's PP&E capitalization threshold (12 Oct 2026), the flux engine's
+# CAPITALIZATION_THRESHOLD. A capital flag under it says so, and the P&L Flux
+# proposes no Journal Entry for it.
+CAPITALIZATION = 5000.0
+# Serif's prepaid threshold (12 Oct 2026), the flux engine's PREPAID_THRESHOLD. The
+# prepaid screen lists from the reporting floor; a flag under this says so, and the
+# P&L Flux proposes no Journal Entry for it.
+PREPAID = 25000.0
 
 AP_ACCOUNT = "2000100"
 
@@ -1115,6 +1123,15 @@ def vendors_table(current, prior, prior2, prior_year, periods, findings, account
                                "May be prepaid" if f["rule_id"] == "F9.PREPAID" else "May be capital",
                                f.get("amount_at_risk") or 0, [x.get("why", "")], [x.get("do", "")],
                                match=_doc_match(f)))
+            # One flag holds every finding of the vendor's, so each line of the match
+            # carries its own finding's total, which the screen's threshold tests (a
+            # prepaid's related charges together), and, for a capital bill, where it
+            # goes (Capital in Process or its fixed asset account) and why.
+            place = (f.get("correction") or {}).get("placement")
+            for m in flags[-1]["match"]:
+                m["total"] = r2(abs(f.get("amount_at_risk") or 0))
+                if place:
+                    m.update(to=place["to"], placement=place)
         # One flag per reason: three findings of one rule on one vendor are one
         # question about that vendor.
         merged = {}
@@ -1361,6 +1378,18 @@ def collapse(lines):
     return sorted(result, key=lambda l: 0 if l["debit"] else 1)
 
 
+def capitalize_memo(vendor, place):
+    """A capital entry's memo says where the purchase goes and, for Capital in
+    Process, until when. The P&L Flux keys an adjustment by its memo, so the memo of
+    an asset in service is the one it always had, and a decision on it carries over."""
+    kind = (place or {}).get("kind", "in_service")
+    if kind in ("buildout", "not_in_service"):
+        return "Capitalize %s purchase to Capital in Process until it is placed in service" % vendor
+    if kind == "no_account":
+        return "Capitalize %s purchase to Capital in Process until its fixed asset account is named" % vendor
+    return "Capitalize %s purchase as a fixed asset" % vendor
+
+
 def entries(findings, period, accrual_depts=None, lookup=None):
     """One proposed Journal Entry per finding that proposes a correction. Rules
     that ask for a confirmation rather than a correction (posting lag, tax
@@ -1379,6 +1408,11 @@ def entries(findings, period, accrual_depts=None, lookup=None):
         rule = f.get("rule_id", "")
         ev = f.get("evidence") or {}
         lines, kind, memo = [], "", ""
+        # A prepaid or capital purchase under Serif's threshold is listed for the reviewer,
+        # not proposed for booking: the policy leaves it in expense.
+        if (rule == "F9.PREPAID" and (f.get("amount_at_risk") or 0) < PREPAID
+                or rule == "F10.CAPITALIZE" and (f.get("amount_at_risk") or 0) < CAPITALIZATION):
+            continue
         if rule == "T1.DEPT_INCONSISTENCY":
             to_dept = quoted(ev.get("expected"), "department")
             kind = "Department reclass"
@@ -1465,7 +1499,7 @@ def entries(findings, period, accrual_depts=None, lookup=None):
                     "F6.ACCRUAL_PATTERN": "Accrue %s for %s, from its billing pattern" % (vendor, period),
                     "F7.REVENUE_IN_EXPENSE": "Move %s customer invoice from expense to revenue" % vendor,
                     "F9.PREPAID": "Move %s bill to prepaid, then amortize over the service period" % vendor,
-                    "F10.CAPITALIZE": "Capitalize %s purchase as a fixed asset" % vendor,
+                    "F10.CAPITALIZE": capitalize_memo(vendor, (f.get("correction") or {}).get("placement")),
                     }.get(rule, "Correction proposed by " + rule)
         else:
             continue
@@ -1743,6 +1777,9 @@ def explain(f, accounts, period):
             why.append("The vendor did not bill this account in the last %s months." % mm.group(2)
                        if mm.group(1) == "0" else
                        "The vendor billed this account in %s of the last %s months." % (mm.group(1), mm.group(2)))
+        if amt < PREPAID:
+            why.append("It is under the %s prepaid threshold, so it stays expense unless related "
+                       "charges for the same service bring it over." % "${:,.0f}".format(PREPAID))
         do = ["Read the invoice for the service period.",
               "If the service continues after %s, move the bill to %s and release it monthly over "
               "the service period." % (period, c.get("proposed", "")),
@@ -1753,9 +1790,16 @@ def explain(f, accounts, period):
         why = [('Bill %s is %s for "%s".' % (mm.group(1), mm.group(2), mm.group(3)) if mm and mm.group(3)
                 else "Bill %s is %s." % (mm.group(1), mm.group(2)) if mm else ""),
                "It is on %s. The asset policy tells you to review purchases on this account." % c.get("current", "")]
+        place = c.get("placement") or {}
+        if amt < CAPITALIZATION:
+            why.append("It is under the %s capitalization threshold, so it stays expense "
+                       "unless it is part of a larger asset." % "${:,.0f}".format(CAPITALIZATION))
+        why.append(place.get("why", ""))
         do = ["Read the bill.",
               "If it buys an item that lasts more than one year, capitalize it to %s." % c.get("proposed", ""),
-              "If it does not, choose Cleared."]
+              "If it does not, choose Cleared.",
+              place.get("ask", "")]
+        do = [x for x in do if x]
     else:
         return None
     return {"why": " ".join(x for x in why if x), "do": " ".join(do), "limit": " ".join(limit)}
