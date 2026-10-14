@@ -1,5 +1,7 @@
 """The export readers find columns by name, so a saved search or report with columns
-added, moved or renamed reads the same. Synthetic files only: no Serif data.
+added, moved or renamed reads the same, and the GL's Project and Program reach the
+console's lines and both sides of a proposed Journal Entry. Synthetic files only: no
+Serif data.
 
     python3 tests/test_readers.py
 """
@@ -11,6 +13,7 @@ from xml.sax.saxutils import escape
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 import serif_sources as S  # noqa: E402
+import serif_views as V  # noqa: E402
 
 FAILED = []
 
@@ -215,6 +218,38 @@ with tempfile.TemporaryDirectory() as d:
     short = os.path.join(d, "coupa_short.csv")
     open(short, "w").write("PO Number,Order Date,Supplier,Amt\n" + "".join(f"FL0870{i:05d},9/3/2026,,1\n" for i in range(4999)))
     ok(S.coupa_row_limit(short) is None, "a report of another size is not")
+
+    print("Project and Program, from the reader to a proposed Journal Entry")
+    cur = V.load_gl(a + s)
+    item = V.lines_for(cur, vendor="Fisher Scientific")["items"][0]
+    ok(item["project"] == "Internal CMC" and item["program"] == "00 Non-Specific",
+       "a line in the console carries its Project and Program")
+    t1 = dict(a[0], vendor_or_name="Fisher Scientific")
+    t2 = dict(s[0], vendor_or_name="Fisher Scientific", project="00 Non-Specific")
+    dept = {"finding_id": "x1", "rule_id": "T1.DEPT_INCONSISTENCY", "transactions": [t1, t2],
+            "evidence": {"expected": "department 'General R&D'"}}
+    e1 = V.entries([dept], "Aug 2026")[0]["lines"]
+    ok(len(e1) == 4 and all(sum(l["debit"] - l["credit"] for l in e1 if l["project"] == p) == 0
+                            for p in ("Internal CMC", "00 Non-Specific")),
+       "both sides of a reclass carry each line's Project, a line per Project")
+    cap = {"finding_id": "x2", "rule_id": "F10.CAPITALIZE", "title": "Fisher Scientific: may be capital", "amount_at_risk": 6100.5,
+           "transactions": [{"document_number": "B-1", "account_code": "6410000", "amount": 6100.5}],
+           "correction": {"entry": "Dr 1505000 Capital in Process / Cr 6410000 Lab Supplies/Consumables"
+                                   " / Production for $6,100.50"}, "evidence": {}}
+    # over the $5,000 capitalization threshold, under which no capital entry is proposed (SERIF-142)
+    e2 = V.entries([cap], "Aug 2026", lookup=V.gl_dims(cur))[0]["lines"]
+    bs, pl = [l for l in e2 if l["account"] == "1505000"], [l for l in e2 if l["account"] == "6410000"]
+    ok(bs and bs[0]["department"] == "Non-Specific" and pl and pl[0]["department"] == "Production",
+       "a balance sheet line takes Non-Specific; the income statement line keeps its department")
+    ok(all(l["project"] == "Internal CMC" and l["program"] == "00 Non-Specific" for l in e2),
+       "a finding's lines with no Project of their own take the ledger line's, on both sides")
+    off = dict(a[0], account_code="1305000", department="General R&D", vendor_or_name="Fisher Scientific")
+    rec = {"finding_id": "x3", "rule_id": "T4.PO_ACCOUNT_MISMATCH", "transactions": [off],
+           "evidence": {"expected": "account 6601000"}}
+    e3 = {l["account"]: l for l in V.entries([rec], "Aug 2026")[0]["lines"]}
+    ok(e3["1305000"]["department"] == "General R&D" and e3["1305000"]["credit"] == 100.5
+       and e3["6601000"]["department"] == "General R&D",
+       "a reclass off a balance sheet line reverses it on its own department, netting the original")
 
     print("GL, a file that is not the ledger")
     bad = os.path.join(d, "netsuite_gl_bad.xls")

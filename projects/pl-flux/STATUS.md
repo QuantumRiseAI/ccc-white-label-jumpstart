@@ -17,14 +17,21 @@ Computed by `serif_uc2_flux.py`, reproducible run to run:
 * **Forecast-to-ledger reconciliation** against the cut FP&A saved after the month closed,
   when `--forecast` is passed
 * **Billing-pattern accruals**, the policy's Step B, for suppliers Coupa does not reach
-* **Prepaid candidates** over the $10,000 threshold, and **capitalization review** of the
-  accounts the asset policy names plus repairs and maintenance
+* **Prepaid candidates** from $2,500, proposed for booking at or over Serif's $25,000 prepaid
+  threshold, and **capitalization review** of the accounts the asset policy names plus
+  repairs and maintenance, from $2,500, proposed for booking at or over the $5,000
+  capitalization threshold, each saying whether it goes to Capital in Process or its fixed
+  asset account, and why
 * **Customer documents posted to expense**, and **journals that lost their vendor**
 
-Aug 2026: **99 findings, $7,893,172.90**. 28 in Adjustments: 12 forecast-to-ledger
-differences, 8 accruals (5 from Coupa receipts, 3 from the billing pattern), 1 prepaid,
-3 capitalization reviews, 1 customer document in expense, 3 prepaid releases with no
-vendor. 71 in variance review: 39 accounts against the prior month, 32 against plan. Accrual population **$110,105**; open PO commitments
+Aug 2026: **101 findings, $7,905,284.90**. 30 in Adjustments: 12 forecast-to-ledger
+differences, 8 accruals (5 from Coupa receipts, 3 from the billing pattern), 3 prepaid
+candidates, 3 capitalization reviews, 1 customer document in expense, 3 prepaid releases
+with no vendor. The three prepaid candidates (service contracts of $16,746, $7,540 and
+$4,572) are under $25,000, and two of the capitalization reviews (Bay State IT $3,240.63,
+Repligen $2,823.39) are under $5,000, so none of those is proposed for booking: 11 proposed
+Journal Entries. 71
+in variance review: 39 accounts against the prior month, 32 against plan. Accrual population **$110,105**; open PO commitments
 **$1,369,533** reported as a disclosure and not accrued.
 
 Every input is a system export as the system wrote it, read by `serif_sources.py`.
@@ -62,7 +69,9 @@ That split is deliberate. A variance an LLM computes will not reproduce next mon
 ## Accounting Review Still Outstanding
 
 No rule here has been ratified by an accountant. The thresholds come from Serif's own
-DRAFT, unapproved policies. Two calls in particular deserve a second opinion:
+DRAFT, unapproved policies, except the prepaid ($25,000) and capitalization ($5,000)
+thresholds, which are Serif's, from Mike's write-up of 12 Oct 2026. Two calls in particular
+deserve a second opinion:
 
 * The commentary rule: **$10,000**, dollars only, against the prior month and plan, one
   commentary per account. CCC prefers dollar thresholds with no percent test; the account

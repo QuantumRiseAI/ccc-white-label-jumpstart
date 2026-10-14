@@ -29,6 +29,7 @@ name, or missing, and ask for any that are missing before you run anything.
 | Rolling forecast workbook, `.xlsx` | The plan: `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
 | UKG roster, `.csv` | The newest roster |
 | NetSuite link IDs, `.csv`, named `netsuite_link_ids_<month>.csv` | Optional, for links. The connector's result for `netsuite_link_ids.sql`; see NetSuite Link IDs |
+| NetSuite's lists, `.csv`: `netsuite_ref_accounts.csv`, `netsuite_ref_departments.csv`, `netsuite_ref_programs.csv` | Kept with the Project's files and replaced only when NetSuite's accounts, departments or programs change. The import CSV then carries NetSuite's internal IDs; see Importing into NetSuite |
 
 The scripts take every month they need from the exports. If a month is missing, they say
 which; ask the reviewer for that export. Never build a file for the scripts to read; the connector's results, saved as the queries return them, are the one exception.
@@ -64,7 +65,7 @@ python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_* \
 
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
   --gl netsuite_gl_* --income-statement netsuite_income_statement_by_month_*.xls \
-  --out out/sep2026
+  --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 
 The first command ties the month's ledger to NetSuite's Income Statement, account by account.
@@ -179,6 +180,22 @@ grouped by transaction date does not tie. Its totals come from the same posted l
 GL, so the tie shows the GL is complete and in the right periods. If a query fails, say so
 and ask for the export.
 
+## Importing into NetSuite
+
+With NetSuite's lists passed to the build (`--netsuite-ref netsuite_ref_*.csv`), the import CSV
+carries internal IDs for Subsidiary (97), Account, Department and Program, the Journal Date and
+Reversal Date as M/D/YYYY, and Project by name. Its last four columns (Account Number, Department
+Name, Program Name, Reversing Entry) are for the reviewer. NetSuite requires a department on every
+line, so an entry with a line missing one, or with an account, department or program NetSuite does
+not hold, stays out of the CSV, and the export says which and why. Journal Entries need no
+approval at Serif: an import posts at once, so the console's decision and sign-off are the
+approval.
+
+In NetSuite: Setup > Import/Export > Import CSV Records, Transactions, Journal Entry, Add. On the
+mapping screen, map Subsidiary, Account, Department and Program by Internal ID, Project by Name,
+and leave the last four columns unmapped. Save the map for later months. A role that can import
+runs it; the AI read-only role cannot.
+
 ## NetSuite Link IDs
 
 Document numbers in the console open their NetSuite transaction, a bill's Coupa invoice
@@ -242,27 +259,47 @@ section opens its pages beside its title.
 * **Documentation**: the **Audit Log** (who decided what and when), **SOX Documentation**
   (sources, the GL tie-out and the Income Statement tie, the policies applied and the sign-off), and **Export**, the
   NetSuite CSV (header fields: Subsidiary, Journal Date, Posting Period, Currency, Exchange Rate,
-  Memo, Reversing Entry, Reversal Date; line fields: Account, Department, Debit, Credit, Line Memo).
+  Memo, Reversing Entry, Reversal Date; line fields: Account, Department, Project, Program, Debit,
+  Credit, Line Memo).
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
   supplied, what each check found, the estimated cost of a run, the inputs and the build
-  record. Settings has the threshold, the decision record (save and load) and **Bring in the
+  record. Settings has the thresholds, the decision record (save and load) and **Bring in the
   earlier run's decisions**.
 
 Every flag and vendor card starts with its reference ID, numbered by screen within the close
 (CAPEX-01, FA-01, PREPAID-01, PPD-01, DEPT-01, DRAFT-01, CLEAR-01, NEW-01), and the Memo of its
 Journal Entry starts with the same ID, so the entry in NetSuite ties back to the card. Use the ID
 when you name a card to the reviewer. Each card shows its document with NetSuite and Coupa links, the vendor's last
-three months by account and department with the line descriptions, and its lines. A flag's
+three months by account and department with the line descriptions, and its lines, each with its
+Project and Program. A flag's
 Journal Entry is filled in and editable: approve it, reject it, or edit it, which marks it
-Modified and needs a note. **Edited in NetSuite**, beside Approve Recode and Recode, records a fix
+Modified and needs a note. Both sides of an entry carry the Project and Program of the line it
+corrects; a new balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the `Non-Specific`
+department, and only income statement lines carry one. The line that reverses the ledger line
+being corrected keeps that line's department, on a balance sheet account too (a bill recoded off
+prepaid credits prepaid on the bill's department), so it nets the original. **Edited in NetSuite**, beside Approve Recode and Recode, records a fix
 made on the bill or Journal Entry itself while the period is open: it settles the item, needs no
 note, and stays out of the CSV, which holds only the reclasses to book. A Journal Entry you drafted
 has no Edited in NetSuite. Export lists the items edited in NetSuite and saves the **Work paper,
 HTML**; the decision record's `fixes` gives each agreed fix's path (Reclass or Edited in NetSuite),
 reference ID, document and, for a reclass, External ID.
 
-The threshold is in dollars only and defaults to **$2,500**. An item at or over it is marked
-Review.
+The thresholds are in dollars only, one per review screen, each set in Settings: **CapEx
+$5,000** and **Prepaid $25,000** (Serif's capitalization and prepaid thresholds, Mike's
+write-up of 12 Oct 2026), and **$2,500** for the rest, the account recodes on Dept & Entity
+and any entry you drafted. A Department flag has none: every line off Non-Specific is
+recoded, whatever its size, so each is marked Review. An item at or over its screen's
+threshold is marked Review. The booked lines on CapEx and Prepaid take their page's. CapEx
+and Prepaid list every flag from $2,500, so a lower threshold shows more; one under its
+threshold says it stays expense. Do not recommend booking a prepaid under $25,000 or
+capitalizing a purchase under $5,000 unless it is part of something larger that is over.
+
+Each CapEx card says whether the purchase goes to **`1505000` Capital in Process** (build-out
+work, or an asset bought but not yet in service) or to its fixed asset account (an asset in
+service), and why, on the card and in its Journal Entry Memo. The ledger has no in-service
+date: unless the line states one, the card asks the reviewer for it, in the note. Office
+furniture and equipment has no fixed asset account in Serif's chart; the entry holds it in
+Capital in Process and asks the Controller which account to use. Never invent one.
 
 ## What You Write
 
@@ -275,7 +312,7 @@ After the three scripts run, write `drafts.json` and build the console again wit
 ```sh
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
   --gl netsuite_gl_* --income-statement netsuite_income_statement_by_month_*.xls \
-  --out out/sep2026 --drafts drafts.json
+  --netsuite-ref netsuite_ref_*.csv --out out/sep2026 --drafts drafts.json
 ```
 
 The build checks every draft against the run. A vendor with no card in the console, or a
@@ -295,8 +332,10 @@ reviewer the rebuilt file, and say in the chat what you drafted.
      "reason": "Why the entry is needed.",
      "vendor": "Global Life Sciences Solutions USA LLC",
      "lines": [
-       {"account": "6410000", "department": "Production", "vendor": "...", "debit": 2261.00, "documents": ["..."]},
-       {"account": "6504000", "department": "Production", "vendor": "...", "credit": 2261.00, "documents": ["..."]}
+       {"account": "6410000", "department": "Production", "project": "Internal CMC", "program": "00 Non-Specific",
+        "vendor": "...", "debit": 2261.00, "documents": ["..."]},
+       {"account": "6504000", "department": "Production", "project": "Internal CMC", "program": "00 Non-Specific",
+        "vendor": "...", "credit": 2261.00, "documents": ["..."], "reverses_line": true}
      ]}
   ]
 }
@@ -312,14 +351,15 @@ Read from `out/<period>/run.json`:
 * `views.tables`, the table with `id` `vendors`: one row per vendor. `flags` (label, amount,
   why, do, finding_ids, match), `by_coding`, `by_account` and `by_department` (prior2, prior,
   current), `planned`,
-  `owner`, and `detail.items`, the lines with date, document, text, account, department and
-  amount.
+  `owner`, and `detail.items`, the lines with date, document, text, account, department,
+  project, program and amount.
 * `findings`, and `views.explain` for each finding: why it was raised, what to do, its limit.
-* `views.entries`: the proposed Journal Entries, balanced, line by line.
+* `views.entries`: the proposed Journal Entries, balanced, line by line, each line with its
+  Project and Program; `reverses_line` marks the line that reverses a posted one.
 
 ### 1. Vendor Notes
 
-For each flagged vendor whose largest flag clears the threshold, largest first:
+For each flagged vendor whose largest flag clears its screen's threshold, largest first:
 
 1. Say what was bought, in plain words, from the line descriptions. If an item is unfamiliar,
    say what it is and what it is used for. If you are not sure, say so. Do not guess.
@@ -357,12 +397,22 @@ Draft an entry where the coding is wrong and no proposed entry in `views.entries
   facilities | Aug'26`, and tell the reviewer it needs the controller's approval.
 * Credit each posted line's account and department. Debit the corrected account and
   department. The entry balances.
-* Each line carries the account code and name, department, vendor and document numbers.
+* Both sides carry the posted line's Project and Program (`project`, `program`, as in
+  `detail.items` or the GL), unless the correction is to the Project or Program itself. A
+  wrong Project or Program on a reclass leaves stray balances that surface a year later.
+* Mark the line that credits (reverses) a posted line `"reverses_line": true`. It keeps the
+  posted line's department, on a balance sheet account too, so it nets the original. Every
+  other balance sheet line (accounts 1xxxxxx to 3xxxxxx) is new and takes the `Non-Specific`
+  department; only income statement lines carry one. The build sets it on every entry.
+* Each line carries the account code and name, department, Project, Program, vendor and
+  document numbers.
 * Memo, per the Data Entry Policy: `Specific description | Mon'YY`, for example
   `Long column holder recoded to lab supplies | Aug'26`. Leave out the reference ID: the build
   puts the card's in front, `DRAFT-01 | Long column holder recoded to lab supplies | Aug'26`.
 * Prepaid and capital flags move the bill to the balance sheet. The accounts are in
-  [`GL_CODING_REVIEW_SKILL.md`](GL_CODING_REVIEW_SKILL.md).
+  [`GL_CODING_REVIEW_SKILL.md`](GL_CODING_REVIEW_SKILL.md). A capital entry says in its Memo
+  and reason whether it goes to Capital in Process or the fixed asset account, and why, and
+  the reason gives the in-service date or says it is not known.
 * Check that debits equal credits before you write the entry.
 
 The entry joins Dept & Entity as `SERIF-DRAFT-1` and on, marked "Drafted by Claude". Once the
@@ -486,8 +536,11 @@ NetSuite."
 2. If an entry the reviewer wants is not in the console, draft it (What You Write, 4) and build
    the console again.
 3. When the reviewer attaches the exported file, check it with code: each External ID
-   balances, each Date is in the close month, and the entries match those approved in the
-   decision record. Report what does not. Change nothing in the file.
+   balances, and balances within each Project and Program unless the entry moves one, each
+   Date is in the close month, each new balance sheet line's Department is `Non-Specific` (a
+   line reversing a posted one keeps that line's), and the
+   entries match those approved in the decision record. Report what does not. Change nothing
+   in the file.
 4. A person imports it into NetSuite. You never post it.
 
 **Summarize the session.** "Summarize the session." "Write the hand-off." Ask for the
@@ -550,8 +603,8 @@ approved.
    attached. Ask for the posted entries: an export of the month's posted Journal Entries, or,
    with the NetSuite connector, read them by External ID. Say which, and when it was read.
 2. With code, match each entry in the CSV to its posted entry by External ID. Compare the
-   date and posting period, the subsidiary, each line's account, department, debit and
-   credit, and the memo. Check that each posted entry balances, and that its amount
+   date and posting period, the subsidiary, each line's account, department, Project,
+   Program, debit and credit, and the memo. Check that each posted entry balances, and that its amount
    agrees to the item it came from in the run.
 3. Report each entry as Matches, Differences found (with each difference) or Not found. List
    any posted entry for the month that carries a review memo but no External ID from the CSV.
@@ -623,7 +676,9 @@ runs in a Project.
    repair an export into a file for the scripts to read.
 3. Serif has one legal entity. Never flag an entity mismatch.
 4. Coupa and the ledger join by supplier name only. Never claim a line-level PO match.
-5. Never apply a dollar threshold to fixed assets. Serif's policy sets none.
+5. Apply Serif's thresholds of 12 Oct 2026: $5,000 to capitalize a fixed asset, $25,000 for a
+   prepaid. They replace the draft asset policy's none and the $10,000 the prepaid policy
+   was read as. Never apply the draft figures.
 6. Every figure cites period, document number, vendor and amount.
 7. When you report results, name every check that did not run and what it needs. A check that
    did not run is not a clean result.

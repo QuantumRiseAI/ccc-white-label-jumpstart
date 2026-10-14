@@ -142,7 +142,9 @@ Reading the real GL export made that unmistakable.
   hire, a Series B, and a $62.4K CRO accrual. All fictional. All removed.
 * **Thresholds**, synthetic invented $25K and $50K materiality and a $5K PP&E threshold. Serif's
   own draft policies set $10,000 pre-close, $100,000 quarterly post-close, $5,000 accrual, $10,000
-  prepaid, and **no fixed asset threshold at all**, deliberately.
+  prepaid, and **no fixed asset threshold at all**, deliberately. On 12 Oct 2026 Serif set its own
+  (Mike's write-up): **$5,000** PP&E capitalization and **$25,000** prepaid, which the engines and
+  the GL Coding Review's CapEx and Prepaid screens now apply.
 
 The change log is [`CHANGELOG.md`](CHANGELOG.md).
 

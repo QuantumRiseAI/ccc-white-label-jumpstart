@@ -21,6 +21,7 @@ access. Every figure is computed here from the runs and the NetSuite exports.
 import argparse
 from datetime import datetime
 import calendar
+import csv
 import hashlib
 import html
 import json
@@ -47,6 +48,9 @@ ap.add_argument("--coding-record", help="the GL Coding Review decision record (J
 ap.add_argument("--coding-drafts", help="the GL Coding Review's drafts.json, with --coding-record: Journal Entries Claude drafted there, so a decision on one can be applied")
 ap.add_argument("--drafts", help="Claude's drafts.json for the console being built (with --only)")
 ap.add_argument("--out", help="output folder")
+ap.add_argument("--netsuite-ref", nargs="+", default=[], metavar="CSV",
+                help="NetSuite's lists from the connector (netsuite_ref_accounts.csv, netsuite_ref_departments.csv, "
+                     "netsuite_ref_programs.csv): the import CSV then carries internal IDs")
 A = ap.parse_args()
 WANT = [A.only] if A.only else ["flux", "coding"]
 EMPTY = {"views": {}, "findings": [], "manifest": {}}
@@ -96,7 +100,32 @@ for r in (PLR, GLR):
     for k, v in (r["views"].get("accounts") or {}).items():
         ACC[k] = v.get("name") if isinstance(v, dict) else v
 acct_name = lambda c: ACC.get(c) or ""
-JE_SUBSIDIARY, JE_CURRENCY, JE_RATE = "Serif Biomedicines, Inc.", "USD", 1   # NetSuite subsidiary 97
+JE_SUBSIDIARY, JE_CURRENCY, JE_RATE = "FL87 Serif Biomedicines, Inc.", "USD", 1   # NetSuite subsidiary 97
+JE_SUBSIDIARY_ID = "97"
+
+
+def read_nsref(paths):
+    """NetSuite's internal IDs, from the connector's lists: {acct: {number: id}, dept: {name: id},
+    prog: {name: id}}. The import matches on these, not on names, which NetSuite nests under parents."""
+    out = {"acct": {}, "dept": {}, "prog": {}}
+    for path in paths:
+        with open(path, encoding="utf-8-sig", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+        base = os.path.basename(path).lower()
+        for r in rows:
+            if (r.get("isinactive") or "F").strip().upper() == "T":
+                continue
+            if "acctnumber" in r:
+                if (r["acctnumber"] or "").strip():
+                    out["acct"][r["acctnumber"].strip()] = r["id"].strip()
+            elif "department" in base:
+                out["dept"][r["name"].strip()] = r["id"].strip()
+            elif "program" in base:
+                out["prog"][r["name"].strip()] = r["id"].strip()
+    return out if any(out.values()) else {}
+
+
+NSREF = read_nsref(A.netsuite_ref)
 PERIOD_END = "%s-%02d-%02d" % (PERIOD[-4:], list(calendar.month_abbr).index(PERIOD[:3]), calendar.monthrange(int(PERIOD[-4:]), list(calendar.month_abbr).index(PERIOD[:3]))[1])
 LINKS = {}
 for r in (PLR, GLR):
@@ -152,6 +181,11 @@ if TIE and not TIE["passed"]:
         sys.exit("Stopped: the ledger does not tie to the Income Statement, so no console was built. Export the GL and "
                  "the Income Statement again from NetSuite, or build with --allow-tie-differences to put the differences at the top.")
 PNL = lambda c: c[:1] in "678"
+# A balance sheet account, 1xxxxxx to 3xxxxxx. On a proposed Journal Entry a new line on one
+# takes BS_DEPARTMENT: only income statement lines carry a department. A line that reverses
+# the ledger line being corrected (`reverses_line`) keeps that line's.
+BS = lambda c: bool(c) and c[0] in "123"
+BS_DEPARTMENT = "Non-Specific"
 gl_now, gl_prior = by_period.get(PERIOD, []), by_period.get(PRIOR, [])
 dept_acct_vendor = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))
 for i, lines in enumerate((gl_now, gl_prior)):
@@ -163,6 +197,8 @@ ytd = sum(l["amount"] for p, ls in by_period.items() if p.endswith(PERIOD[-4:]) 
 gl_6x = sum(l["amount"] for l in gl_now if l["account_code"][:1] == "6")
 pl_lines_now = sum(1 for l in gl_now if PNL(l["account_code"]))
 DEPTS = sorted({l["department"] for ls in by_period.values() for l in ls if l.get("department")})
+PROJECTS = sorted({l["project"] for ls in by_period.values() for l in ls if l.get("project")})
+PROGRAMS = sorted({l["program"] for ls in by_period.values() for l in ls if l.get("program")})
 for _ls in by_period.values():
     for _l in _ls:
         if not ACC.get(_l["account_code"]) and _l.get("account_leaf"):
@@ -240,10 +276,12 @@ def je_editor(iid, lines, when=None, label=None):
     """A proposed Journal Entry, filled in and editable. The page fills the values."""
     rows = "".join('<tr><td><input class="f mono" data-jef="%s|%d|account" list="accts" size="9" aria-label="Account, line %d"><small data-jean="%s|%d"></small></td>'
                    '<td><input class="f" data-jef="%s|%d|department" list="depts" aria-label="Department, line %d"></td>'
+                   '<td><input class="f" data-jef="%s|%d|project" list="projs" aria-label="Project, line %d"></td>'
+                   '<td><input class="f" data-jef="%s|%d|program" list="progs" aria-label="Program, line %d"></td>'
                    '<td class="n2"><input class="f num" data-jef="%s|%d|debit" inputmode="decimal" aria-label="Debit, line %d"></td>'
                    '<td class="n2"><input class="f num" data-jef="%s|%d|credit" inputmode="decimal" aria-label="Credit, line %d"></td>'
                    '<td><input class="f wide" data-jef="%s|%d|memo" aria-label="Line Memo, line %d"></td></tr>'
-                   % (iid, i, i + 1, iid, i, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1) for i in range(len(lines)))
+                   % (iid, i, i + 1, iid, i, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1, iid, i, i + 1) for i in range(len(lines)))
     head = ('<div class="jf"><label>Subsidiary<span>%s</span></label><label>Currency<span>%s</span></label><label>Exchange Rate<span>%s</span></label>'
             '<label>Journal Date<input class="f" type="date" data-jeh="%s|date"></label><label>Posting Period<input class="f" data-jeh="%s|period"></label>'
             '<label>Reversing Entry<select class="f" data-jeh="%s|reversing"><option>N</option><option>Y</option></select></label>'
@@ -251,7 +289,7 @@ def je_editor(iid, lines, when=None, label=None):
             '<label class="memo">Memo<input class="f" data-jeh="%s|memo"></label></div>' % (e(JE_SUBSIDIARY), JE_CURRENCY, JE_RATE, iid, iid, iid, iid, iid))
     return ('<div class="jee" data-je="%s"%s%s><div class="jh"><span class="l">Journal Entry</span><span data-jebal></span>'
             '<button class="lk" data-jereset="%s" hidden>Reset</button></div>%s<div class="tw"><table><thead><tr><th>Account</th><th>Department</th>'
-            '<th class="n2">Debit</th><th class="n2">Credit</th><th>Line Memo</th></tr></thead><tbody>%s</tbody></table></div></div>'
+            '<th>Project</th><th>Program</th><th class="n2">Debit</th><th class="n2">Credit</th><th>Line Memo</th></tr></thead><tbody>%s</tbody></table></div></div>'
             % (iid, (' data-when="%s" hidden' % when) if when else "", (' data-label="%s"' % e(label)) if label else "", iid, head, rows))
 
 
@@ -290,6 +328,7 @@ def drafted_entries(fids_ok=None):
     out = []
     for i, x in enumerate(RAW_DRAFTS.get("entries") or [], 1):
         lines = [{"account": txt(l.get("account")), "department": txt(l.get("department")), "vendor": txt(l.get("vendor")),
+                  "project": txt(l.get("project")), "program": txt(l.get("program")), "reverses_line": l.get("reverses_line") is True,
                   "debit": round(float(l.get("debit") or 0), 2), "credit": round(float(l.get("credit") or 0), 2),
                   "documents": [txt(d) for d in (l.get("documents") or [])]} for l in x.get("lines") or []]
         dr, cr = round(sum(l["debit"] for l in lines), 2), round(sum(l["credit"] for l in lines), 2)
@@ -305,8 +344,20 @@ def count(n, word):
     return "%d %s%s" % (n, word, "" if n == 1 else "s")
 
 
-def je_lines(lines):
-    return [{"account": l["account"], "department": l.get("department") or "", "debit": round(l.get("debit") or 0, 2), "credit": round(l.get("credit") or 0, 2)} for l in lines]
+def je_lines(lines, src=None):
+    """A proposed entry's lines. Each carries the Project and Program of `src`, the line it
+    corrects, unless it names its own, so both sides of a reclass keep them. A new balance
+    sheet line takes BS_DEPARTMENT; the line marked `reverses_line`, which reverses the ledger
+    line being corrected, keeps its department so the reversal nets the original."""
+    src = src or {}
+    return [{"account": l["account"], "department": BS_DEPARTMENT if BS(l["account"]) and not l.get("reverses_line") else l.get("department") or "",
+             "project": l.get("project", src.get("project")) or "", "program": l.get("program", src.get("program")) or "",
+             "debit": round(l.get("debit") or 0, 2), "credit": round(l.get("credit") or 0, 2)} for l in lines]
+
+
+def proj_prog(x):
+    """A line's Project, with its Program under it, as NetSuite names them."""
+    return "%s<small>%s</small>" % (e(x.get("project") or "") or "&ndash;", e(x.get("program") or "") or "&ndash;")
 
 
 def je_finish(je):
@@ -716,13 +767,22 @@ def shell(title, product, sections, pages, data, js):
             + SETTINGS_SVG + '</button></div></header><div id="sharedbar" hidden></div><div id="tip"></div><div id="toast" role="status" hidden></div>'
             '<div id="ask" hidden><div class="askbox" role="dialog" aria-modal="true"><h3></h3><div class="askbody"></div><div class="acts">'
             '<button class="pill solid" data-askok>OK</button><button class="pill" data-askno>Cancel</button></div></div></div><main>' + "".join(pages)
-            + page("settings", '<div class="card"><h3>Settings</h3><div class="pad setcard"><label for="thr">Review threshold</label>'
-                   '<span>$</span><input class="f" id="thr" inputmode="numeric" style="width:9ch"></div></div>'
+            + page("settings", '<div class="card"><h3>Settings</h3>' + "".join(
+                       '<div class="pad setcard"><label for="%s"%s>%s</label><span>$</span><input class="f" id="%s" data-thrin="%s" inputmode="numeric" style="width:9ch">%s</div>'
+                       % (i, ' style="min-width:9.5rem"' if n else "", lab, i, k, n)
+                       for i, k, lab, n in ((("thr", "thr", "Review threshold", ""),) if data.get("kind") != "coding" else (
+                           ("thr", "thr", "Review threshold", '<span class="note">Dept &amp; Entity account recodes, and drafted entries</span>'),
+                           ("thrcapex", "thr_capex", "CapEx threshold", '<span class="note">CapEx Flags</span>'),
+                           ("thrprepaid", "thr_prepaid", "Prepaid threshold", '<span class="note">Prepaid Flags</span>'))))
+                   + ('<div class="pad setcard"><span class="note">Department flags have no threshold: each is marked Review, whatever its size.</span></div>'
+                      if data.get("kind") == "coding" else "") + "</div>"
                    '<div class="card"><h3>Decision record</h3><div class="pad acts"><button class="pill" data-recsave>Save decision record</button>'
                    '<button class="pill" data-recload>Load decision record</button><input type="file" id="recfile" accept=".json,application/json" hidden>'
                    '<button class="pill" data-carry hidden>Bring in the earlier run&rsquo;s decisions</button></div></div>')
             + '<datalist id="accts">' + "".join('<option value="%s">%s</option>' % (e(k), e(v)) for k, v in sorted(ACC.items()) if v) + "</datalist>"
             + '<datalist id="depts">' + "".join('<option value="%s">' % e(d) for d in DEPTS) + "</datalist>"
+            + '<datalist id="projs">' + "".join('<option value="%s">' % e(d) for d in PROJECTS) + "</datalist>"
+            + '<datalist id="progs">' + "".join('<option value="%s">' % e(d) for d in PROGRAMS) + "</datalist>"
             + "<footer>Serif Biomedicines, Inc. (FL87) &middot; " + e(product) + " &middot; " + e(PERIOD) + "</footer></main><script>window.DATA="
             + json.dumps(dict(data, acct={k: v for k, v in ACC.items() if v}, period=PERIOD, version=VERSION), ensure_ascii=False).replace("</", "<\\/")
             + ";</script><script>" + COMMON_JS + js + "\nShared.start();</script></body></html>")
@@ -733,7 +793,9 @@ const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySel
 const KEY = 'serif-console::' + DATA.kind + '::' + DATA.run;
 /* The review's state. Each of STORES is a map of item to value: decisions,
    commentary and notes, entry edits, the GAAP checklist, sign-off and the audit
-   log. The threshold is this browser's setting. */
+   log. The thresholds are this browser's settings: thr, and on the GL Coding Review
+   thr_capex and thr_prepaid, each falling back to the build's default, so a state saved
+   with thr alone keeps it and takes the CapEx and Prepaid defaults. */
 const STORES = ['dec', 'notes', 'je', 'jh', 'ck', 'sign', 'log'];
 const refOf = id => (DATA.ref || {})[id] || '';
 let S = {dec: {}, notes: {}, sign: {}, ck: {}, je: {}, jh: {}, log: {}, thr: DATA.thr};
@@ -919,7 +981,7 @@ const Shared = (function(){
   }
   /* A viewer cannot type into a field their access does not let them save. */
   document.addEventListener('beforeinput', ev => { if (!st.on || !st.ro) return; const t = ev.target;
-    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT') && t.id !== 'thr') ev.preventDefault(); }, true);
+    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT') && t.dataset.thrin === undefined) ev.preventDefault(); }, true);
   return {start: start, changed: changed, earlierRecord: earlierRecord,
           on: () => st.on, ro: () => st.on && st.ro, uid: () => st.on ? st.uid : null, name: nameOf};
 })();
@@ -1051,7 +1113,7 @@ document.addEventListener('input', ev => {
   const t = ev.target;
   if (t.dataset.note !== undefined){ S.notes[t.dataset.note] = t.value; save(); return; }
   if (t.dataset.jef || t.dataset.jeh){ editJE(t); return; }
-  if (t.id === 'thr'){ const v = Number(String(t.value).replace(/[^0-9.]/g, '')); if (isFinite(v) && v > 0){ S.thr = v; save(); refresh(); } }
+  if (t.dataset.thrin){ const v = Number(String(t.value).replace(/[^0-9.]/g, '')); if (isFinite(v) && v > 0){ S[t.dataset.thrin] = v; save(); refresh(); } }
 });
 /* tabs are announced as tabs, the selected one marked */
 $$('.tabs').forEach(tl => { tl.setAttribute('role', 'tablist');
@@ -1086,7 +1148,7 @@ function paintItems(){
       + (d.by_uid ? ' · ' + Shared.name(d.by_uid) : '') : 'Pending';
       st.className = 'stp' + (d ? (d.v === 'reject' || d.v === 'none' ? ' rej' : ' done') : ''); }
     el.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('on', !!d && d.v === b.dataset.v));
-    const nt = el.querySelector('textarea[data-note]'); if (nt){ nt.hidden = !(d && ['modify','recode','netsuite','reject','none'].indexOf(d.v) > -1) && !(S.notes[id]||'').trim();
+    const nt = el.querySelector('textarea[data-note]'); if (nt){ nt.hidden = nt.dataset.ask === undefined && !(d && ['modify','recode','netsuite','reject','none'].indexOf(d.v) > -1) && !(S.notes[id]||'').trim();
       if (document.activeElement !== nt) nt.value = S.notes[id] || ''; } });
   $$('textarea.c[data-note]').forEach(t => { if (!t.closest('[data-item]') && document.activeElement !== t) t.value = S.notes[t.dataset.note] || ''; });
   paintJE();
@@ -1121,9 +1183,12 @@ const csv = rows => rows.map(r => r.map(c => { const s = String(c == null ? '' :
 /* Proposed Journal Entries: filled in from the run, edited in place. An edit
    is kept in S.je and marks the item Modified (Recode on a vendor line). */
 const jeOf = id => { const b = DATA.je[id], j = Object.assign({}, b, S.jh[id] || {});   // S.je holds the lines, S.jh the header fields edited
-  j.lines = (S.je[id] || b.lines).map(l => l.memo == null ? Object.assign({}, l, {memo: j.memo}) : l); return j; };
+  /* lines saved before Project and Program were carried take the run's */
+  j.lines = (S.je[id] || b.lines).map((l, i) => { const o = b.lines[i] || {}, x = l.memo == null ? Object.assign({}, l, {memo: j.memo}) : l;
+    return x.project == null || x.program == null ? Object.assign({}, x, {project: x.project == null ? o.project || '' : x.project, program: x.program == null ? o.program || '' : x.program}) : x; });
+  return j; };
 const jeBal = j => Math.round(j.lines.reduce((a, l) => a + (Number(l.debit) || 0) - (Number(l.credit) || 0), 0) * 100) / 100;
-const jeNoop = j => { const m = {}; j.lines.forEach(l => { const k = (l.account || '') + '|' + (l.department || ''); m[k] = (m[k] || 0) + (Number(l.debit) || 0) - (Number(l.credit) || 0); });
+const jeNoop = j => { const m = {}; j.lines.forEach(l => { const k = [l.account, l.department, l.project, l.program].map(v => v || '').join('|'); m[k] = (m[k] || 0) + (Number(l.debit) || 0) - (Number(l.credit) || 0); });
   return Object.values(m).every(v => Math.abs(v) < 0.005); };
 const jeEdited = id => !!(S.je[id] || S.jh[id]);
 const jeLive = id => { const d = S.dec[id]; return !!d && ['approve', 'modify', 'recode'].indexOf(d.v) > -1 && !!DATA.je[id] && (!DATA.je[id].proposal || jeEdited(id)); };
@@ -1132,9 +1197,18 @@ const isoOk = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '') && !isNaN(Date.parse(s)) 
 /* why an entry cannot go into the import yet, or '' */
 const jeWhy = id => { const j = jeOf(id);
   return jeBal(j) ? 'out of balance' : jeNoop(j) ? 'unchanged' : !decided(id) ? 'missing note' : !j.lines.every(l => (l.account || '').trim()) ? 'missing account'
+    : !j.lines.every(l => (l.department || '').trim()) ? 'missing department (NetSuite requires one on every line)' : nsMiss(j) ? nsMiss(j)
     : !isoOk(j.date) ? 'Journal Date is not a valid date' : !/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}$/.test(j.period || '') ? 'Posting Period is not Mon YYYY'
     : j.reversing === 'Y' && !(j.reversal_date || '').trim() ? 'reversal date missing' : j.reversing === 'Y' && !(isoOk(j.reversal_date) && j.reversal_date > j.date) ? 'Reversal Date is not a date after the Journal Date' : ''; };
 const jeReady = id => jeLive(id) && decided(id) && !jeWhy(id);
+/* With NetSuite's lists supplied, every account, department and program must be one NetSuite holds */
+const NO_PROG = p => !p || /^- No .* -$/.test(p);
+function nsMiss(j){ const R = DATA.nsref || {}; if (!R.acct) return '';
+  for (const l of j.lines){ const a = (l.account || '').trim(), d = (l.department || '').trim(), p = (l.program || '').trim();
+    if (!R.acct[a]) return 'account ' + a + ' is not an active NetSuite account';
+    if (!R.dept[d]) return 'department ' + d + ' is not an active NetSuite department';
+    if (!NO_PROG(p) && !R.prog[p]) return 'program ' + p + ' is not an active NetSuite program'; }
+  return ''; }
 const jeOpen = pg => $$('#p-' + pg + ' [data-jerow]').filter(r => jeEdited(r.dataset.jerow) && !(jeLive(r.dataset.jerow) && jeReady(r.dataset.jerow)));   // proposals begun and not ready
 function editJE(t){
   if (Shared.ro()) return;
@@ -1142,7 +1216,9 @@ function editJE(t){
   if (t.dataset.jeh){ const H = S.jh[id] || (S.jh[id] = {}), old = jeOf(id).memo; H[i] = t.value.trim();
     if (i === 'memo'){ if (!S.je[id]) S.je[id] = JSON.parse(JSON.stringify(jeOf(id).lines)); S.je[id].forEach(l => { if (l.memo == null || l.memo === old) l.memo = H.memo; }); } }
   else { if (!S.je[id]) S.je[id] = JSON.parse(JSON.stringify(DATA.je[id].lines));
-    S.je[id][i][f] = f === 'debit' || f === 'credit' ? (Number(String(t.value).replace(/[^0-9.]/g, '')) || 0) : t.value.trim(); }
+    S.je[id][i][f] = f === 'debit' || f === 'credit' ? (Number(String(t.value).replace(/[^0-9.]/g, '')) || 0) : t.value.trim();
+    /* a balance sheet account takes the Non-Specific department; the reviewer can still change it */
+    if (f === 'account' && /^[123]\d{6}$/.test(S.je[id][i].account)) S.je[id][i].department = 'Non-Specific'; }
   const box = t.closest('[data-je]'), v = box.dataset.when || 'modify', d = S.dec[id];
   /* an item edited in NetSuite stays so: its entry then shows what was changed there */
   if (!d || (d.v !== v && d.v !== 'netsuite')){ const it = t.closest('[data-item]'), lb = it && it.querySelector('[data-d]');
@@ -1167,12 +1243,20 @@ function paintJE(){
 }
 /* NetSuite rejects a Memo over 999 characters; a reviewer's note or edit can take one past it */
 const memoCut = m => m.length > 999 ? m.slice(0, 996).trimEnd() + '...' : m;
+/* NetSuite reads an import's dates in the importing user's format, M/D/YYYY at Serif */
+const nsDate = d => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || ''); return m ? +m[2] + '/' + +m[3] + '/' + m[1] : (d || ''); };
 function exportCSV(){
-  const rows = [['External ID', 'Subsidiary', 'Journal Date', 'Posting Period', 'Currency', 'Exchange Rate', 'Memo', 'Reversing Entry', 'Reversal Date', 'Account', 'Department', 'Debit', 'Credit', 'Line Memo']];
+  /* Subsidiary, Account, Department and Program carry NetSuite's internal IDs when its lists were
+     supplied (map them by Internal ID); the last four columns are for the reviewer, left unmapped. */
+  const R = DATA.nsref || {}, id_ = (m, v) => (m && m[v]) || v;
+  const rows = [['External ID', 'Subsidiary', 'Journal Date', 'Posting Period', 'Memo', 'Reversal Date', 'Account', 'Department', 'Project', 'Program', 'Debit', 'Credit', 'Line Memo',
+                 'Account Number', 'Department Name', 'Program Name', 'Reversing Entry']];
   const held = Object.keys(DATA.je).filter(id => jeLive(id) && !jeReady(id)).map(id => jeOf(id).memo.slice(0, 60) + ': ' + jeWhy(id)).join('; ');
   Object.keys(DATA.je).forEach(id => { if (!jeReady(id)) return;
-    const j = jeOf(id); j.lines.forEach(l => rows.push([j.id, j.subsidiary, j.date, j.period, j.currency, j.rate, memoCut(j.memo + (S.notes[id] ? ' | ' + S.notes[id] : '')), j.reversing,
-      j.reversing === 'Y' ? j.reversal_date : '', l.account, l.department || '', l.debit || '', l.credit || '', memoCut(l.memo || '')])); });
+    const j = jeOf(id); j.lines.forEach(l => { const prog = NO_PROG(l.program) ? '' : l.program;
+      rows.push([j.id, R.acct ? DATA.sub_id : j.subsidiary, nsDate(j.date), j.period, memoCut(j.memo + (S.notes[id] ? ' | ' + S.notes[id] : '')),
+        j.reversing === 'Y' ? nsDate(j.reversal_date) : '', id_(R.acct, l.account), id_(R.dept, l.department || ''), l.project || '', id_(R.prog, prog),
+        l.debit || '', l.credit || '', memoCut(l.memo || ''), l.account, l.department || '', prog, j.reversing]); }); });
   const ns = nsIds().length, edited = ns ? plural(ns, 'item') + ' edited in NetSuite, not in the import: the CSV holds only the reclasses to book' : '';
   const said = [held ? 'Left out: ' + held : '', edited].filter(Boolean).join('. ');
   if (rows.length === 1){ alertBox(said ? said + '.' : 'Approve an entry first: only approved entries go into the import.'); return; }
@@ -1202,8 +1286,13 @@ function checklist(){
 document.addEventListener('click', ev => { const r = ev.target.closest('tr[data-go]'); if (r) show(r.dataset.go); });
 document.addEventListener('click', ev => { const h = ev.target.closest('.item.foldable > .ih'); if (!h || ev.target.closest('a,button')) return;
   const el = h.parentElement; el.classList.toggle('unfold', el.classList.contains('folded')); paintItems(); });
-/* a line at or over the threshold is marked for review */
+/* a line at or over the threshold is marked for review; a card, at or over its screen's
+   (data-thr names it; "all" is always reviewed) */
+const thrOf = k => Number(S[k]) || DATA[k] || S.thr || DATA.thr;
 function marks(){
+  $$('.item[data-thr]').forEach(x => { const k = x.dataset.thr, hi = k === 'all' || Number(x.dataset.tamt || x.dataset.amt) >= thrOf(k);
+    x.classList.toggle('hi', hi); const g = x.querySelector(':scope > .ih > [data-rev]'); if (g) g.hidden = !hi; });
+  $$('[data-thrin]').forEach(t => { if (document.activeElement !== t) t.value = thrOf(t.dataset.thrin).toLocaleString('en-US'); });
   const thr = S.thr || DATA.thr;
   $$('tr[data-var]').forEach(tr => { const a = Math.abs(Number(tr.dataset.var) || 0);
     const k = a >= thr ? 'rev' : 'ok';
@@ -1211,7 +1300,6 @@ function marks(){
     const td = tr.cells[0]; let m = td.querySelector('.mk');
     if (!m){ m = document.createElement('span'); m.className = 'mk'; td.appendChild(m); }
     m.innerHTML = k === 'rev' ? '<span class="tag hi">Review</span>' : ''; });
-  const t = $('#thr'); if (t && document.activeElement !== t) t.value = (S.thr || DATA.thr).toLocaleString('en-US');
 }
 """
 
@@ -1763,7 +1851,7 @@ def flux():
                        % (" hi" if hi else "", aid, round(x["debits"], 2), e(x.get("kind") or ""), en(x["memo"]), "", e(acct["account"]), e(acct_name(acct["account"])), money(x["debits"], True),
                           fav(imp, ("&#9660; Favorable " if imp > 0 else "&#9650; Unfavorable " if imp < 0 else "No P&amp;L impact") + (money(abs(imp), True) if round(imp) else "")),
                           e(", ".join(vend) or "&ndash;"), e(", ".join("%s %s %s" % (l["account"], acct_name(l["account"]), money((l.get("debit") or 0) - (l.get("credit") or 0), True).replace("&ndash;", "-")) for l in bsl)) or "&ndash;",
-                          e(", ".join(sorted({l.get("department") for l in x["lines"] if l.get("department")})) or "&ndash;"),
+                          e(", ".join(sorted({l.get("department") for l in x["lines"] if l.get("department") and not BS(l["account"])})) or "&ndash;"),
                           en(f.get("recommendation") or x.get("support") or x["memo"]), (" " + " ".join(doc_links(d) for d in docs)) if docs else "", en(f.get("policy_basis") or ""), je_editor(aid, je[aid]["lines"]) + dhtml,
                           aid, e(x["memo"]), aid, e(x["memo"]), aid, e(x["memo"]), aid))
     for r in revs:
@@ -1893,7 +1981,7 @@ def flux():
                 ("Close Workflow", ([("bs", "Balance Sheet Flux")] if bs["rows"] else []) + [("adj", "Adjustments"), ("sox", "SOX & GAAP")])]
     SKIPPED.extend("commentary for " + k for k in (RAW_DRAFTS.get("commentary") or {}) if k not in used_com)
     SKIPPED.extend("adjustment note for " + k for k in (RAW_DRAFTS.get("adjustments") or {}) if k not in used_adj)
-    data = {"kind": "flux", "run": M["run_id"], "slug": SLUG, "thr": thr, "je": je_finish(je), "icons": {}, "drafts": DRAFTS}
+    data = {"kind": "flux", "run": M["run_id"], "slug": SLUG, "thr": thr, "je": je_finish(je), "icons": {}, "drafts": DRAFTS, "nsref": NSREF, "sub_id": JE_SUBSIDIARY_ID}
     js = r"""
 function refresh(){
   marks(); paintItems(); counts(); signs(); checklist();
@@ -1926,6 +2014,11 @@ def coding():
     V = GLR["views"]
     G = {f["finding_id"]: f for f in GLR["findings"]}
     thr = 2500.0
+    # Each review screen's own line, set in Settings: CapEx at Serif's PP&E capitalization
+    # threshold, Prepaid at its prepaid threshold (12 Oct 2026), the rest at thr. A Department
+    # flag has none ("all"): every line off Non-Specific is recoded, whatever its size.
+    THR = {"thr": thr, "thr_capex": 5000.0, "thr_prepaid": 25000.0}
+    over = lambda k, a: k == "all" or (a or 0) >= THR[k]
     vend = next(t for t in V["tables"] if t["id"] == "vendors")
     vrows = [r for s in vend["sections"] for r in s["rows"]]
     billed = [r for r in vrows if round(r.get("amount") or 0)]
@@ -1945,12 +2038,12 @@ def coding():
                if (not account or i["account"] == account) and (not docs or i["document"] in docs)]
         if not its:
             return ""
-        rows = "".join('<tr><td class="mono">%s</td><td>%s %s%s</td><td>%s</td><td><span class="mono">%s</span><small>%s</small></td><td>%s</td><td class="n2">%s</td></tr>'
-                       % (e(i["date"]), e(i["type"]), e(i["document"]), doc_links(i["document"]), e(i["text"]), e(i["account"]), e(acct_name(i["account"])), e(i.get("department") or ""), money(i["amount"], True))
+        rows = "".join('<tr><td class="mono">%s</td><td>%s %s%s</td><td>%s</td><td><span class="mono">%s</span><small>%s</small></td><td>%s</td><td>%s</td><td class="n2">%s</td></tr>'
+                       % (e(i["date"]), e(i["type"]), e(i["document"]), doc_links(i["document"]), e(i["text"]), e(i["account"]), e(acct_name(i["account"])), e(i.get("department") or ""), proj_prog(i), money(i["amount"], True))
                        for i in sorted(its, key=lambda i: -abs(i["amount"])))
         more = (((r or {}).get("detail") or {}).get("count") or len(its)) - len(its) if not account and not docs else 0
         return ('<details class="lines"><summary>Lines (%d)</summary><div class="tw"><table><thead><tr><th>Date</th><th>Document</th><th>Description</th><th>Account</th><th>Department</th>'
-                '<th class="n2">Amount</th></tr></thead><tbody>%s</tbody></table></div>%s</details>' % (len(its), rows, ('<p class="note">%d more lines in NetSuite.</p>' % more) if more > 0 else ""))
+                '<th>Project / Program</th><th class="n2">Amount</th></tr></thead><tbody>%s</tbody></table></div>%s</details>' % (len(its), rows, ('<p class="note">%d more lines in NetSuite.</p>' % more) if more > 0 else ""))
 
     def acts(iid, label, actions):
         return "".join('<button class="pill" data-d="%s" data-v="%s" data-label="%s">%s</button>' % (iid, v, e(label), lab) for v, lab in actions)
@@ -1962,7 +2055,7 @@ def coding():
         i = next((i for r in vrows if r["vendor"] == vname for i in (r.get("detail") or {}).get("items") or [] if i["document"] == d), None)
         return (i["type"] + " " + d) if i else d
 
-    def card(iid, vendor, amount, hi, cur, rec, doc, extra, why, pol, actions, lines="", more="", flag=True):
+    def card(iid, vendor, amount, hi, cur, rec, doc, extra, why, pol, actions, lines="", more="", flag=True, thr=None, tamt=None, ask=""):
         dl = doc_links(doc["document"]) if doc else ""
         if doc:
             nsdoc.setdefault(iid, doc["type"] + " " + doc["document"])
@@ -1973,13 +2066,21 @@ def coding():
             more = draft("ven:" + iid, txt(dv.get("note")), iid, iid if v_ else None, v_,
                          {"reject": "Coding stands: reject the recode.", "approve": "Approve the recode."}.get(v_, "Ask the owner.")) + more
         amts[iid] = amount or 0
-        return ('<div class="item%s" data-item="%s" data-amt="%s"%s><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span>%s</div><div class="ib"><div class="kv">'
+        # thr names the screen's threshold, which the console marks Review against as
+        # the reviewer changes it (tamt, when the test is on more than the card's
+        # amount); ask keeps the note open with its question as the placeholder.
+        if thr:
+            hi = over(thr, amount if tamt is None else tamt)
+        tag = ('<span class="tag hi" data-rev%s>Review</span>' % ("" if hi else " hidden") if thr else '<span class="tag hi">Review</span>' if hi else "")
+        return ('<div class="item%s" data-item="%s" data-amt="%s"%s%s><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span>%s</div><div class="ib"><div class="kv">'
                 '<div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Recommended</div><div class="x">%s</div></div>'
-                '<div><div class="l">Document / item</div><div class="x">%s%s</div></div>%s</div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
-                % (" hi" if hi else "", iid, round(amount or 0, 2), " data-flag" if flag else "", iid, e(vendor), money(amount, True), '<span class="tag hi">Review</span>' if hi else "", cur, rec,
+                '<div><div class="l">Document / item</div><div class="x">%s%s</div></div>%s</div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="%s"%s></textarea></div></div></div>'
+                % (" hi" if hi else "", iid, round(amount or 0, 2), " data-flag" if flag else "",
+                   (' data-thr="%s"' % thr + (' data-tamt="%s"' % round(tamt, 2) if tamt is not None else "")) if thr else "",
+                   iid, e(vendor), money(amount, True), tag, cur, rec,
                    (e(doc["type"] + " " + doc["document"]) + "<small>" + e(doc["text"]) + "</small>") if doc else "&ndash;", dl, extra,
                    ('<div class="why">' + why + "</div>") if why else "", ('<div class="pol">' + e(pol) + "</div>") if pol else "", more, lines,
-                   acts(iid, vendor, actions), iid))
+                   acts(iid, vendor, actions), iid, e(ask) if ask else "Note", " data-ask" if ask else " hidden"))
     coding_ = lambda a, d=None: "%s<small>%s%s</small>" % (e(a), e(acct_name(a)), (" / " + e(d)) if d else "")
     # A fix to an existing transaction is booked as a reclass (the CSV) or made by editing
     # the bill or Journal Entry in NetSuite while the period is open. An entry Claude
@@ -1997,26 +2098,49 @@ def coding():
             if fl.get("id") not in screen:
                 continue
             ms = fl.get("match") or [{}]
+            p0 = ms[0].get("placement") or {}
             for m in ms:
                 it = next((i for i in its if i["document"] == m.get("document") and i["account"] == m.get("account")), None)
                 to = re.search(r"\b(1\d{6})\b", fl.get("do") or "")
+                # The flag's words are its first bill's; a capital bill says where it goes in its own.
+                p = m.get("placement") or {}
+                why, do = fl.get("why") or "", fl.get("do") or ""
+                if p and p0 and p != p0:
+                    why, do = why.replace(p0["why"], p["why"]), (do.replace(p0["ask"], p["ask"]) if p0["ask"] else (do + " " + p["ask"]).strip())
                 screen[fl["id"]].append({"vendor": r["vendor"], "from_account": m.get("account") or (it or {}).get("account") or "",
-                                         "to_account": to.group(1) if to else "", "department": (it or {}).get("department") or "",
+                                         "to_account": m.get("to") or (to.group(1) if to else ""), "department": (it or {}).get("department") or "",
                                          "what": (it or {}).get("text") or "", "amount": (it or {}).get("amount") if len(ms) > 1 and it else fl["amount"],
-                                         "why": fl.get("why") or "", "do": fl.get("do") or "", "doc": it})
+                                         "total": m.get("total"), "placement": p, "why": why, "do": do, "doc": it})
     for k in screen:
         screen[k].sort(key=lambda x: -(x["amount"] or 0))
+    # A capital recode says where it goes and why: Capital in Process for build-out work and
+    # an asset not yet in service, the fixed asset account for one in service. The ledger has
+    # no in-service date, so the card asks for it unless the line states one.
+    PLACED = {"buildout": ("Capital in Process: build-out, until in use", "When employees begin using the space; ask the date"),
+              "not_in_service": ("Capital in Process: not yet in service", "Not yet; ask the date"),
+              "no_account": ("Capital in Process: the chart has no fixed asset account for it", "Invoice date, %s, by policy: confirm"),
+              "in_service": ("in service: fixed asset", "Invoice date, %s, by policy: confirm")}
     cap_cards, pre_cards = [], []
     for sec_id, prefix, bucket, typ in (("capital", "C", cap_cards, "CapEx missed"), ("prepaid", "P", pre_cards, "Prepaid missed")):
         for r in screen[sec_id]:
             iid = sid(prefix, r["vendor"], r["from_account"], r["to_account"], r.get("what"), r.get("department"))
             doc = r["doc"] or line_doc(r["vendor"], r["from_account"])
-            je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": doc["date"] if doc else "", "memo": "Recode %s %s from %s to %s" % (r["vendor"], r.get("what") or "", r["from_account"], r["to_account"]),
-                       "lines": je_lines([{"account": r["to_account"], "department": r["department"], "debit": r["amount"]}, {"account": r["from_account"], "department": r["department"], "credit": r["amount"]}])}
+            p = r["placement"]
+            memo, placed = PLACED.get(p.get("kind"), ("", ""))
+            if p.get("in_service"):
+                placed = "%s, as the line says" % p["in_service"]
+            elif "%s" in placed:
+                placed %= (doc or {}).get("date") or "not shown"
+            je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": doc["date"] if doc else "", "memo": "Recode %s %s from %s to %s%s" % (r["vendor"], r.get("what") or "", r["from_account"], r["to_account"], (", " + memo) if memo else ""),
+                       "lines": je_lines([{"account": r["to_account"], "department": r["department"], "debit": r["amount"]}, {"account": r["from_account"], "department": r["department"], "credit": r["amount"], "reverses_line": True}], doc)}
             items.append(("capex" if prefix == "C" else "prepaid", iid, typ, r["vendor"], r.get("what") or "", r["amount"], r["from_account"], r["to_account"]))
-            bucket.append(card(iid, r["vendor"], r["amount"], True, coding_(r["from_account"], r["department"]), '<span class="arrow">&rarr;</span> ' + coding_(r["to_account"], r["department"]),
-                               doc, '<div><div class="l">Department</div><div class="x">' + e(r["department"]) + "</div></div>", en(r["why"]) + (" " + en(r["do"]) if r["do"] else ""), "",
-                               FLAG_ACTS, lines_html(r["vendor"], r["from_account"]), je_editor(iid, je[iid]["lines"]) + history(r["vendor"])))
+            bucket.append(card(iid, r["vendor"], r["amount"], True, coding_(r["from_account"], r["department"]), '<span class="arrow">&rarr;</span> ' + coding_(r["to_account"], je[iid]["lines"][0]["department"]),
+                               doc, '<div><div class="l">Department</div><div class="x">' + e(r["department"]) + "</div></div>"
+                               + ('<div><div class="l">Placed in service</div><div class="x" data-placed="%s">%s</div></div>' % (e(p.get("kind")), e(placed)) if p else ""),
+                               en(r["why"]) + (" " + en(r["do"]) if r["do"] else ""), "",
+                               FLAG_ACTS, lines_html(r["vendor"], r["from_account"]), je_editor(iid, je[iid]["lines"]) + history(r["vendor"]),
+                               thr="thr_capex" if prefix == "C" else "thr_prepaid", tamt=r.get("total"),
+                               ask="In-service date, and a note" if p and not p.get("in_service") else ""))
 
     # The other direction: bills posted to prepaid or fixed-asset accounts this month
     def usual_expense(vendor, dept):
@@ -2036,12 +2160,13 @@ def coding():
             ea, ed = usual_expense(v, l["department"] or "")
             amt = round(l["amount"], 2)
             je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": l["date"], "memo": "Recode %s %s from %s to expense" % (v, desc(l), l["account_code"]),
-                       "lines": je_lines([{"account": ea, "department": ed, "debit": amt}, {"account": l["account_code"], "department": l["department"], "credit": amt}]), "when": "recode"}
+                       "lines": je_lines([{"account": ea, "department": ed, "debit": amt}, {"account": l["account_code"], "department": l["department"], "credit": amt, "reverses_line": True}], l), "when": "recode"}
             doc = {"type": l["txn_type"], "document": l["document_number"], "text": desc(l), "date": l["date"]}
             out.append(card(iid, v, amt, amt >= thr, coding_(l["account_code"], l["department"]), "&ndash;", doc,
-                            '<div><div class="l">Department</div><div class="x">' + e(l["department"] or "&ndash;") + "</div></div>", "", "",
+                            '<div><div class="l">Department</div><div class="x">' + e(l["department"] or "&ndash;") + "</div></div>"
+                            '<div><div class="l">Project / Program</div><div class="x">' + proj_prog(l) + "</div></div>", "", "",
                             (("confirm", "Confirm, Stays on Balance Sheet"), ("recode", "Recode to Expense"), ("netsuite", "Edited in NetSuite")), "",
-                            je_editor(iid, je[iid]["lines"], "recode") + history(v), flag=False))
+                            je_editor(iid, je[iid]["lines"], "recode") + history(v), flag=False, thr="thr_capex" if tag == "CB" else "thr_prepaid"))
         return out
     cap_booked, pre_booked = booked(("15",), "CB"), booked(("13",), "PB")
 
@@ -2052,7 +2177,7 @@ def coding():
         je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"]), "reverses": x.get("reverses")}
         items.append(("dept", iid, "Drafted by Claude", ", ".join(sorted({l["vendor"] for l in x["lines"] if l["vendor"]})) or x["memo"], x["memo"], x["debits"], "", ""))
         dcards.append(card(iid, x["memo"] or "Drafted Journal Entry", x["debits"], x["debits"] >= thr, "&ndash;", "&ndash;", None,
-                           '<div><div class="l">Type</div><div class="x">Drafted by Claude</div></div>', e(x["support"]), "", DRAFT_ACTS, "", je_editor(iid, je[iid]["lines"])))
+                           '<div><div class="l">Type</div><div class="x">Drafted by Claude</div></div>', e(x["support"]), "", DRAFT_ACTS, "", je_editor(iid, je[iid]["lines"]), thr="thr"))
     ents = {x["finding_id"]: x for x in V.get("entries") or []}
     drift = [f for f in GLR["findings"] if f["rule_id"] == "T4.ITEM_ACCOUNT_DRIFT"]
     COVER = ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")
@@ -2095,7 +2220,7 @@ def coding():
         dcards.append(card(iid, vname, f.get("amount_at_risk") or 0, (f.get("amount_at_risk") or 0) >= thr, cur, rec, doc,
                            '<div><div class="l">Type</div><div class="x">' + e(typ) + "</div></div>", en(f.get("recommendation") or ""), "", FLAG_ACTS,
                            lines_html(vname, docs=set(d for l in (x or {}).get("lines", []) for d in (l.get("documents") or [])) or None),
-                           (je_editor(iid, je[iid]["lines"]) if iid in je else "") + history(vname)))
+                           (je_editor(iid, je[iid]["lines"]) if iid in je else "") + history(vname), thr="all" if typ == "Department" else "thr"))
 
     # Reviewed & Cleared and New This Period: by department, then account
     def coding_of(r):
@@ -2115,8 +2240,11 @@ def coding():
         if doc:
             nsdoc[iid] = doc["type"] + " " + doc["document"]
         cur = "<br>".join(coding_(c["account"], c.get("department")) for c in (r.get("by_coding") or []) if round(c.get("current") or 0)) or coding_(a)
+        pp = {(i.get("project") or "", i.get("program") or "") for i in (r.get("detail") or {}).get("items") or []
+              if i["account"] == a and (i.get("department") or "Non-Specific") == dept}
         je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": (doc or {}).get("date") or "", "memo": "Recode %s from %s %s" % (r["vendor"], a, dept),
-                   "lines": je_lines([{"account": a, "department": dept, "debit": camt}, {"account": a, "department": dept, "credit": camt}]), "when": "recode"}
+                   "lines": je_lines([{"account": a, "department": dept, "debit": camt}, {"account": a, "department": dept, "credit": camt, "reverses_line": True}],
+                                     dict(zip(("project", "program"), pp.pop())) if len(pp) == 1 else None), "when": "recode"}
         amts[iid] = r["amount"] or 0
         return ('<div class="item" data-item="%s" data-amt="%s"><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span><span class="tag%s">%s</span></div>'
                 '<div class="ib"><div class="kv"><div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Document / item</div><div class="x">%s%s</div></div>'
@@ -2229,7 +2357,9 @@ def coding():
         *([("Of which accepted exceptions", "%d items, %s" % (len(excepted), money(exc_amt, True)))] if excepted else []),
         ("Ledger balances", ("Pass: " if tie.get("passed") else "Fail: ") + e(tie.get("note") or "")), tuple(e(x) for x in tie_row([PERIOD])), ("Flags as subset of GL", "Pass: every flag is drawn from posted GL lines")])
     pol_rows = "".join('<tr><td>%s</td><td class="mono" style="text-align:right">%s</td></tr>' % (a, b) for a, b in [
-        ("Vendors billed this month", str(len(billed))), ("P&amp;L lines this month", format(pl_lines_now, ",")), ("CapEx flags", str(len(cap_cards))), ("Prepaid flags", str(len(pre_cards))),
+        ("Vendors billed this month", str(len(billed))), ("P&amp;L lines this month", format(pl_lines_now, ",")),
+        ("Review thresholds, by default", "CapEx %s &middot; Prepaid %s &middot; other %s &middot; department flags none" % (money(THR["thr_capex"]), money(THR["thr_prepaid"]), money(thr))),
+        ("CapEx flags", str(len(cap_cards))), ("Prepaid flags", str(len(pre_cards))),
         ("Department and account flags", str(len(dcards))), *([("Accepted exceptions", "%d items, %s" % (len(excepted), money(exc_amt, True)))] if excepted else []), ("Vendors with no flags", str(len(clear))), ("New vendors", str(len(news)))])
     sign = "".join('<div class="sign"><b>%s</b><input class="f" data-sname="%s" placeholder="Name, title"><input class="f" data-sdate="%s" placeholder="Date"><button class="pill" data-signbtn="%s">Sign</button></div>'
                    % (lab, k, k, k) for k, lab in (("prep", "Prepared by"), ("rev", "Reviewed by"), ("appr", "Approved by")))
@@ -2239,7 +2369,7 @@ def coding():
                       + '<div class="card"><div class="ch">Management Review &amp; Sign-Off</div><div class="pad">' + sign + "</div></div>"))
     pages.append(page("export", '<div class="card"><div class="ch">Export to NetSuite<button class="pill r" data-wpsave>Work paper, HTML</button><button class="pill solid" data-export>Export to NetSuite, CSV</button></div>'
                       '<div class="sumline" data-fixsum></div>'
-                      '<div class="tw"><table><thead><tr><th>Memo</th><th>Account</th><th>Department</th><th class="n2">Debit</th><th class="n2">Credit</th><th>Status</th></tr></thead><tbody data-exportrows></tbody></table></div></div>'
+                      '<div class="tw"><table><thead><tr><th>Memo</th><th>Account</th><th>Department</th><th>Project / Program</th><th class="n2">Debit</th><th class="n2">Credit</th><th>Status</th></tr></thead><tbody data-exportrows></tbody></table></div></div>'
                       '<div class="card"><div class="ch">Edited in NetSuite<span class="r note">Fixed on the bill or Journal Entry itself; resolved, and not in the CSV</span></div>'
                       '<div class="tw"><table><thead><tr><th>Ref ID</th><th>Item</th><th>Document</th><th class="n2">Amount</th><th>Note</th><th>Decided</th></tr></thead><tbody data-nsrows></tbody></table></div></div>'))
     sections = [("Overview", [("ov", "Overview")]),
@@ -2258,7 +2388,7 @@ def coding():
         j["memo"] = ref_memo(ref.get(iid), j["memo"])
     pages = [re.sub(r"\{ref:([\w-]+)\}", lambda m: '<span class="ref mono">%s</span>' % ref[m.group(1)] if m.group(1) in ref else m.group(0), x) for x in pages]
     CODING_BUILT.update(je=je_finish(je), items=items)
-    data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "je": je_finish(je), "ref": ref, "icons": {}, "drafts": DRAFTS}
+    data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "thr_capex": THR["thr_capex"], "thr_prepaid": THR["thr_prepaid"], "je":je_finish(je), "ref": ref, "icons": {}, "drafts": DRAFTS, "nsref": NSREF, "sub_id": JE_SUBSIDIARY_ID}
     js = r"""
 function refresh(){
   marks(); paintItems(); counts(); signs(); checklist();
@@ -2280,9 +2410,9 @@ function refresh(){
     '</td><td>' + esc(LABEL[l.v] || 'Cleared') + '</td><td>' + esc(l.by_uid ? Shared.name(l.by_uid) : '') + '</td><td>' + esc(l.note || '') + '</td></tr>').join('') : '<tr><td colspan="5" class="note">No decisions recorded yet.</td></tr>';
   const ex = $('[data-exportrows]'); if (ex){ const r = [];
     Object.keys(DATA.je).forEach(id => { if (!jeLive(id)) return; const j = jeOf(id), ok = jeReady(id);
-      j.lines.forEach((l, i) => r.push('<tr><td>' + (i ? '' : named(j.memo)) + '</td><td><span class="mono">' + esc(l.account) + '</span><small>' + esc(DATA.acct[(l.account || '').trim()] || '') + '</small></td><td>' + esc(l.department || '') + '</td><td class="n2">' + (Number(l.debit) ? money(l.debit) : '') +
+      j.lines.forEach((l, i) => r.push('<tr><td>' + (i ? '' : named(j.memo)) + '</td><td><span class="mono">' + esc(l.account) + '</span><small>' + esc(DATA.acct[(l.account || '').trim()] || '') + '</small></td><td>' + esc(l.department || '') + '</td><td>' + (esc(l.project || '') || '&ndash;') + '<small>' + (esc(l.program || '') || '&ndash;') + '</small></td><td class="n2">' + (Number(l.debit) ? money(l.debit) : '') +
         '</td><td class="n2">' + (Number(l.credit) ? money(l.credit) : '') + '</td><td>' + (i ? '' : ok ? 'Ready' : '<span class="unf">' + jeWhy(id).replace(/^./, c => c.toUpperCase()) + '</span>') + '</td></tr>')); });
-    ex.innerHTML = r.length ? r.join('') : '<tr><td colspan="6" class="note">No approved entries yet.</td></tr>'; }
+    ex.innerHTML = r.length ? r.join('') : '<tr><td colspan="7" class="note">No approved entries yet.</td></tr>'; }
 }
 /* The work paper: every decision, with its reference ID, the path an agreed fix took and
    the document it changed; the reclasses in the import; the sign-off. One page for the
@@ -2301,7 +2431,7 @@ function workPaper(){
       + td(S.notes[id] || '') + td(d.by_uid ? Shared.name(d.by_uid) : '') + td(String(d.at || '').slice(0, 16).replace('T', ' '), 'm') + '</tr>'; });
   const lines = [];
   Object.keys(DATA.je).filter(jeReady).forEach(id => { const j = jeOf(id);
-    j.lines.forEach((l, i) => lines.push('<tr>' + td(i ? '' : refOf(id), 'm') + td(i ? '' : j.id, 'm') + td(i ? '' : j.memo) + td(l.account, 'm') + td(l.department || '')
+    j.lines.forEach((l, i) => lines.push('<tr>' + td(i ? '' : refOf(id), 'm') + td(i ? '' : j.id, 'm') + td(i ? '' : j.memo) + td(l.account, 'm') + td(l.department || '') + td(l.project || '') + td(l.program || '')
       + td(Number(l.debit) ? usd(l.debit) : '', 'n') + td(Number(l.credit) ? usd(l.credit) : '', 'n') + '</tr>')); });
   const signs = Object.keys(S.sign).map(r => { const s = S.sign[r], lb = $('[data-sname="' + r + '"]'); return '<tr>' + td(lb ? lb.closest('.sign').querySelector('b').textContent : r) + td(s.name) + td(s.date) + '</tr>'; });
   const table = (head, rows, none) => '<table><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + (rows.join('') || '<tr><td colspan="' + head.length + '">' + none + '</td></tr>') + '</tbody></table>';
@@ -2313,7 +2443,7 @@ function workPaper(){
     + '<p>' + items.length + ' items, ' + (items.length - open.length) + ' decided, ' + open.length + ' open. Agreed fixes: ' + fx.length + '; ' + rc.length + ' booked as reclasses (' + rc.filter(f => f.in_import).length
     + ' in the import), ' + (fx.length - rc.length) + ' edited in NetSuite, not in the import.</p>'
     + '<h2>Decisions</h2>' + table(['Ref ID', 'Page', 'Item', 'Amount', 'Decision', 'Path', 'Document', 'External ID', 'Change', 'Note', 'Decided by', 'When (UTC)'], dec, 'No decisions recorded.')
-    + '<h2>Reclasses in the NetSuite import</h2>' + table(['Ref ID', 'External ID', 'Memo', 'Account', 'Department', 'Debit', 'Credit'], lines, 'None ready.')
+    + '<h2>Reclasses in the NetSuite import</h2>' + table(['Ref ID', 'External ID', 'Memo', 'Account', 'Department', 'Project', 'Program', 'Debit', 'Credit'], lines, 'None ready.')
     + '<h2>Sign-off</h2>' + table(['Role', 'Name', 'Date'], signs, 'Not signed.') + '</body></html>';
   download('serif-' + DATA.kind + '-work-paper-' + DATA.slug + '.html', html, 'text/html');
 }

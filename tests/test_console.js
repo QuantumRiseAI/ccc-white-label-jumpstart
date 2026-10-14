@@ -76,14 +76,15 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     p.on('pageerror', e => errs.push(k + ' standalone: ' + e.message));
     await p.goto('file://' + FILES[k]); await p.waitForTimeout(500);
     ok(await p.locator('#sharedbar').isHidden(), k + ': no shared banner');
-    const sel = k === 'gl' ? '#p-prepaid [data-flag]' : '#p-adj [data-item]';
+    // The GL Coding Review's first flag is CapEx, whose Journal Entry is the one these tests edit
+    const sel = k === 'gl' ? '#p-capex [data-flag]' : '#p-adj [data-item]';
     const id = await firstItem(p, sel);
     ok(/^[A-Z]+-[0-9a-f]{8}/.test(id), k + ': item id is built from the item (' + id + ')');
     await p.evaluate(id => decide(id, 'approve', 'x'), id);
     await p.reload(); await p.waitForTimeout(400);
     ok(await p.evaluate(id => (S.dec[id] || {}).v === 'approve', id), k + ': decision survives a reload');
     // edit the entry: marks it Modified, needs a note, then exports as edited
-    await p.evaluate(() => show(DATA.kind === 'coding' ? 'prepaid' : 'adj'));
+    await p.evaluate(() => show(DATA.kind === 'coding' ? 'capex' : 'adj'));
     const inp = p.locator('[data-jef="' + id + '|0|department"]');
     await inp.fill('Finance');
     ok(await p.evaluate(id => S.dec[id].v === 'modify', id), k + ': an entry edit marks the item Modified');
@@ -124,7 +125,46 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     }
     if (k === 'gl'){
       const [ref, ext] = await p.evaluate(id => [refOf(id), DATA.je[id].id], id), rows = csvText.split('\n').filter(r => r.startsWith(ext + ','));
-      ok(/^PREPAID-\d{2}$/.test(ref) && rows.length > 1 && rows.every(r => r.includes(',' + ref + ' | ') || r.includes(',"' + ref + ' | ')), 'gl: the CSV Memo starts with the finding\'s reference ID (' + ref + ')');
+      ok(/^CAPEX-\d{2}$/.test(ref) && rows.length > 1 && rows.every(r => r.includes(',' + ref + ' | ') || r.includes(',"' + ref + ' | ')), 'gl: the CSV Memo starts with the finding\'s reference ID (' + ref + ')');
+      // SERIF-144: Project and Program on each line and on both sides of each entry; balance sheet lines Non-Specific
+      ok(/^﻿?External ID,.*,Account,Department,Project,Program,Debit,Credit,Line Memo,Account Number,Department Name,Program Name,Reversing Entry\r?$/.test(csvText.split('\n')[0])
+         && rows.every(r => r.includes(',00 Non-Specific,1,') && /,00 Non-Specific,[YN]\r?$/.test(r)),
+         'gl: the CSV carries each line\'s Project, and its Program as NetSuite\'s internal ID with the name for the reviewer');
+      ok(rows.every(r => /^[^,]+,97,\d{1,2}\/\d{1,2}\/\d{4},/.test(r)) && rows.every(r => { const c = (r.match(/("([^"]|"")*"|[^,]*)(,|$)/g) || []).map(x => x.replace(/,$/, '')); return /^\d+$/.test(c[6] || '') && /^\d+$/.test(c[7] || ''); }),
+         'gl: Subsidiary is internal ID 97, dates are M/D/YYYY and accounts are internal IDs');
+      ok(await p.evaluate(() => { const ids = Object.keys(DATA.je).filter(i => /^(C|P|CB|PB|D)-/.test(i));
+        return ids.length > 10 && ids.every(i => { const m = {};
+          DATA.je[i].lines.forEach(l => { const d = l.project + '|' + l.program; m[d] = (m[d] || 0) + (Number(l.debit) || 0) - (Number(l.credit) || 0); });
+          return DATA.je[i].lines.every(l => l.project || l.program) && Object.values(m).every(v => Math.abs(v) < 0.005); })
+          && ids.some(i => DATA.je[i].lines.some(l => l.project === 'Internal CMC')); }),
+         'gl: both sides of each entry from a ledger line carry that line\'s Project and Program');
+      ok(await p.evaluate(() => { const c = Object.keys(DATA.je).filter(i => /^(C|P)-/.test(i));
+        return c.length > 0 && c.every(i => DATA.je[i].lines.every(l => /^[123]/.test(l.account) ? l.department === 'Non-Specific' && Number(l.debit) > 0 : !!l.department && l.department !== 'Non-Specific')); }),
+         'gl: on CapEx and Prepaid flags the new balance sheet line is Non-Specific; the expense line keeps its department');
+      ok(await p.evaluate(() => { const b = Object.keys(DATA.je).filter(i => /^(PB|CB)-/.test(i)), seen = [];
+        const ok_ = b.length > 0 && b.every(i => { const x = $('[data-item="' + i + '"]'), kv = {};
+          x.querySelectorAll('.kv > div').forEach(d => { kv[d.querySelector('.l').textContent] = d.querySelector('.x').textContent; });
+          const cr = DATA.je[i].lines.filter(l => Number(l.credit));
+          seen.push(cr[0].department);
+          return cr.length === 1 && /^1/.test(cr[0].account) && kv['Current coding'].startsWith(cr[0].account) && cr[0].department === kv['Department']
+            && Math.abs(Number(cr[0].credit) - Number(x.dataset.amt)) < 0.005; });
+        return ok_ && seen.some(d => d !== 'Non-Specific'); }),
+         'gl: a bill booked to prepaid or fixed assets is reversed on its own account and department, netting the original');
+      ok(await p.evaluate(() => { const i = Object.keys(DATA.je).find(i => i.startsWith('C-') && /^1/.test(DATA.je[i].lines[0].account)), l = DATA.je[i].lines[0];
+        return !!DATA.je[i].lines[1].department && DATA.je[i].lines[1].department !== 'Non-Specific' && $('[data-item="' + i + '"] .kv').textContent.includes(DATA.acct[l.account] + ' / Non-Specific'); }),
+         'gl: a CapEx card recommends the asset account with Non-Specific, not the expense\'s department');
+      ok(await p.evaluate(() => /Project \/ Program/.test($('#p-capex details.lines thead').textContent) && /00 Non-Specific/.test($('#p-capex details.lines tbody').textContent)
+         && $$('[data-jef$="|project"]').length === $$('[data-jef$="|department"]').length && $$('[data-jef$="|program"]').length === $$('[data-jef$="|department"]').length),
+         'gl: a card\'s lines show Project and Program, and every entry line can edit them');
+      const rc = await p.evaluate(() => $$('#p-clear [data-item]').pop().dataset.item);
+      await p.evaluate(rc => { decide(rc, 'recode', 'x'); show('clear'); }, rc);
+      ok(await p.evaluate(rc => jeWhy(rc) === 'unchanged', rc), 'gl: a recode with nothing changed is unchanged');
+      await p.fill('[data-jef="' + rc + '|0|project"]', 'Internal CMC');
+      ok(await p.evaluate(rc => jeWhy(rc) === 'missing note' && jeOf(rc).lines[0].project === 'Internal CMC' && jeOf(rc).lines[1].project === DATA.je[rc].lines[1].project, rc),
+         'gl: moving a line to another Project is a change, the other side keeps its Project');
+      ok(await p.evaluate(rc => { const was = S.je[rc]; S.je[rc] = DATA.je[rc].lines.map(l => ({account: l.account, department: l.department, debit: l.debit, credit: l.credit}));
+        const back = jeOf(rc).lines.every((l, n) => l.project === DATA.je[rc].lines[n].project && l.program === DATA.je[rc].lines[n].program);
+        S.je[rc] = was; delete S.je[rc]; delete S.dec[rc]; save(); refresh(); return back; }, rc), 'gl: lines saved before Project and Program were carried take the run\'s');
     }
     if (k === 'gl'){
       const r = await p.evaluate(() => document.querySelector('#p-clear [data-item]').dataset.item);
@@ -150,7 +190,9 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
         shown: (x.querySelector(':scope > .ih > .ref') || {}).textContent || '', ref: refOf(x.dataset.item)})));
       ok(refs.length > 0 && refs.length === await p.evaluate(() => Object.keys(DATA.ref).length) && refs.every(r => r.shown && r.shown === r.ref), 'gl: every card shows its reference ID in its header (' + refs.length + ')');
       ok(refs.every(r => /^(CAPEX|FA|PREPAID|PPD|DEPT|DRAFT|CLEAR|NEW)-\d{2,}$/.test(r.ref)) && new Set(refs.map(r => r.ref)).size === refs.length, 'gl: reference IDs are PREFIX-NN and unique');
-      ok(['CAPEX', 'PREPAID', 'DEPT'].every(s => refs.some(r => r.ref === s + '-01')) && refs.some(r => r.ref.startsWith('PREPAID-') && r.id.startsWith('P-')) && refs.some(r => r.ref.startsWith('DEPT-') && r.id.startsWith('D-')), 'gl: CapEx, Prepaid and Dept & Entity cards are numbered by screen');
+      ok(['CAPEX', 'PREPAID', 'PPD', 'DEPT'].every(s => refs.some(r => r.ref === s + '-01')) && refs.some(r => r.ref.startsWith('CAPEX-') && r.id.startsWith('C-'))
+        && refs.some(r => r.ref.startsWith('PREPAID-') && r.id.startsWith('P-')) && refs.some(r => r.ref.startsWith('PPD-') && r.id.startsWith('PB-'))
+        && refs.some(r => r.ref.startsWith('DEPT-') && r.id.startsWith('D-')), 'gl: CapEx, Prepaid and Dept & Entity cards are numbered by screen');
       ok(Object.values(refs.reduce((m, r) => { const [s, n] = r.ref.split('-'); (m[s] = m[s] || [])[Number(n) - 1] = r; return m; }, {}))
         .every(xs => Array.from(xs).every((r, i) => r && (!i || xs[i - 1].amt >= r.amt))), 'gl: within a screen, numbered from 01 with no gaps, largest amount first');
       ok(await p.evaluate(() => Object.keys(DATA.je).every(id => refOf(id) && DATA.je[id].memo.startsWith(refOf(id) + ' | ') && / \| Aug'26$/.test(DATA.je[id].memo)
@@ -175,6 +217,57 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
           'gl: a drafted entry is DRAFT-01 and moves no other reference ID');
       } else console.log('  SKIP gl: reference IDs across builds (needs out/dist, out/aug2026 and inputs/aug2026: run tools/build.sh first)');
     }
+    if (k === 'gl'){
+      // SERIF-142: a threshold per screen. CapEx and Prepaid have their own, saved like the general one; a Department flag has none
+      await p.evaluate(() => show('settings'));
+      ok(JSON.stringify(await p.evaluate(() => $$('[data-thrin]').map(t => [t.dataset.thrin, t.value]))) === JSON.stringify([['thr', '2,500'], ['thr_capex', '5,000'], ['thr_prepaid', '25,000']])
+         && /Department flags have no threshold/.test(await p.textContent('#p-settings')), 'gl: Settings has the review, CapEx and Prepaid thresholds ($2,500, $5,000, $25,000); department flags have none');
+      const marked = s => p.evaluate(s => $$(s).filter(x => { const g = x.querySelector(':scope > .ih > [data-rev]'); return x.classList.contains('hi') && g && !g.hidden; }).map(x => x.dataset.item), s);
+      const over = (s, t) => p.evaluate(([s, t]) => $$(s).filter(x => Number(x.dataset.tamt || x.dataset.amt) >= t).map(x => x.dataset.item), [s, t]);
+      const same = async (s, t) => { const a = await marked(s), b = await over(s, t); return a.length === b.length && a.every((x, i) => x === b[i]); };
+      const CAP = '#p-capex [data-thr="thr_capex"]', PRE = '#p-prepaid [data-thr="thr_prepaid"]';
+      ok(await p.locator(CAP).count() >= 3 && await same(CAP, 5000) && (await marked(CAP)).length === 1, 'gl: CapEx cards are marked Review at or over $5,000 (1 of ' + await p.locator(CAP).count() + ')');
+      ok(await p.locator(PRE).count() > 0 && await same(PRE, 25000), 'gl: Prepaid cards are marked Review at or over $25,000 (' + (await marked(PRE)).length + ' of ' + await p.locator(PRE).count() + ')');
+      const dept = await p.evaluate(() => [$$('#p-dept [data-thr="all"]').length, $$('#p-dept [data-thr="thr"]').length]);
+      await p.fill('#thr', '1000000');
+      ok(dept[0] > 0 && (await marked('#p-dept [data-thr="all"]')).length === dept[0] && dept[1] > 0 && (await marked('#p-dept [data-thr="thr"]')).length === 0,
+         'gl: at a $1,000,000 review threshold every Department flag is still Review (' + dept[0] + '); account recodes are not');
+      ok(await same(CAP, 5000) && await same(PRE, 25000), 'gl: the review threshold does not move CapEx or Prepaid');
+      // the prepaid screen lists from the $2,500 reporting floor, as CapEx does: lowering the Prepaid threshold marks more
+      const PF = '#p-prepaid [data-flag]', pf = await p.locator(PF).count();
+      ok(pf > 0 && (await marked(PF)).length === (await over(PF, 25000)).length && (await over(PF, 2500)).length === pf, 'gl: prepaid flags are listed from $2,500 and marked Review from $25,000 (' + (await marked(PF)).length + ' of ' + pf + ')');
+      await p.fill('#thrprepaid', '5000');
+      ok(await same(PF, 5000) && (await marked(PF)).length > (await over(PF, 25000)).length, 'gl: lowering the Prepaid threshold to $5,000 marks more prepaid flags (' + (await marked(PF)).length + ')');
+      await p.fill('#thrcapex', '3000'); await p.fill('#thrprepaid', '10000');
+      ok(await same(CAP, 3000) && (await marked(CAP)).length === 2 && await same(PRE, 10000), 'gl: changing the CapEx and Prepaid thresholds marks their screens again');
+      await p.reload(); await p.waitForTimeout(400);
+      ok(await p.evaluate(() => S.thr === 1000000 && S.thr_capex === 3000 && S.thr_prepaid === 10000 && $('#thrcapex').value === '3,000') && await same(CAP, 3000),
+         'gl: the three thresholds are saved with the review and survive a reload');
+      await p.evaluate(() => { S.thr = DATA.thr; delete S.thr_capex; delete S.thr_prepaid; save(); refresh(); });
+      // a review saved before SERIF-142 holds one threshold: it loads, keeps it, and CapEx and Prepaid take their defaults
+      const c0 = await b.newContext(); const o = await c0.newPage(), key = await p.evaluate(() => KEY), idOld = await p.evaluate(() => $('#p-dept [data-flag]').dataset.item);
+      o.on('pageerror', e => errs.push('gl old state: ' + e.message));
+      await o.addInitScript(([k, v]) => { if (!sessionStorage.getItem('seeded')){ localStorage.setItem(k, v); sessionStorage.setItem('seeded', '1'); } },
+        [key, JSON.stringify({dec: {[idOld]: {v: 'approve', at: '2026-09-02T10:00:00Z'}}, notes: {}, thr: 40000})]);
+      await o.goto('file://' + FILES.gl); await o.waitForTimeout(500);
+      ok(await o.evaluate(id => S.thr === 40000 && thrOf('thr_capex') === 5000 && thrOf('thr_prepaid') === 25000 && (S.dec[id] || {}).v === 'approve' && decided(id), idOld),
+         'gl: a review saved with one threshold restores, its decisions and threshold kept, CapEx and Prepaid at their defaults');
+      ok(await o.evaluate(() => $$('#p-dept [data-thr="thr"]').every(x => x.classList.contains('hi') === Number(x.dataset.amt) >= 40000) && $('#thr').value === '40,000'), 'gl: its threshold marks the account recodes');
+      await c0.close();
+      // SERIF-147: each CapEx recommendation says whether it goes to Capital in Process or its fixed asset account, why, and asks the in-service date
+      await p.evaluate(() => show('capex'));
+      const cx = await p.evaluate(() => $$('#p-capex [data-flag]').map(x => { const pl = x.querySelector('[data-placed]'), nt = x.querySelector('textarea[data-note]');
+        return {id: x.dataset.item, text: x.querySelector('.why').textContent, to: DATA.je[x.dataset.item].lines.find(l => Number(l.debit)).account, memo: DATA.je[x.dataset.item].memo,
+                kind: pl ? pl.dataset.placed : '', note: nt && !nt.hidden ? nt.placeholder : '', name: x.querySelector('.ih b').textContent}; }));
+      ok(cx.length > 0 && cx.every(c => c.kind && (['buildout', 'not_in_service', 'no_account'].includes(c.kind) ? c.to === '1505000' && /Capital in Process/.test(c.memo) : /^15[1-9]\d{4}$/.test(c.to) && /in service: fixed asset/.test(c.memo))),
+         'gl: every CapEx card says where it goes, Capital in Process or a fixed asset account, on the card and in its Memo');
+      const rt = cx.find(c => c.name === 'Red Thread Spaces LLC') || {}, rp = cx.find(c => c.name === 'Repligen Corporation') || {};
+      ok(rt.kind === 'buildout' && rt.to === '1505000' && /names build-out work/.test(rt.text) && /until employees begin using the space/.test(rt.text) && /Ask the date employees began/.test(rt.text),
+         'gl: the office desk expansion goes to Capital in Process as build-out work, and asks when the space is in use');
+      ok(rp.kind === 'in_service' && rp.to === '1510000' && /policy places it in service at the invoice date/.test(rp.text) && /no in-service date\. Ask when it went into use/.test(rp.text) && /under the \$5,000 capitalization threshold/.test(rp.text),
+         'gl: a lab purchase goes to 1510000 Lab Equipment - New, in service at the invoice date, and asks the in-service date');
+      ok(cx.every(c => c.note === 'In-service date, and a note'), 'gl: each CapEx card keeps its note open for the in-service date');
+    }
     if (k === 'pl'){
       // a variance row proposes an entry: the row's account, an offset to fill, the memo from the review; it joins the same CSV
       await p.evaluate(() => show('ava'));
@@ -193,7 +286,12 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.evaluate(pid => !S.dec[pid] && !S.je[pid] && !S.jh[pid] && !S.notes[pid] && !jeLive(pid) && jeOpen('ava').length === 0, pid), 'pl: Reset clears a proposal, nothing is held');
       await p.fill('[data-jef="' + pid + '|0|debit"]', '500');
       await p.fill('[data-jef="' + pid + '|1|account"]', '2206000');
+      ok(await p.evaluate(pid => jeOf(pid).lines[1].department === 'Non-Specific' && $('[data-jef="' + pid + '|1|department"]').value === 'Non-Specific', pid),
+         'pl: a line moved to a balance sheet account takes the Non-Specific department');
       await p.fill('[data-jef="' + pid + '|0|debit"]', '500'); await p.fill('[data-jef="' + pid + '|1|credit"]', '500');
+      ok(await p.evaluate(pid => { S.notes[pid] = S.notes[pid] || 'Reviewer note'; const w = jeWhy(pid); delete S.notes[pid]; return /missing department/.test(w); }, pid),
+         'pl: a proposed line with no department is held (NetSuite requires one)');
+      await p.fill('[data-jef="' + pid + '|0|department"]', 'General R&D');
       await p.fill('[data-jef="' + pid + '|0|memo"]', 'Reclass test line');
       await p.selectOption('[data-jeh="' + pid + '|reversing"]', 'Y');
       ok(await p.evaluate(pid => { S.notes[pid] = 'Reviewer note'; return !jeReady(pid); }, pid), 'pl: reversing without a reversal date is held');
@@ -211,8 +309,18 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.evaluate(pid => jeReady(pid), pid), 'pl: a balanced, noted proposal is ready');
       const [d2] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
       const rowsCsv = d2 ? fs.readFileSync(await d2.path(), 'utf8').split('\n') : [];
-      ok(/^\ufeff?External ID,Subsidiary,Journal Date,Posting Period,Currency,Exchange Rate,Memo,Reversing Entry,Reversal Date,Account,Department,Debit,Credit,Line Memo$/.test(rowsCsv[0] || ''), 'pl: the CSV carries the NetSuite header and line fields');
-      ok(rowsCsv.some(r => /"?Serif Biomedicines, Inc\.?"?,2026-08-31,Aug 2026,USD,1,.*,Y,2026-09-01,.*Reclass test line/.test(r)), 'pl: the proposed entry exports with subsidiary, posting period, reversal and line memo');
+      ok(/^\ufeff?External ID,Subsidiary,Journal Date,Posting Period,Memo,Reversal Date,Account,Department,Project,Program,Debit,Credit,Line Memo,Account Number,Department Name,Program Name,Reversing Entry$/.test(rowsCsv[0] || ''), 'pl: the CSV carries the NetSuite header and line fields');
+      ok(await p.evaluate(() => { const x = Object.values(DATA.je).filter(j => /^Capitalize /.test(j.memo || ''));
+        return x.length > 0 && x.every(j => j.lines.every(l => /^1/.test(l.account) ? l.department === 'Non-Specific' : l.department !== 'Non-Specific')
+          && new Set(j.lines.map(l => l.project + '|' + l.program)).size === 1 && !!j.lines[0].project); }),
+         'pl: a Capitalize entry\'s asset line is Non-Specific and both lines carry the bill\'s Project and Program');
+      ok(rowsCsv.some(r => /^[^,]+,97,8\/31\/2026,Aug 2026,.*,9\/1\/2026,.*Reclass test line.*,Y$/.test(r)), 'pl: the proposed entry exports with subsidiary 97, posting period, M/D/YYYY dates, reversal and line memo');
+      ok(await p.evaluate(pid => { const was = S.je[pid], j = JSON.parse(JSON.stringify(jeOf(pid).lines)); const say = [];
+        S.je[pid] = j.map((l, i) => i ? l : Object.assign({}, l, {account: '9999999'})); say.push(jeWhy(pid));
+        S.je[pid] = j.map((l, i) => i ? l : Object.assign({}, l, {department: ''})); say.push(jeWhy(pid));
+        if (was) S.je[pid] = was; else delete S.je[pid];
+        return /not an active NetSuite account/.test(say[0]) && /missing department/.test(say[1]); }, pid),
+         'pl: an account NetSuite does not hold, or a line with no department, holds the entry out of the import');
       ok(await p.locator('#p-ava [data-pane="mom"] th', {hasText: '3-mo avg'}).count() === 1, 'pl: MoM carries trailing averages');
       ok(await p.locator('#p-dept .ch', {hasText: 'Credits in Expense Accounts'}).count() === 1 && await p.locator('[data-note^="cr:"]').count() > 0, 'pl: credits in expense accounts listed');
       ok(await p.locator('[data-note="bonus:total"]').count() === 1, 'pl: bonus accrual check, in total');
