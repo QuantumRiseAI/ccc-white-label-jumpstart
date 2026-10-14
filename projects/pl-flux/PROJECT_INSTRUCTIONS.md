@@ -31,7 +31,7 @@ name, or missing, and ask for any that are missing before you run anything.
 | Rolling forecast workbook, `.xlsx`, the month's cut | The workbook FP&A saved after the month closed, such as `serif_rolling_forecast_2026-09.xlsx`, for Forecast vs. Actual |
 | Rolling forecast workbook, `.xlsx`, the plan | `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
 | NetSuite Balance Sheet report, monthly columns, `.xls` | For Balance Sheet Flux and the tie-outs |
-| NetSuite Income Statement by month report, `.xls` | The month and the month before. The ledger is tied to it by account before the console is built, and on SOX & GAAP |
+| NetSuite Income Statement by month report, `.xls`, by accounting period (a connector query grouped by transaction date does not tie) | The month and the month before. The ledger is tied to it by account before the console is built, and on SOX & GAAP |
 | UKG roster, `.csv` | The newest roster |
 | NetSuite link IDs, `.csv`, named `netsuite_link_ids_<month>.csv` | Optional, for links. The connector's result for `netsuite_link_ids.sql`; see NetSuite Link IDs |
 
