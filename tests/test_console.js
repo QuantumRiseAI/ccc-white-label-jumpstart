@@ -126,6 +126,42 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     if (k === 'gl'){
       const [ref, ext] = await p.evaluate(id => [refOf(id), DATA.je[id].id], id), rows = csvText.split('\n').filter(r => r.startsWith(ext + ','));
       ok(/^CAPEX-\d{2}$/.test(ref) && rows.length > 1 && rows.every(r => r.includes(',' + ref + ' | ') || r.includes(',"' + ref + ' | ')), 'gl: the CSV Memo starts with the finding\'s reference ID (' + ref + ')');
+      // SERIF-144: Project and Program on each line and on both sides of each entry; balance sheet lines Non-Specific
+      ok(/^﻿?External ID,.*,Account,Department,Project,Program,Debit,Credit,Line Memo\r?$/.test(csvText.split('\n')[0]) && rows.every(r => r.includes(',00 Non-Specific,00 Non-Specific,')),
+         'gl: the CSV carries each line\'s Project and Program beside its department');
+      ok(await p.evaluate(() => { const ids = Object.keys(DATA.je).filter(i => /^(C|P|CB|PB|D)-/.test(i));
+        return ids.length > 10 && ids.every(i => { const m = {};
+          DATA.je[i].lines.forEach(l => { const d = l.project + '|' + l.program; m[d] = (m[d] || 0) + (Number(l.debit) || 0) - (Number(l.credit) || 0); });
+          return DATA.je[i].lines.every(l => l.project || l.program) && Object.values(m).every(v => Math.abs(v) < 0.005); })
+          && ids.some(i => DATA.je[i].lines.some(l => l.project === 'Internal CMC')); }),
+         'gl: both sides of each entry from a ledger line carry that line\'s Project and Program');
+      ok(await p.evaluate(() => { const c = Object.keys(DATA.je).filter(i => /^(C|P)-/.test(i));
+        return c.length > 0 && c.every(i => DATA.je[i].lines.every(l => /^[123]/.test(l.account) ? l.department === 'Non-Specific' && Number(l.debit) > 0 : !!l.department && l.department !== 'Non-Specific')); }),
+         'gl: on CapEx and Prepaid flags the new balance sheet line is Non-Specific; the expense line keeps its department');
+      ok(await p.evaluate(() => { const b = Object.keys(DATA.je).filter(i => /^(PB|CB)-/.test(i)), seen = [];
+        const ok_ = b.length > 0 && b.every(i => { const x = $('[data-item="' + i + '"]'), kv = {};
+          x.querySelectorAll('.kv > div').forEach(d => { kv[d.querySelector('.l').textContent] = d.querySelector('.x').textContent; });
+          const cr = DATA.je[i].lines.filter(l => Number(l.credit));
+          seen.push(cr[0].department);
+          return cr.length === 1 && /^1/.test(cr[0].account) && kv['Current coding'].startsWith(cr[0].account) && cr[0].department === kv['Department']
+            && Math.abs(Number(cr[0].credit) - Number(x.dataset.amt)) < 0.005; });
+        return ok_ && seen.some(d => d !== 'Non-Specific'); }),
+         'gl: a bill booked to prepaid or fixed assets is reversed on its own account and department, netting the original');
+      ok(await p.evaluate(() => { const i = Object.keys(DATA.je).find(i => i.startsWith('C-') && /^1/.test(DATA.je[i].lines[0].account)), l = DATA.je[i].lines[0];
+        return !!DATA.je[i].lines[1].department && DATA.je[i].lines[1].department !== 'Non-Specific' && $('[data-item="' + i + '"] .kv').textContent.includes(DATA.acct[l.account] + ' / Non-Specific'); }),
+         'gl: a CapEx card recommends the asset account with Non-Specific, not the expense\'s department');
+      ok(await p.evaluate(() => /Project \/ Program/.test($('#p-capex details.lines thead').textContent) && /00 Non-Specific/.test($('#p-capex details.lines tbody').textContent)
+         && $$('[data-jef$="|project"]').length === $$('[data-jef$="|department"]').length && $$('[data-jef$="|program"]').length === $$('[data-jef$="|department"]').length),
+         'gl: a card\'s lines show Project and Program, and every entry line can edit them');
+      const rc = await p.evaluate(() => $$('#p-clear [data-item]').pop().dataset.item);
+      await p.evaluate(rc => { decide(rc, 'recode', 'x'); show('clear'); }, rc);
+      ok(await p.evaluate(rc => jeWhy(rc) === 'unchanged', rc), 'gl: a recode with nothing changed is unchanged');
+      await p.fill('[data-jef="' + rc + '|0|project"]', 'Internal CMC');
+      ok(await p.evaluate(rc => jeWhy(rc) === 'missing note' && jeOf(rc).lines[0].project === 'Internal CMC' && jeOf(rc).lines[1].project === DATA.je[rc].lines[1].project, rc),
+         'gl: moving a line to another Project is a change, the other side keeps its Project');
+      ok(await p.evaluate(rc => { const was = S.je[rc]; S.je[rc] = DATA.je[rc].lines.map(l => ({account: l.account, department: l.department, debit: l.debit, credit: l.credit}));
+        const back = jeOf(rc).lines.every((l, n) => l.project === DATA.je[rc].lines[n].project && l.program === DATA.je[rc].lines[n].program);
+        S.je[rc] = was; delete S.je[rc]; delete S.dec[rc]; save(); refresh(); return back; }, rc), 'gl: lines saved before Project and Program were carried take the run\'s');
     }
     if (k === 'gl'){
       const r = await p.evaluate(() => document.querySelector('#p-clear [data-item]').dataset.item);
@@ -247,6 +283,8 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.evaluate(pid => !S.dec[pid] && !S.je[pid] && !S.jh[pid] && !S.notes[pid] && !jeLive(pid) && jeOpen('ava').length === 0, pid), 'pl: Reset clears a proposal, nothing is held');
       await p.fill('[data-jef="' + pid + '|0|debit"]', '500');
       await p.fill('[data-jef="' + pid + '|1|account"]', '2206000');
+      ok(await p.evaluate(pid => jeOf(pid).lines[1].department === 'Non-Specific' && $('[data-jef="' + pid + '|1|department"]').value === 'Non-Specific', pid),
+         'pl: a line moved to a balance sheet account takes the Non-Specific department');
       await p.fill('[data-jef="' + pid + '|0|debit"]', '500'); await p.fill('[data-jef="' + pid + '|1|credit"]', '500');
       await p.fill('[data-jef="' + pid + '|0|memo"]', 'Reclass test line');
       await p.selectOption('[data-jeh="' + pid + '|reversing"]', 'Y');
@@ -265,7 +303,11 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.evaluate(pid => jeReady(pid), pid), 'pl: a balanced, noted proposal is ready');
       const [d2] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
       const rowsCsv = d2 ? fs.readFileSync(await d2.path(), 'utf8').split('\n') : [];
-      ok(/^\ufeff?External ID,Subsidiary,Journal Date,Posting Period,Currency,Exchange Rate,Memo,Reversing Entry,Reversal Date,Account,Department,Debit,Credit,Line Memo$/.test(rowsCsv[0] || ''), 'pl: the CSV carries the NetSuite header and line fields');
+      ok(/^\ufeff?External ID,Subsidiary,Journal Date,Posting Period,Currency,Exchange Rate,Memo,Reversing Entry,Reversal Date,Account,Department,Project,Program,Debit,Credit,Line Memo$/.test(rowsCsv[0] || ''), 'pl: the CSV carries the NetSuite header and line fields');
+      ok(await p.evaluate(() => { const x = Object.values(DATA.je).filter(j => /^Capitalize /.test(j.memo || ''));
+        return x.length > 0 && x.every(j => j.lines.every(l => /^1/.test(l.account) ? l.department === 'Non-Specific' : l.department !== 'Non-Specific')
+          && new Set(j.lines.map(l => l.project + '|' + l.program)).size === 1 && !!j.lines[0].project); }),
+         'pl: a Capitalize entry\'s asset line is Non-Specific and both lines carry the bill\'s Project and Program');
       ok(rowsCsv.some(r => /"?Serif Biomedicines, Inc\.?"?,2026-08-31,Aug 2026,USD,1,.*,Y,2026-09-01,.*Reclass test line/.test(r)), 'pl: the proposed entry exports with subsidiary, posting period, reversal and line memo');
       ok(await p.locator('#p-ava [data-pane="mom"] th', {hasText: '3-mo avg'}).count() === 1, 'pl: MoM carries trailing averages');
       ok(await p.locator('#p-dept .ch', {hasText: 'Credits in Expense Accounts'}).count() === 1 && await p.locator('[data-note^="cr:"]').count() > 0, 'pl: credits in expense accounts listed');

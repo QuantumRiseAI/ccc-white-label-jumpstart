@@ -37,6 +37,45 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: Project and Program on lines and entries, Non-Specific on balance sheet lines (SERIF-144)
+
+- **Both consoles**: each ledger line a card lists shows its Project and Program (the GL's
+  `ProjectID: Name` and `Program: Name`) beside its department: a card's lines, and a bill booked
+  to prepaid or fixed assets (GL Coding Review). Every proposed Journal Entry carries them on both
+  sides, from the line it corrects, so a reclass leaves no stray balance on a Project. The entry
+  editor edits them (an edit marks the item Modified, as any edit does), and Export, the work
+  paper and the NetSuite CSV carry them: two line columns, `Project` and `Program`, after
+  `Department`. A reclass whose lines sit on different Projects becomes a line per Project, each
+  netting to zero. An entry with no ledger line behind it (an accrual from Coupa receipts, a
+  reclass staged in the forecast, Propose entry) leaves them blank to fill.
+- **New balance sheet lines take `Non-Specific`**: on every proposed entry, a new line on a
+  balance sheet account (1xxxxxx to 3xxxxxx) takes the `Non-Specific` department; income statement
+  lines keep theirs. A CapEx recode to 1505000 Capital in Process put the expense's General R&D on
+  the asset line; the card and the entry now say Non-Specific. The line that reverses the ledger
+  line being corrected keeps that line's department, on a balance sheet account too, so it nets
+  the original: a bill booked to prepaid and recoded to expense credits prepaid on the bill's own
+  department. Entry lines mark it `reverses_line` (in `views.entries` and in Claude's drafted
+  entries). A line the reviewer moves to a balance sheet account takes Non-Specific, which can
+  still be changed. Balance sheet lines keep the Project and Program. Ledger balance sheet lines
+  that carry another department are not flagged: that is an open question to Serif (123 of 1,260
+  in Aug 2026).
+- **Saved reviews** load as before: an entry edit saved earlier takes the run's Project and
+  Program on its lines. The decision record's format stays 3.
+- `serif_views.py`: `detail.items` and the `views.entries` lines carry `project` and `program`; a
+  flux finding's transactions, which do not, take them from the GL by document and account, and
+  only when its lines agree.
+- Aug 2026: 2,711 of 2,713 ledger lines carry a Project and all carry a Program (212 on
+  `Internal CMC`). GL Coding Review: all 226 lines of the 102 entries carry both (22 on Internal
+  CMC); the 4 new balance sheet lines move to Non-Specific (CAPEX-01 to 03 from the expense's
+  department, PREPAID-01), the 7 prepaid credits on PPD-01 to 07 keep the bills' General R&D, and
+  two reclasses split by Project (DEPT-01, 6 lines to 8; DEPT-21, 4 to 6). P&L Flux: 8 of the 14
+  adjustments carry both; its 12 balance sheet lines are all new (8 accrual credits to 2206000,
+  3 Capitalize and 1 prepaid debit) and, having had no department, take Non-Specific.
+- Tests: `test_console.js` (116) checks both sides of each entry, the new CapEx and Prepaid
+  asset lines, the prepaid credit that nets the bill, the CSV columns, a Project edit and an
+  earlier saved edit; `test_readers.py` (25) follows Project and Program from the reader to both
+  sides of an entry and reverses a balance sheet line on its own department.
+
 ## Unreleased: a threshold per coding screen, and Capital in Process or a fixed asset (SERIF-142, SERIF-147)
 
 - **Serif's thresholds** (Mike's write-up, 12 Oct 2026): **$5,000** PP&E capitalization and

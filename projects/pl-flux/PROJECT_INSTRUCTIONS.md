@@ -234,8 +234,13 @@ opens its pages beside its title.
     gap**: two or more bills this month, none last month, billed in at least two of the four
     months before, and at least 1.5 times the usual month and at or over the threshold, which
     may be a missed accrual coming back. The NetSuite CSV downloads here, with Subsidiary, Journal
-    Date, Posting Period, Currency, Exchange Rate, Memo, Reversing Entry, Reversal Date and a Line
-    Memo on each line. Journal Date, Posting Period, Memo, Reversing Entry, Reversal Date and Line
+    Date, Posting Period, Currency, Exchange Rate, Memo, Reversing Entry, Reversal Date, and on
+    each line Account, Department, Project, Program, Debit, Credit and a Line Memo. Both sides of
+    an entry carry the Project and Program of the bill it corrects (an accrual from Coupa receipts
+    or a reclass staged in the forecast has none, and leaves them to fill); a new balance sheet
+    line (accounts 1xxxxxx to 3xxxxxx) takes the `Non-Specific` department, and only income
+    statement lines carry one. The line that reverses the posted line keeps its department, on a
+    balance sheet account too, so it nets the original. Journal Date, Posting Period, Memo, Reversing Entry, Reversal Date and Line
     Memo are editable on the entry; Subsidiary, Currency and Exchange Rate are shown, not
     editable. The Journal Date defaults to the last day of the close month;
   * **SOX & GAAP**: the tie-outs of the ledger to the Income Statement (by account, and in total) and Balance Sheet, the
@@ -278,8 +283,10 @@ you drafted.
     {"memo": "Specific description | Aug'26", "reason": "Why the entry is needed.",
      "reverses": "2026-09-01",
      "lines": [
-       {"account": "6504000", "department": "Production", "vendor": "...", "debit": 1000.00},
-       {"account": "2206000", "vendor": "...", "credit": 1000.00}
+       {"account": "6504000", "department": "Production", "project": "00 Non-Specific",
+        "program": "00 Non-Specific", "vendor": "...", "debit": 1000.00},
+       {"account": "2206000", "department": "Non-Specific", "project": "00 Non-Specific",
+        "program": "00 Non-Specific", "vendor": "...", "credit": 1000.00}
      ]}
   ]
 }
@@ -298,7 +305,8 @@ Read from `out/<period>/run.json`:
 * `findings`. For `F1.VARIANCE` and `F2.BUDGET`: `departments` (the account in each
   department) and `movers` (each department and vendor, prior and current, the change, and
   the lines behind it). For the adjustments: `evidence`, `correction` and `views.explain`.
-* `views.entries`: the proposed Journal Entries, balanced, line by line.
+* `views.entries`: the proposed Journal Entries, balanced, line by line, each line with its
+  Project and Program; `reverses_line` marks the line that reverses a posted one.
 * `manifest.budget_coverage`: what the plan does not cover.
 
 ### 1. Commentary
@@ -376,8 +384,13 @@ covers it.
   out-of-period adjustment: date it in the close month, start the Memo with the period it
   corrects, for example `Out-of-period correction Jun'26 | Lab supplies recoded from
   facilities | Aug'26`, and tell the reviewer it needs the controller's approval.
-* Debits equal credits. Each line carries the account code and name, department, vendor and
-  documents. Accruals reverse on the first day of the next month.
+* Debits equal credits. Each line carries the account code and name, department, Project,
+  Program, vendor and documents. Accruals reverse on the first day of the next month.
+* A reclass keeps the posted line's Project and Program on both sides, unless the correction
+  is to the Project or Program itself. Mark the line that reverses a posted line
+  `"reverses_line": true`: it keeps that line's department, on a balance sheet account too. Every
+  other balance sheet line (accounts 1xxxxxx to 3xxxxxx) is new and takes the `Non-Specific`
+  department; only income statement lines carry one. The build sets it on every entry.
 * Memo, per the Data Entry Policy: `Specific description | Mon'YY`.
 * Patterns and accounts are in [`PL_FLUX_SKILL.md`](PL_FLUX_SKILL.md).
 
@@ -554,8 +567,10 @@ NetSuite."
    the console again.
 3. When the reviewer attaches the exported file, check it with code: each External ID
    balances, each Date is in the close month, each accrual has a Reversal Date on the first
-   day of the next month, and the entries match those approved in the decision record. Report
-   what does not. Change nothing in the file.
+   day of the next month, each new balance sheet line's Department is `Non-Specific` (a line
+   reversing a posted one keeps that line's), and the
+   entries match those approved in the decision record. Report what does not. Change nothing
+   in the file.
 4. A person imports it into NetSuite. You never post it.
 
 **Draft the forecast revisions.** "Draft the forecast revisions." Follow What You Write, 4.
@@ -620,8 +635,8 @@ approved.
    attached. Ask for the posted entries: an export of the month's posted Journal Entries, or,
    with the NetSuite connector, read them by External ID. Say which, and when it was read.
 2. With code, match each entry in the CSV to its posted entry by External ID. Compare the
-   date and posting period, the subsidiary, each line's account, department, debit and
-   credit, and the memo, and each accrual's Reversal Date. Check that each posted entry balances, and that its amount
+   date and posting period, the subsidiary, each line's account, department, Project,
+   Program, debit and credit, and the memo, and each accrual's Reversal Date. Check that each posted entry balances, and that its amount
    agrees to the item it came from in the run.
 3. Report each entry as Matches, Differences found (with each difference) or Not found. List
    any posted entry for the month that carries a review memo but no External ID from the CSV.
