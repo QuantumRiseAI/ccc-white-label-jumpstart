@@ -37,6 +37,17 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: September data fixes
+
+- **P&L Flux**: a run whose GL exports hold no same month last year builds, with YoY shown as
+  not run, instead of stopping on an error.
+- **Coding engine 0.2.6**: the PO account checks report "did not run" when the Coupa report has
+  no Account column (both checks) or no Supplier (the PO account check), instead of running and
+  finding nothing.
+- The statement reader's messages name the report generically, since it reads the Income
+  Statement too, and ask for it by accounting period. Both Projects say the Income Statement
+  must be by accounting period.
+
 ## Unreleased: the ledger tied to the Income Statement by account (SERIF-146)
 
 - **Both Projects** tie the ledger to NetSuite's Income Statement by month report, account by
