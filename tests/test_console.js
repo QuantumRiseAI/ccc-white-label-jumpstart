@@ -3,14 +3,14 @@
 // record and the work paper), then shared mode on a mocked Artifact db:
 // two reviewers, attribution, a conflict, a read-only viewer, downloads, and a rerun
 // bringing in the earlier run's decisions. Needs Playwright with Chromium.
-//   node tests/test_console.js [folder holding the two aug2026 v2.0.0 consoles]   (or: make test)
+//   node tests/test_console.js [folder holding the two aug2026 v2.1.0 consoles]   (or: make test)
 // With no folder, it tests consoles/.
 let chromium; try { ({ chromium } = require('playwright')); }
 catch (e) { ({ chromium } = require(process.env.PLAYWRIGHT || '/Users/anniebritton/.npm/_npx/520e866687cefe78/node_modules/playwright')); }
 const fs = require('fs'), path = require('path'), os = require('os');
 const B = path.resolve(__dirname, '..') + '/';
 const DIR = process.argv[2];
-const FILES = DIR ? {gl: path.join(DIR, 'serif-gl-coding-review-aug2026-v2.0.0.html'), pl: path.join(DIR, 'serif-pl-flux-aug2026-v2.0.0.html')}
+const FILES = DIR ? {gl: path.join(DIR, 'serif-gl-coding-review-aug2026-v2.1.0.html'), pl: path.join(DIR, 'serif-pl-flux-aug2026-v2.1.0.html')}
   : {gl: B + 'consoles/serif-gl-coding-review.html', pl: B + 'consoles/serif-pl-flux.html'};
 let fails = 0;
 const ok = (c, m) => { console.log((c ? '  PASS ' : '  FAIL ') + m); if (!c) fails++; };
@@ -122,8 +122,8 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
         S.thr_pct = 1000; refresh(); const n1 = $$('#p-ava [data-pane="mom"] tr[data-var]').filter(overThr).length, chip = $('#p-ava [data-thrv="thr"]').textContent;
         delete S.thr_pct; save(); refresh(); return n1 < n0 && /and 1000%/.test(chip) && $$('#p-ava [data-pane="mom"] tr[data-var]').filter(overThr).length === n0; }),
       'pl: an optional percent narrows the lines needing commentary, shows on the chip, and clears');
-    if (k === 'gl') ok(await p.evaluate(() => $$('#p-dept .item').filter(x => /Same item, two accounts/.test(x.textContent)).every(x => DATA.je[x.dataset.item] && x.querySelector('[data-v="reject"]').textContent === 'Coding Stands')),
-      'gl: a same item on two accounts is a card with the recode and Coding Stands');
+    if (k === 'gl') ok(await p.evaluate(() => $$('#p-dept .item').filter(x => /Same item, two accounts/.test(x.textContent)).every(x => DATA.je[x.dataset.item] && x.querySelector('[data-v="reject"]').textContent === 'Reject')),
+      'gl: a same item on two accounts is a card with the recode and Reject');
     if (k === 'pl'){
       ok(await p.evaluate(() => $$('.draft.auto a.xl').length > 0 && !$$('.draft.auto').some(d => /NetSuiteCoupa|\dNetSuite/.test(DATA.drafts[d.dataset.draft].note))),
          'pl: a line summary drafted from the ledger keeps its NetSuite and Coupa links, and its text reads cleanly');
@@ -153,18 +153,19 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ns = await p.evaluate(() => { const n = $$('#p-dept [data-flag]').map(x => x.dataset.item).find(i => DATA.je[i] && DATA.docs[i] && $('[data-item="' + i + '"] [data-v="netsuite"]'));
         if (!refOf(n)) DATA.ref = Object.assign({}, DATA.ref, {[n]: 'TEST-01'});
         return {id: n, doc: DATA.docs[n], ref: refOf(n), ext: DATA.je[n].id}; });
-      ok(!!ns.id && !!ns.doc, 'gl: a Dept & Entity flag offers Edited in NetSuite and knows its document (' + ns.doc + ')');
-      ok(await p.evaluate(() => !$$('[data-item^="DR-"] [data-v="netsuite"]').length && $$('#p-clear [data-v="netsuite"]').length > 0 && $$('#p-prepaid [data-v="netsuite"]').length > 0),
-         'gl: Edited in NetSuite is offered beside each fix to a transaction, not on an entry Claude drafted');
+      ok(!!ns.id && !!ns.doc, 'gl: an Organization & Account flag offers Edited Manually in NetSuite and knows its document (' + ns.doc + ')');
+      ok(await p.evaluate(() => $$('[data-item^="DR-"]').every(x => x.querySelector('[data-v="netsuite"]')) && $$('#p-clear [data-v="netsuite"]').length > 0 && $$('#p-prepaid [data-v="netsuite"]').length > 0),
+         'gl: Edited Manually in NetSuite is offered beside each fix, an entry Claude drafted included');
       await p.evaluate(() => show('dept'));
       // A page of many cards opens folded: the reviewer opens the card first.
       ok(await p.locator('[data-item="' + ns.id + '"] [data-v="netsuite"]').isHidden(), 'gl: a long page opens with its cards folded');
       ok(await p.evaluate(() => $('[data-c="clear"]').classList.contains('soft') && !$('[data-c="dept"]').classList.contains('soft')
-         && /^\d+$/.test($('[data-c="dept"]').textContent) && $('#p-dept .hero [data-pgs="dept:open"]').textContent === $('[data-c="dept"]').textContent),
-         'gl: Dept & Entity counts its open decisions in red and in its header; the confirmation pages count in grey');
+         && /^\d+$/.test($('[data-c="dept"]').textContent)
+         && (m => !!m && String(+m[2] - +m[1]) === $('[data-c="dept"]').textContent)(/^(\d+) of (\d+)$/.exec($('#p-dept .hero [data-pgs="dept:done"]').textContent))),
+         'gl: Organization & Account counts its open decisions in red and in its header; the confirmation pages count in grey');
       await p.click('[data-item="' + ns.id + '"] > .ih');
       await p.click('[data-item="' + ns.id + '"] [data-v="netsuite"]');
-      ok(await p.evaluate(n => S.dec[n].v === 'netsuite' && decided(n) && !jeLive(n) && /Edited in NetSuite/.test($('[data-item="' + n + '"] .stp').textContent)
+      ok(await p.evaluate(n => S.dec[n].v === 'netsuite' && decided(n) && !jeLive(n) && /Edited manually in NetSuite/.test($('[data-item="' + n + '"] .stp').textContent)
          && !$('[data-note="' + n + '"]').hidden, ns.id), 'gl: Edited in NetSuite counts as decided, no note required, the note offered');
       await p.fill('[data-jef="' + ns.id + '|0|department"]', 'Finance');
       ok(await p.evaluate(n => S.dec[n].v === 'netsuite', ns.id), 'gl: editing its entry records what changed and keeps it Edited in NetSuite');
@@ -187,9 +188,14 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       const [ref, ext] = await p.evaluate(id => [refOf(id), DATA.je[id].id], id), rows = csvText.split('\n').filter(r => r.startsWith(ext + ','));
       ok(/^CAPEX-\d{2}$/.test(ref) && rows.length > 1 && rows.every(r => r.includes(',' + ref + ' | ') || r.includes(',"' + ref + ' | ')), 'gl: the CSV Memo starts with the finding\'s reference ID (' + ref + ')');
       // SERIF-144: Project and Program on each line and on both sides of each entry; balance sheet lines Non-Specific
-      ok(/^﻿?External ID,.*,Account,Department,Project,Program,Debit,Credit,Line Memo,Account Number,Department Name,Program Name,Reversing Entry\r?$/.test(csvText.split('\n')[0])
+      ok(/^﻿?External ID,.*,Account,Department,Project,Program,Name,Coupa PO Number,Debit,Credit,Line Memo,Account Number,Department Name,Program Name,Reversing Entry\r?$/.test(csvText.split('\n')[0])
          && rows.every(r => r.includes(',00 Non-Specific,1,') && /,00 Non-Specific,[YN]\r?$/.test(r)),
          'gl: the CSV carries each line\'s Project, and its Program as NetSuite\'s internal ID with the name for the reviewer');
+      // SERIF-161: each entry line names its vendor (NetSuite's Name), one name each. The Aug 2026 export has no Coupa PO
+      // column, so every PO here is blank; Sep 2026's fill the PO where the bill has one.
+      ok(await p.evaluate(() => { const ls = Object.keys(DATA.je).filter(i => /^(C|P|D)-/.test(i)).flatMap(i => DATA.je[i].lines);
+        return ls.length > 0 && ls.filter(l => l.vendor).length >= 0.9 * ls.length && ls.every(l => !/, .*, |\(no vendor\)/.test(l.vendor || '')) && ls.every(l => 'po' in l); }),
+         'gl: entry lines carry their vendor, one name each, and a Coupa PO field');
       ok(rows.every(r => /^[^,]+,97,\d{1,2}\/\d{1,2}\/\d{4},/.test(r)) && rows.every(r => { const c = (r.match(/("([^"]|"")*"|[^,]*)(,|$)/g) || []).map(x => x.replace(/,$/, '')); return /^\d+$/.test(c[6] || '') && /^\d+$/.test(c[7] || ''); }),
          'gl: Subsidiary is internal ID 97, dates are M/D/YYYY and accounts are internal IDs');
       ok(await p.evaluate(() => { const ids = Object.keys(DATA.je).filter(i => /^(C|P|CB|PB|D)-/.test(i));
@@ -216,7 +222,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.evaluate(() => /Project \/ Program/.test($('#p-capex details.lines thead').textContent) && /00 Non-Specific/.test($('#p-capex details.lines tbody').textContent)
          && $$('[data-jef$="|project"]').length === $$('[data-jef$="|department"]').length && $$('[data-jef$="|program"]').length === $$('[data-jef$="|department"]').length),
          'gl: a card\'s lines show Project and Program, and every entry line can edit them');
-      const rc = await p.evaluate(() => $$('#p-clear [data-item]').pop().dataset.item);
+      const rc = await p.evaluate(() => $$('#p-clear [data-pane]:not([hidden]) [data-item]').pop().dataset.item);   // in the open department tab
       await p.evaluate(rc => { decide(rc, 'recode', 'x'); show('clear'); }, rc);
       ok(await p.evaluate(rc => jeWhy(rc) === 'unchanged', rc), 'gl: a recode with nothing changed is unchanged');
       await p.fill('[data-jef="' + rc + '|0|project"]', 'Internal CMC');
@@ -283,8 +289,8 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.evaluate(() => Object.keys(DATA.je).every(id => refOf(id) && DATA.je[id].memo.startsWith(refOf(id) + ' | ') && / \| Aug'26$/.test(DATA.je[id].memo)
         && DATA.je[id].memo.length <= 999 && DATA.je[id].lines.every(l => l.memo.startsWith(refOf(id) + ' | ') && l.memo.length <= 999))), 'gl: each entry\'s Memo and Line Memo is REF | description | Aug\'26, within NetSuite\'s 999 characters');
       ok(await p.evaluate(() => { const m = $('#p-dept [data-jeh$="|memo"]'), id = m.dataset.jeh.split('|')[0];
-        return /^DEPT-\d{2}$/.test(refOf(id)) && m.value === DATA.je[id].memo && m.value.startsWith(refOf(id) + ' | '); }), 'gl: the entry editor\'s Memo carries the reference ID');
-      // a rebuild of the same run numbers every card the same; a drafted entry adds a DRAFT ID and moves none
+        return /^(DEPT|CODING)-\d{2,}$/.test(refOf(id)) && m.value === DATA.je[id].memo && m.value.startsWith(refOf(id) + ' | '); }), 'gl: the entry editor\'s Memo carries the reference ID');
+      // a rebuild of the same run numbers every card the same; a drafted entry takes its category's next ID and moves none
       const DG = B + 'out/dist/gl-coding-review/', run = B + 'out/aug2026/gl-coding-review/run.json';
       if (fs.existsSync(DG + 'build_pages.py') && fs.existsSync(run) && fs.existsSync(B + 'inputs/aug2026')){
         const cp = require('child_process'), tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'serif-refs-'));
@@ -298,8 +304,9 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
           return JSON.parse(h.match(/window\.DATA=(.*?);<\/script>/s)[1]).ref; };
         const mine = await p.evaluate(() => DATA.ref), again = refsOf('again', []), withDraft = refsOf('draft', ['--drafts', drafts]);
         ok(again && JSON.stringify(again) === JSON.stringify(mine), 'gl: a rebuild of the same data gives the same reference IDs');
-        ok(withDraft && Object.keys(mine).every(i => withDraft[i] === mine[i]) && Object.keys(withDraft).filter(i => !(i in mine)).map(i => withDraft[i]).join() === 'DRAFT-01',
-          'gl: a drafted entry is DRAFT-01 and moves no other reference ID');
+        const nextDept = 'DEPT-' + String(Object.values(mine).filter(r => r.startsWith('DEPT-')).length + 1).padStart(2, '0');
+        ok(withDraft && Object.keys(mine).every(i => withDraft[i] === mine[i]) && Object.keys(withDraft).filter(i => !(i in mine)).map(i => withDraft[i]).join() === nextDept,
+          'gl: a drafted account recode is ' + nextDept + ', after the run\'s own, and moves no other reference ID');
       } else console.log('  SKIP gl: reference IDs across builds (needs out/dist, out/aug2026 and inputs/aug2026: run tools/build.sh first)');
     }
     if (k === 'gl'){
@@ -350,7 +357,8 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
          'gl: a review saved with one threshold restores, its decisions and threshold kept, CapEx and Prepaid at their defaults');
       ok(await o.evaluate(() => $$('#p-dept [data-thr="thr"]').every(x => x.classList.contains('hi') === Number(x.dataset.amt) >= 40000) && $('#thr').value === '40,000'), 'gl: its threshold marks the account recodes');
       await c0.close();
-      // SERIF-147: each CapEx recommendation says whether it goes to Capital in Process or its fixed asset account, why, and asks the in-service date
+      // SERIF-147: each CapEx recommendation says whether it goes to Capital in Process or its fixed asset account and why; the note asks
+      // the in-service date. SERIF-172: the reason states what was found, not what to do, so it carries no 'Ask ...' sentence.
       await p.evaluate(() => show('capex'));
       const cx = await p.evaluate(() => $$('#p-capex [data-flag]').map(x => { const pl = x.querySelector('[data-placed]'), nt = x.querySelector('textarea[data-note]');
         return {id: x.dataset.item, text: x.querySelector('.why').textContent, to: DATA.je[x.dataset.item].lines.find(l => Number(l.debit)).account, memo: DATA.je[x.dataset.item].memo,
@@ -358,9 +366,9 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(cx.length > 0 && cx.every(c => c.kind && (['buildout', 'not_in_service', 'no_account'].includes(c.kind) ? c.to === '1505000' && /Capital in Process/.test(c.memo) : /^15[1-9]\d{4}$/.test(c.to) && /in service: fixed asset/.test(c.memo))),
          'gl: every CapEx card says where it goes, Capital in Process or a fixed asset account, on the card and in its Memo');
       const rt = cx.find(c => c.name === 'Red Thread Spaces LLC') || {}, rp = cx.find(c => c.name === 'Repligen Corporation') || {};
-      ok(rt.kind === 'buildout' && rt.to === '1505000' && /names build-out work/.test(rt.text) && /until employees begin using the space/.test(rt.text) && /Ask the date employees began/.test(rt.text),
-         'gl: the office desk expansion goes to Capital in Process as build-out work, and asks when the space is in use');
-      ok(rp.kind === 'in_service' && rp.to === '1510000' && /policy places it in service at the invoice date/.test(rp.text) && /no in-service date\. Ask when it went into use/.test(rp.text) && /under the \$5,000 capitalization threshold/.test(rp.text),
+      ok(rt.kind === 'buildout' && rt.to === '1505000' && /names build-out work/.test(rt.text) && /until employees begin using the space/.test(rt.text) && !/\bAsk\b/.test(rt.text),
+         'gl: the office desk expansion goes to Capital in Process as build-out work, its reason with no instruction');
+      ok(rp.kind === 'in_service' && rp.to === '1510000' && /policy places it in service at the invoice date/.test(rp.text) && !/\bAsk\b/.test(rp.text) && /In-service date/.test(rp.note) && /under the \$5,000 capitalization threshold/.test(rp.text),
          'gl: a lab purchase goes to 1510000 Lab Equipment - New, in service at the invoice date, and asks the in-service date');
       ok(cx.every(c => c.note === 'In-service date, and a note' || c.note === 'saved'), 'gl: each CapEx card keeps its note open for the in-service date, or shows it saved');
     }
@@ -405,7 +413,9 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.evaluate(pid => jeReady(pid), pid), 'pl: a balanced, noted proposal is ready');
       const [d2] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
       const rowsCsv = d2 ? fs.readFileSync(await d2.path(), 'utf8').split('\n') : [];
-      ok(/^\ufeff?External ID,Subsidiary,Journal Date,Posting Period,Memo,Reversal Date,Account,Department,Project,Program,Debit,Credit,Line Memo,Account Number,Department Name,Program Name,Reversing Entry$/.test(rowsCsv[0] || ''), 'pl: the CSV carries the NetSuite header and line fields');
+      ok(/^\ufeff?External ID,Subsidiary,Journal Date,Posting Period,Memo,Reversal Date,Account,Department,Project,Program,Name,Coupa PO Number,Debit,Credit,Line Memo,Account Number,Department Name,Program Name,Reversing Entry$/.test(rowsCsv[0] || ''), 'pl: the CSV carries the NetSuite header and line fields');
+      ok(await p.evaluate(() => { const ls = Object.keys(DATA.je).filter(i => /^ADJ-/.test(i)).flatMap(i => DATA.je[i].lines);
+        return ls.length > 0 && ls.some(l => l.vendor); }), 'pl: adjustment lines carry their vendor');
       ok(await p.evaluate(() => { const x = Object.values(DATA.je).filter(j => /^Capitalize /.test(j.memo || ''));
         return x.length > 0 && x.every(j => j.lines.every(l => /^1/.test(l.account) ? l.department === 'Non-Specific' : l.department !== 'Non-Specific')
           && new Set(j.lines.map(l => l.project + '|' + l.program)).size === 1 && !!j.lines[0].project); }),
@@ -426,7 +436,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     // the run log
     await p.evaluate(() => show('runlog'));
     ok(await p.locator('#p-runlog h3', {hasText: 'What each check found'}).count() === 1, k + ': run log shows each check');
-    ok(await p.locator('#p-runlog td', {hasText: '2.0.0'}).count() >= 1, k + ': build record names 2.0.0');
+    ok(await p.locator('#p-runlog td', {hasText: '2.1.0'}).count() >= 1, k + ': build record names 2.1.0');
     // the decision record: save, then load into a clean browser
     await p.evaluate(() => show('settings'));
     const [rd] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('[data-recsave]')]);
@@ -490,7 +500,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     const nsId = k === 'gl' ? await A.evaluate(() => $('#p-dept [data-flag] [data-v="netsuite"]').closest('[data-item]').dataset.item) : null;
     if (nsId){
       await A.evaluate(id => decide(id, 'netsuite', 'n'), nsId); await sleep(1500);
-      ok(await Bp.evaluate(id => (S.dec[id] || {}).v === 'netsuite' && decided(id) && /^Edited in NetSuite · Alice Reviewer/.test($('[data-item="' + id + '"] .stp').textContent), nsId),
+      ok(await Bp.evaluate(id => (S.dec[id] || {}).v === 'netsuite' && decided(id) && /^Edited manually in NetSuite · Alice Reviewer/.test($('[data-item="' + id + '"] .stp').textContent), nsId),
          'B sees A\'s Edited in NetSuite, named');
     }
     ok(!JSON.stringify(Array.from(store.values())).includes('Alice Reviewer'), 'no name written to the shared review');

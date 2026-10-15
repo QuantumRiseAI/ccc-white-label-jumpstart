@@ -6,7 +6,7 @@ The scripts find and lay out. You explain and write.
 
 Three scripts run in order and produce a review console, one HTML file, laid out as the
 controller's August GL review. The reviewer works the console. You write what the reviewer needs around it: what each flagged vendor bought and
-whether its coding fits, the questions for owners, the reasons for cleared items, and the
+whether its coding fits, what the lines do not show, the reasons for cleared items, and the
 Journal Entries no rule proposed. Every figure you use comes from the run.
 
 Never compute findings, totals or variances yourself. A number you add up by hand does not
@@ -61,7 +61,7 @@ each activity to its booked line, maps Flagship's accounts to Serif's from the b
 checks each item against the capital and prepaid thresholds, its service period and its
 account (parking or travel booked as consulting), and proposes the reclass. Without one, the
 card says a breakdown would show more, links to Coupa, and is decided Reviewed in Coupa; every
-other card on that bill (CapEx, Prepaid, Dept & Entity) carries a Pass-through bill line, since
+other card on that bill (CapEx, Prepaid, Organization & Account) carries a Pass-through bill line, since
 one line may hold several items. In drafts, name the bill and the items the breakdown shows.
 
 Disha is confirming with Scott whether department reclasses on these items are in scope; until
@@ -113,7 +113,7 @@ bonus accrual, interest) and none at this one. That says the GL was pulled befor
 closed. Say so first, name the accounts, and ask for the GL again after close. The list
 leads the first page of the console too.
 
-The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v2.0.0.html`. Publish it
+The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v2.1.0.html`. Publish it
 as [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML
 yourself: if it needs a change, change the script and build again.
 
@@ -270,70 +270,104 @@ Coupa has no connector yet. When it has one, the same rules apply.
 ## What the Reviewer Sees
 
 The console is laid out as the controller's August GL review. The bar holds four sections; a
-section opens its pages beside its title.
+section's pages open in a bar under the header.
 
-* **Overview**: total period spend, the flags and what they are worth, clean vendors, what is
-  resolved, the tie to NetSuite's Income Statement (every account, or the ones that differ),
-  and the close checklist: each page, what is open on it and what that is worth.
+* **Overview**: **Vendor Spend** for the month (net of credits, on P&L accounts, and what it
+  leaves out: lines with no vendor, such as payroll, accruals and journals, and expense
+  reports), **Items to Review** (the flags and the bills booked to fixed-asset or prepaid
+  accounts, by page, with their value; the same count as the Review badge), **Vendors to
+  Confirm** (Vendors Reviewed & Cleared and New Vendors This Period; the same count as the
+  Confirm badge), the tie to NetSuite's Income Statement (every account, or the ones that
+  differ), and the Review Checklist: each page, what is open on it and what that is worth.
 * **Review**:
   * **CapEx Flags** and **Prepaid Flags**, both directions: expense lines that may be capital
     or prepaid, each with its proposed Journal Entry; then this month's bills posted to
-    fixed-asset or prepaid accounts, to confirm or recode to expense;
-  * **Dept & Entity**: department and account recodes, each with its proposed Journal Entry,
-    and any Journal Entry you drafted;
+    fixed-asset or prepaid accounts, each with **Confirm, Stays on Balance Sheet**, **Recode to
+    Expense, Add to NetSuite CSV** and **Edited Manually in NetSuite**;
+  * **Organization & Account**: department and account recodes, each with its proposed Journal
+    Entry, and any Journal Entry you drafted that changes an account or department;
   * **Pass-Through Bills**: each Flagship pass-through bill, reviewed against its cost breakdown
     when one was supplied (see Flagship Pass-Through Bills).
-  Dept & Entity also carries **Same item, two accounts**: an item a vendor billed this month to
-  6410000 Lab Supplies/Consumables or 6415000 Lab Non-Capital Equipment that went only to the
-  other in the six months before. It reads the ledger, so it runs when the Coupa report has no
-  Account column. Either side may be wrong: the card offers the recode back or Coding Stands.
-  Last on Dept & Entity, **Coding changed or off plan**: a vendor card for each vendor whose
-  account or department this month is one it did not use in the months before (Coding changed),
-  or whose coding differs from the plan (Coded off plan). The card covers only those codings,
-  less any another card already moves (CapEx, Prepaid, a Dept & Entity entry, Same item, a
-  pass-through bill, a drafted entry); a vendor new this month stays on New This Period. Its
-  Journal Entry moves a changed coding back to the one the vendor used before, and an off-plan
-  coding the vendor never used to the planned one; a coding it has used before is left as booked. The reviewer confirms the coding, or recodes,
-  editing the entry if the lines belong elsewhere, with a note. Draft notes for these vendors as
-  for any flagged vendor; a note that names a bill goes on the card for that bill.
-  Each page shows its threshold beside its title; a long page opens folded to one line per card.
+  Organization & Account holds its items in a **Coding Inconsistencies** box, one tab for what
+  the coding disagrees with:
+    * **vs. Vendor History**: Department flags (`T1.DEPT_INCONSISTENCY`), Coding changed
+      vendors, and drafted account or department recodes;
+    * **vs. Coupa PO**: account flags against the Coupa PO (`T4.PO_ACCOUNT_MISMATCH`, and
+      `T4.ITEM_ACCOUNT_DRIFT` at or over the threshold). When the PO check did not run, the tab
+      shows a dash and the run's reason;
+    * **vs. Forecast**: Coded off plan vendors;
+    * **Same Item, Different Accounts**: an item a vendor billed this month to 6410000 Lab
+      Supplies/Consumables or 6415000 Lab Non-Capital Equipment that went only to the other in
+      the six months before. It reads the ledger, so it runs when the Coupa report has no
+      Account column. Either side may be wrong: the card offers the recode back or Reject.
+  Each item is tagged with what its entry changes: Account, Department, or Account and
+  department. **Coding changed or off plan** is a vendor card for each vendor whose account or
+  department this month is one it did not use in the months before (Coding changed), or whose
+  coding differs from the plan (Coded off plan); its first flag picks its tab. The card covers
+  only those codings, less any another card already moves (CapEx, Prepaid, an Organization &
+  Account entry, Same item, a pass-through bill, a drafted entry); a vendor new this month stays
+  on New Vendors This Period. The vendor's pass-through bills stay on Pass-Through Bills: the
+  card's codings, line count, Lines and notes cover the vendor's other bills only. Its Journal
+  Entry moves a changed coding back to the one the vendor used before, and an off-plan coding
+  the vendor never used to the planned one; a coding it has used before is left as booked. A
+  Coded off plan vendor whose codings the vendor used before proposes no move: the card says
+  "The coding matches the vendor's earlier months; only the plan differs.", the Memo is
+  `Recode <vendor>`, and the entry starts as booked. The reviewer confirms the coding
+  (**Confirm, Coding Stands**), or recodes (**Recode, Add to NetSuite CSV**), editing the entry
+  if the lines belong elsewhere, with a note, or marks it **Edited Manually in NetSuite**. Draft notes for these
+  vendors as for any flagged vendor; a note that names a bill goes on the card for that bill.
+  Each page shows its threshold beside its title.
   The reviewer accepts or edits a draft and saves each note; only saved notes read as finished.
-* **Confirm**: **Reviewed & Cleared**, the vendors no check flagged, and **New This
-  Period**, the vendors first seen this month. Both are grouped by department, then account;
-  each vendor is confirmed, or recoded with a filled-in Journal Entry and a note. A vendor on
-  Reviewed & Cleared shows which checks it passed (coded as in the two months before, account
-  matching its Coupa PO, not prepaid or capital, coded as planned), and which could not apply
-  and why. A confirmed vendor folds to its name; its name opens it again.
+* **Confirm**: **Vendors Reviewed & Cleared**, the vendors no check flagged, and **New
+  Vendors This Period**, the vendors first seen this month. Both have a folder tab per
+  department, then group by account; each vendor is confirmed (**Confirm, No Recode** on
+  Vendors Reviewed & Cleared, **Confirm Vendor & Coding** on New Vendors This Period), recoded
+  (**Recode, Add to NetSuite CSV**) with a filled-in Journal Entry and a note, or marked **Edited
+  Manually in NetSuite**. A vendor on Vendors Reviewed & Cleared shows which checks it passed
+  (coded as in the two months before, account matching its Coupa PO, not prepaid or capital,
+  coded as planned), and which could not apply and why. A confirmed vendor folds to its name;
+  its name opens it again.
 * **Documentation**: the **Audit Log** (who decided what and when), **SOX Documentation**
   (sources, the GL tie-out and the Income Statement tie, the policies applied and the sign-off), and **Export**, the
-  NetSuite CSV (External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs) and the **Work paper, HTML**. The same export saves the support file beside it (`...-support.html`): every entry in the import, by External ID, with its reason, the decision and who made it, the note and its lines, to attach in NetSuite with the import.
+  NetSuite CSV (External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Name (the vendor, NetSuite's entity), Coupa PO Number, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs) and the **Work paper, HTML**. The same export saves the support file beside it (`...-support.html`): every entry in the import, by External ID, with its reason, the decision and who made it, the note and its lines, to attach in NetSuite with the import.
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
   supplied, what each check found, the estimated cost of a run, the inputs and the build
   record. Settings has the thresholds, the decision record (save and load) and **Bring in the
   earlier run's decisions**.
 
+Every review and vendor page opens with one **Decided** counter (0 of 5, say) and a line
+saying what its items are, and with every card folded to its header; a card opens on its own.
+
 Every flag and vendor card starts with its reference ID, numbered by screen within the close
-(CAPEX-01, FA-01, PREPAID-01, PPD-01, DEPT-01, DRAFT-01, CODING-01, PASS-01, CLEAR-01, NEW-01), and the Memo of its
+(CAPEX-01, FA-01, PREPAID-01, PPD-01, DEPT-01, CODING-01, PASS-01, CLEAR-01, NEW-01; a Journal
+Entry you drafted takes the ID of its category), and the Memo of its
 Journal Entry starts with the same ID, so the entry in NetSuite ties back to the card. Use the ID
 when you name a card to the reviewer. Each card shows its document with NetSuite and Coupa links, the vendor's last
 three months by account and department with the line descriptions, and its lines, each with its
-Project and Program. A flag's
-Journal Entry is filled in and editable: approve it, reject it, or edit it, which marks it
-Modified and needs a note. Both sides of an entry carry the Project and Program of the line it
+Project and Program. A card states what was found and why; it never says what to do. The
+decision buttons sit under the card's folds (Why it was flagged, Journal Entry, Last three
+months, Lines). A flag's Journal Entry is filled in and editable, and offers **Add to NetSuite
+CSV**, **Edited Manually in NetSuite** and **Reject**. There is no Modify button: editing the
+entry's lines marks it Added to NetSuite CSV, edited; it still goes to the CSV and needs a note.
+Each entry line carries the Vendor (the CSV's Name, NetSuite's entity) and the Coupa PO, both
+editable, filled from the item's bill lines: the PO on the line's account and department, for
+the same amount where one matches; the debit that receives a cost carries the PO of the credit
+that removes it. The PO is the PO number as the GL holds it. Both sides of an entry carry the Project and Program of the line it
 corrects; a new balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the `Non-Specific`
 department, and only income statement lines carry one. The line that reverses the ledger line
 being corrected keeps that line's department, on a balance sheet account too (a bill recoded off
-prepaid credits prepaid on the bill's department), so it nets the original. **Edited in NetSuite**, beside Approve Recode and Recode, records a fix
+prepaid credits prepaid on the bill's department), so it nets the original. **Edited Manually in NetSuite** records a fix
 made on the bill or Journal Entry itself while the period is open: it settles the item, needs no
-note, and stays out of the CSV, which holds only the reclasses to book. A Journal Entry you drafted
-has no Edited in NetSuite. Export lists the items edited in NetSuite and saves the **Work paper,
+note, and stays out of the CSV, which holds only the reclasses to book. Export lists the items
+edited manually in NetSuite and saves the **Work paper,
 HTML**; the decision record's `fixes` gives each agreed fix's path (Reclass or Edited in NetSuite),
-reference ID, document and, for a reclass, External ID.
+reference ID, document and, for a reclass, External ID. A decided flag's status reads "Added to
+NetSuite CSV", "Added to NetSuite CSV, edited", "Edited manually in NetSuite" or "Rejected".
 
 The thresholds are in dollars only, one per review screen, each set in Settings: **CapEx
 $5,000** and **Prepaid $25,000** (Serif's capitalization and prepaid thresholds, Mike's
-write-up of 12 Oct 2026), and **$2,500** for the rest, the account recodes on Dept & Entity
-and any entry you drafted. A Department flag has none: every line off Non-Specific is
+write-up of 12 Oct 2026), and **$2,500** for the rest, the account recodes on Organization &
+Account and any entry you drafted. A Department flag has none: every line off Non-Specific is
 recoded, whatever its size, so each is marked Review. An item at or over its screen's
 threshold is marked Review. The booked lines on CapEx and Prepaid take their page's. CapEx
 and Prepaid list every flag from $2,500, so a lower threshold shows more; one under its
@@ -346,9 +380,9 @@ Serif's close entries do) is not flagged on CapEx or Prepaid: it is already book
 Each CapEx card says whether the purchase goes to **`1505000` Capital in Process** (build-out
 work, or an asset bought but not yet in service) or to its fixed asset account (an asset in
 service), and why, on the card and in its Journal Entry Memo. The ledger has no in-service
-date: unless the line states one, the card asks the reviewer for it, in the note. Office
-furniture and equipment has no fixed asset account in Serif's chart; the entry holds it in
-Capital in Process and asks the Controller which account to use. Never invent one.
+date: unless the line states one, the card's note asks for it. Office furniture and
+equipment has no fixed asset account in Serif's chart; the entry holds it in Capital in
+Process, and the card says the chart has no fixed asset account for it. Never invent one.
 
 ## What You Write
 
@@ -375,8 +409,8 @@ reviewer the rebuilt file, and say in the chat what you drafted.
 {
   "vendors": {
     "Global Life Sciences Solutions USA LLC": {
-      "recommend": "question",
-      "note": "What was bought, whether the coding fits, and the question, reason or entry."
+      "recommend": "entry",
+      "note": "What was bought, whether the coding fits, and the reason or entry."
     }
   },
   "entries": [
@@ -394,8 +428,9 @@ reviewer the rebuilt file, and say in the chat what you drafted.
 ```
 
 `recommend` is `clear`, `entry` or `question`. On a vendor card, `clear` is Confirm and `entry`
-is Recode. On a flag, `clear` is Reject (the coding stands) and `entry` is Approve (book the
-recode). `question` is a note only: ask the owner. Vendor names are exactly as in the run.
+is Recode. On a flag, `clear` is Reject (the coding stands) and `entry` is Add to NetSuite CSV
+(book the recode). `question` is a note only: it sets no decision and shows no label. Vendor
+names are exactly as in the run.
 Every part is optional. When the reviewer asks for a table or a CSV in the chat, give that too.
 
 Read from `out/<period>/run.json`:
@@ -416,14 +451,14 @@ For each flagged vendor whose largest flag clears its screen's threshold, larges
 1. Say what was bought, in plain words, from the line descriptions. If an item is unfamiliar,
    say what it is and what it is used for. If you are not sure, say so. Do not guess.
 2. Say whether the account and the department fit what was bought.
-3. Recommend one outcome: **Confirm** (`clear`), **Recode** (`entry`), or a question for the
-   owner (`question`). Put what was bought, the fit, and the reason, question or entry in
-   `note`. The reviewer decides.
+3. Recommend one outcome: **Confirm** (`clear`) or **Recode** (`entry`). Where the lines do
+   not settle it, mark it `question` and say what they do not show. Put what was bought, the
+   fit, and the reason or entry in `note`, as facts and a recommendation. The reviewer decides.
 
 > Global Life Sciences Solutions USA LLC, $8,998. GenVoy-ILM T cell kits and NanoAssemblr
 > Spark cartridges: lipid nanoparticle formulation reagents and consumables. Lab Supplies fits.
 > Chemistry is new for this vendor; Production and General R&D carried it in June and July.
-> Recommend a question to Chemistry: did Chemistry use these kits?
+> The lines do not show which department used the kits.
 
 ### 2. Reasons for Confirmed Vendors
 
@@ -432,11 +467,11 @@ sentence: what the item is, and why the coding stands.
 
 > Consumable chromatography column, not equipment. Lab Supplies is correct.
 
-### 3. Questions for Owners
+### 3. What the Lines Do Not Show
 
-For a vendor you recommend as a question, end `note` with one question to the row's `owner`
-department. Cite the document number, description and amount, and say which answer would
-change the coding.
+For a vendor you mark `question`, end `note` with what the lines do not show, as a statement,
+not a question to the owner. Cite the document number, description and amount, name the row's
+`owner` department, and say which answer would change the coding.
 
 ### 4. Journal Entries
 
@@ -460,19 +495,27 @@ Draft an entry where the coding is wrong and no proposed entry in `views.entries
   document numbers.
 * Memo, per the Data Entry Policy: `Specific description | Mon'YY`, for example
   `Long column holder recoded to lab supplies | Aug'26`. Leave out the reference ID: the build
-  puts the card's in front, `DRAFT-01 | Long column holder recoded to lab supplies | Aug'26`.
+  puts the card's in front, `DEPT-07 | Long column holder recoded to lab supplies | Aug'26`.
 * Prepaid and capital flags move the bill to the balance sheet. The accounts are in
   [`GL_CODING_REVIEW_SKILL.md`](GL_CODING_REVIEW_SKILL.md). A capital entry says in its Memo
   and reason whether it goes to Capital in Process or the fixed asset account, and why, and
   the reason gives the in-service date or says it is not known.
 * Check that debits equal credits before you write the entry.
 
-The entry joins Dept & Entity as `SERIF-DRAFT-1` and on, marked "Draft" with a sparkle. Once the
-reviewer approves it, it is in the NetSuite CSV on Export.
+The entry is built like any other item, with the vendor as its title, Current coding, Proposed
+recode, Document / item, Lines and Last three months, and no Draft marker on the card. It goes
+to the page its change belongs to and takes that category's reference ID: a debit to a fixed
+asset account (15xxxxx) goes on CapEx Flags as CAPEX-NN, a debit to a prepaid account (13xxxxx)
+on Prepaid Flags as PREPAID-NN, and any other on Organization & Account, under vs. Vendor
+History, as DEPT-NN. It is numbered after the run's own items in that category, so an entry
+drafted later moves no reference ID already cited. Its External ID is `SERIF-DRAFT-1` and on;
+its item id keeps `DR-`. The work paper's decision Path adds ", drafted by Claude". It offers
+Add to NetSuite CSV, Edited Manually in NetSuite and Reject; once added, it is in the NetSuite
+CSV on Export.
 
 ### 5. In the Chat
 
-Do not write a `summary`. The Overview opens on the figures and the close checklist, which the
+Do not write a `summary`. The Overview opens on the figures and the Review Checklist, which the
 reviewer works from. Say in the chat what you drafted, and name every check that did not
 run and why. The hand-off at the end of a session is written in the chat; see Requests.
 
@@ -484,6 +527,10 @@ run and why. The hand-off at the end of a session is written in the chat; see Re
 * Name a person only where the reviewer needs it. Never write an email address.
 * Figures exactly as the run has them, with the dollar sign and commas.
 * Say what the data shows, then what you recommend. Keep the two apart.
+* State what was found and why. Never write an instruction to the reviewer or a question to an
+  owner. The build drops any sentence in a note or a reason that starts with Read, If, Ask, Open,
+  Choose, Put, Attach, Check, Book, Reclass, Tell, Supply, Look, Review, Use, Approve, Reject or
+  Question to.
 * No filler: not "no significant change", not "due to business activity", never a restated
   number without a reason.
 * Every Serif policy is a draft. Say so when you cite one.
@@ -547,15 +594,18 @@ record, and the reviewer can change it.
 The record (`kind` `serif-decision-record`, `format` 3, `console_kind` `coding`) holds, each
 keyed by item id:
 
-* `dec`: decisions (`v`: `approve`, `reject`, `modify`, `confirm` or `recode`; `at`; `by_uid`
-  in shared mode);
+* `dec`: decisions (`v`: `approve`, `reject`, `modify`, `netsuite`, `confirm` or `recode`;
+  `at`; `by_uid` in shared mode). The verbs are stored as before; only the buttons' words
+  changed (`approve` is Add to NetSuite CSV, `modify` an entry edited before adding it,
+  `netsuite` Edited Manually in NetSuite);
 * `notes`: the reviewer's notes;
 * `je`: the reviewer's edits to an entry's lines;
 * `sign`: the sign-off; `log`: the audit log.
 
 Item ids start `C-` and `P-` for CapEx and Prepaid flags, `CB-` and `PB-` for bills booked to
-fixed-asset and prepaid accounts, `D-` for Dept & Entity, `DR-` for your drafted entries, and
-`VC-` for Coding changed or off plan, `R-` and `N-` for Reviewed & Cleared and New This Period, and `PT-` for Pass-Through Bills. Notes are the reviewer's own words.
+fixed-asset and prepaid accounts, `D-` for Organization & Account, `DR-` for your drafted entries
+(on the page of their category), `VC-` for Coding changed or off plan, `R-` and `N-` for Vendors
+Reviewed & Cleared and New Vendors This Period, and `PT-` for Pass-Through Bills. Notes are the reviewer's own words.
 
 ## Requests
 
@@ -568,7 +618,8 @@ Month, Run It, then What You Write.
 **Rerun since the last review.** "Run it again." "Rerun since the last review." "Reviewed as
 of 20 Sep." Follow Later Runs in the Same Chat.
 
-**Draft the questions email.** "Draft the questions email."
+**Draft the questions email.** "Draft the questions email." The cards carry no questions to
+owners, so this request is unchanged by them: the questions come from the reviewer's notes.
 
 1. Ask for the latest decision record if it is not attached. Take the questions from its
    `notes`. If the reviewer wants your drafts instead, say they are not yet used.
@@ -582,8 +633,9 @@ of 20 Sep." Follow Later Runs in the Same Chat.
 NetSuite."
 
 1. The import comes from the console: **Export to NetSuite, CSV** on Documentation > Export. It
-   holds every entry approved, modified or recoded with a note, as edited, and leaves out any
-   that is out of balance or unchanged, and every item marked Edited in NetSuite. Never write
+   holds every entry added to the NetSuite CSV (an edited one with a note) or recoded with a
+   note, as edited, and leaves out any that is out of balance or unchanged, and every item
+   marked Edited Manually in NetSuite. Never write
    the import yourself.
 2. If an entry the reviewer wants is not in the console, draft it (What You Write, 4) and build
    the console again.
@@ -604,7 +656,7 @@ latest run and the record:
 3. What is decided, by outcome, and what is left over the threshold, with its value. Without
    the record, give the run's figures and say decisions are not counted.
 4. Questions still waiting on an owner, by department, from the notes.
-5. Journal Entries approved and recodes, the fixes edited in NetSuite (not in the CSV), and
+5. Journal Entries added to the NetSuite CSV and recodes, the fixes edited manually in NetSuite (not in the CSV), and
    whether the NetSuite CSV has been downloaded and uploaded.
 6. Every check that did not run, and what it needs.
 7. Where the record is: the decision record, saved from Settings, to keep with the close file
@@ -619,12 +671,12 @@ reviewer has worked every page. Ask for the latest decision record and the NetSu
 they are not attached.
 
 1. Find what is open, with code: every item in the console (`data-item` in the HTML) with no
-   decision in `dec`, or with Modified or Recode and no note. If anything is open, list it with
-   its page and amount, and stop. The Overview's close checklist shows the same. Only the
+   decision in `dec`, or edited (`modify`) or recoded (`recode`) with no note. If anything is open, list it with
+   its page and amount, and stop. The Overview's Review Checklist shows the same. Only the
    reviewer settles an item, in the console.
 2. Summarize the session, as above.
 3. Check the CSV with code, as in Build the NetSuite import, step 3, and that its entries are
-   the ones the record has approved, modified or recoded. Report what does not.
+   the ones the record has added to the CSV, edited or recoded. Report what does not.
 4. Hand over the upload file: give the reviewer the CSV back unchanged, with its file name,
    entries and lines. Never edit, rebuild or re-export it.
 5. A person uploads it to NetSuite. You never post it.
@@ -811,7 +863,7 @@ tax findings, and it changes no rule: a covered finding stays in `findings`, is 
 "accepted by <approved_by>: <reason>", never call it clean, and do not propose a recode for it. A row
 that cannot be applied (missing field, shifted columns, no 7-digit account) is listed under
 `manifest.exceptions.rejected` with its line number, a row that matches nothing under `unmatched`, and
-an unreadable file is `malformed`; the load summary and the Dept & Entity page show all three. Report
+an unreadable file is `malformed`; the load summary and the Organization & Account page show all three. Report
 them. The file is hashed into the manifest when it has content; absent or header-only is recorded as
 such and changes nothing.
 

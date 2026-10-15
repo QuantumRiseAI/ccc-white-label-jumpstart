@@ -83,7 +83,7 @@ In a Claude Project every uploaded file sits at the top level, so all of these a
 filenames. In the repo, `make build PERIOD=sep2026` runs the same commands from the packaged
 Project folder on the exports in `inputs/sep2026/`.
 
-The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v2.0.0.html`, one
+The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v2.1.0.html`, one
 self-contained file that opens in any browser. That is the deliverable.
 
 The filename carries the period and the console version, so builds of different versions do
@@ -159,7 +159,7 @@ decision record each time you ask for a rerun or a hand-off.
 |---|---|
 | `Run the GL coding review for Sep 2026.` | The first run of the close: lists the exports, runs the scripts, drafts, publishes the console |
 | `Run it again. Reviewed as of 20 Sep.` | Runs on the newest exports and says what is new since that review |
-| `Draft the questions email.` | One email per owner department, from the questions in your decision record, for you to send |
+| `Draft the questions email.` | One email per owner department, from the questions in your notes in the decision record (the cards carry none), for you to send |
 | `Build the NetSuite import.` | Drafts any entry the console lacks, then checks the **Export to NetSuite, CSV** you download. A person imports it. |
 | `Summarize the session.` | The hand-off: runs, decisions, what is left, checks not run, where the record is |
 | `List the follow-ups.` | A checklist of everything waiting on someone, from your decision record, with an ID, owner, due date and status for each |
@@ -315,21 +315,36 @@ console renders in those.
 ## Working the Console
 
 The HTML is a working surface, not a report, laid out as the controller's August GL review.
-The bar holds four section titles; clicking one opens its pages beside it, each with what is
-left on it. Run log and Settings are the icons at the right.
+The bar holds four section titles; clicking one opens its pages in a bar under the header,
+each with what is left on it. Run log and Settings are the icons at the right.
 
-* **Overview**: total period spend, the flags and their value as a share of spend, clean
-  vendors, how many flags are resolved, the tie to NetSuite's Income Statement (every account,
-  or the ones that differ), and the close checklist: each page, what is open on it
-  and what that is worth. A line of the checklist opens its page.
-* **Review**: CapEx Flags, Prepaid Flags, Dept & Entity, and Pass-Through Bills.
+* **Overview**: **Vendor Spend** (net of credits, on P&L accounts; it says what it leaves out:
+  lines with no vendor, such as payroll, accruals and journals, and expense reports), **Items to
+  Review** (the flags and the bills booked to fixed-asset or prepaid accounts, by page, the same
+  count as the Review badge), **Vendors to Confirm** (the same count as the Confirm badge), the
+  tie to NetSuite's Income Statement (every account, or the ones that differ), and the close
+  checklist: each page, what is open on it and what that is worth. A line of the checklist
+  opens its page.
+* **Review**: CapEx Flags, Prepaid Flags, Organization & Account, and Pass-Through Bills.
+  * **Organization & Account** holds a **Coding Inconsistencies** box with four tabs, by what
+    the coding disagrees with: **vs. Vendor History** (Department flags, Coding changed vendors,
+    and Claude's drafted account or department recodes), **vs. Coupa PO** (account flags against
+    the Coupa PO; when that check did not run, the tab shows a dash and the run's reason),
+    **vs. Forecast** (Coded off plan vendors) and **Same Item, Different Accounts**. Each item is
+    tagged with what its entry changes: Account, Department, or Account and department. A
+    Coding changed or off plan card leaves the vendor's pass-through bills to Pass-Through
+    Bills; its codings, line count, Lines and notes cover the vendor's other bills only. A Coded
+    off plan vendor whose codings it used before proposes no move: the card says the coding
+    matches the vendor's earlier months and only the plan differs, and its Memo is
+    `Recode <vendor>`.
   * **Pass-Through Bills** lists the month's Flagship Labs LLC and Flagship Pioneering Labs TPC Inc
     bills, each one lump sum of costs Flagship paid for Serif. Give a bill's cost breakdown from
     Coupa (`flagship_breakdown_<invoice>.xlsx`, with `--flagship-breakdown`) and its card ties the
     breakdown to the bill, maps each item to Serif's account, flags capital, prepaid and misplaced
     items, and proposes the reclass. Without one, the card links to Coupa and is decided Reviewed in
     Coupa; nothing waits on it. `python3 serif_sources.py passthrough` lists the bills.
-* **Confirm**: Reviewed & Cleared, and New This Period.
+* **Confirm**: Vendors Reviewed & Cleared, and New Vendors This Period, each with a folder tab
+  per department.
 * **Documentation**: Audit Log, SOX Documentation (with the **Sign-Off & Export** card at its foot), and Export.
 
 ### A Card
@@ -342,11 +357,20 @@ over its screen's threshold is marked Review; a Department flag always is.
 
 Each card's header starts with its reference ID, numbered by screen within the close, largest
 amount first: CAPEX-01, FA-01 (booked to fixed assets), PREPAID-01, PPD-01 (booked to prepaid),
-DEPT-01, DRAFT-01 (a Journal Entry Claude drafted), CODING-01 (coding changed or off plan), PASS-01, CLEAR-01 and NEW-01. A rebuild of the same
+DEPT-01, CODING-01 (coding changed or off plan), PASS-01, CLEAR-01 and NEW-01. A rebuild of the same
 data gives the same IDs; they are not kept from one close to the next. The card's Journal Entry
 Memo follows the Data Entry Policy with the ID in front, `DEPT-01 | Reclass ... | Aug'26`, so the
 entry in the CSV and in NetSuite ties back to the card. NetSuite takes up to 999 characters in a
 Memo; the build keeps every Memo and Line Memo within it.
+
+A Journal Entry Claude drafted is a card like any other: the vendor as its title, Current
+coding, Proposed recode, Document / item, Lines and Last three months, with no Draft marker. It
+goes to the page its change belongs to and takes that category's ID: a debit to a fixed asset
+account (15xxxxx) is CAPEX-NN on CapEx Flags, a debit to a prepaid account (13xxxxx) is
+PREPAID-NN on Prepaid Flags, and any other is DEPT-NN on Organization & Account, under vs. Vendor
+History. It is numbered after the run's own items in that category, so a draft added later
+moves no ID already cited. Its External ID stays `SERIF-DRAFT-N`, and the work paper's decision
+Path says ", drafted by Claude".
 
 ### CapEx and Prepaid, Both Directions
 
@@ -365,8 +389,8 @@ text and in its Journal Entry Memo:
   equipment, `1530000` Computers & Software for computers and software. The policy places it
   in service at the invoice date.
 * Office furniture and equipment has no fixed asset account in Serif's chart. Until Serif
-  names one, the entry holds it in Capital in Process and the card says to ask the Controller
-  which account to use.
+  names one, the entry holds it in Capital in Process and the card says the chart has no fixed
+  asset account for it.
 
 The ledger has no in-service date, so the card asks for it, and its note stays open for the
 date. A capital purchase under the $5,000 capitalization threshold is listed, not marked
@@ -381,21 +405,32 @@ prepaid rent, for example). Both sides carry the original line's Project and Pro
 
 ### Settling an Item
 
-* **A flag** (CapEx, Prepaid, Dept & Entity) shows its Journal Entry, filled in. **Approve
-  Recode** books it as proposed. **Reject** leaves the coding as it is. Editing any account,
-  department, Project, Program or amount marks it **Modified**, which needs a note. A line moved
+* **A flag** (CapEx, Prepaid, Organization & Account, and a Journal Entry Claude drafted) shows
+  its Journal Entry, filled in. **Add to NetSuite CSV** books it as proposed. **Reject** leaves
+  the coding as it is; on Same Item, Different Accounts it means the coding stands. There is no
+  Modify button: editing any account, department, Project, Program or amount marks it **Added to
+  NetSuite CSV, edited**, which still goes to the CSV and needs a note. A line moved
   to a balance sheet account takes `Non-Specific`, which can still be changed. The entry shows whether it
   balances; **Reset** brings back the proposal.
-* **A vendor** on Reviewed & Cleared or New This Period is **confirmed**, or **recoded**: the
-  Journal Entry opens, filled in with its coding, to edit, with a note. A confirmed vendor
-  folds to its name; click the name to open it again.
-* **Edited in NetSuite**, beside Approve Recode and Recode, records a fix made on the bill or
-  Journal Entry itself while the period is open, instead of a reclass. It settles the item,
-  needs no note, and stays out of the CSV. The card's document is recorded with it; add a note
-  for anything else, and edit the entry if the change differs from the one proposed. A Journal
-  Entry Claude drafted is approved or not; it has no one transaction to edit.
+* **A bill booked to fixed assets or prepaid** is **Confirm, Stays on Balance Sheet**, or
+  **Recode to Expense, Add to NetSuite CSV**.
+* **A vendor** on Vendors Reviewed & Cleared or New Vendors This Period is confirmed (**Confirm,
+  No Recode** or **Confirm Vendor & Coding**), or recoded (**Recode, Add to NetSuite CSV**): the
+  Journal Entry opens, filled in with its coding, to edit, with a note. A Coding changed or off
+  plan card offers **Confirm, Coding Stands** and the same Recode. A confirmed vendor folds to
+  its name; click the name to open it again.
+* **Edited Manually in NetSuite**, on flags, booked bills and vendor cards, records a fix made
+  on the bill or Journal Entry itself while the period is open, instead of a reclass. It settles
+  the item, needs no note, and stays out of the CSV; the card's status reads **Edited manually in
+  NetSuite**. The card's document is recorded with it; add a note for anything else, and edit
+  the entry if the change differs from the one proposed.
 
-Reviewed & Cleared holds the vendors no check flagged. Each card says which checks it passed:
+Every Journal Entry line carries a **Vendor** and a **Coupa PO**, both editable. They are filled
+from the item's bill lines: the PO on the line's account and department, for the same amount
+where one matches; the debit that receives a cost carries the PO of the credit that removes it.
+The PO is the PO number as the GL holds it.
+
+Vendors Reviewed & Cleared holds the vendors no check flagged. Each card says which checks it passed:
 coded as in the two months before, account matching its Coupa PO, not a prepaid or capital
 purchase, and coded as planned. A check with nothing to compare against says so (no bills in
 the two months before, no Coupa PO, no plan line) rather than passing. Confirm each vendor, or
@@ -403,20 +438,22 @@ recode it if the coding is wrong, starting with those at $2,500 or more.
 
 A draft from Claude sits on its card with **Accept**, which copies the note and sets the
 recommended decision (marked Recommended on its button), and **Edit**, which copies the note to change.
-A card leads with its facts, the draft and the decision; why it was flagged, the Journal Entry, the
-last three months and the lines open beneath it. A page of more than 12 cards opens folded to one
-line each, with Expand all. A page that applies a threshold shows it beside its title; click its
+A card states what was found and why, never what to do. It leads with its facts and the draft;
+why it was flagged, the Journal Entry, the last three months and the lines fold beneath them,
+and the decision buttons sit under the folds. Every page opens with its cards folded to one
+line each; a card opens on its own. Each review and vendor page has one **Decided** counter
+(0 of 5, say) with a line saying what its items are. A page that applies a threshold shows it beside its title; click its
 value to change it, and Reset returns the default. A note
 is saved with **Save** (or Cmd+Enter) and then reads as finished text, with who saved it and when;
 until then it is marked Not saved. Edit opens it again, and Cancel brings back what was saved. Only the current month gets an entry.
 
 ### Export
 
-**Export to NetSuite, CSV** on Documentation > Export holds every entry approved, modified or
-recoded with a note, as edited: the reclasses still to book. Items marked Edited in NetSuite are
-not in it; Export lists them, with the count of each path, and **Work paper, HTML** saves every
+**Export to NetSuite, CSV** on Documentation > Export holds every entry added to the NetSuite
+CSV (an edited one with a note) or recoded with a note, as edited: the reclasses still to book.
+Items marked Edited Manually in NetSuite are not in it; Export lists them, with the count of each path, and **Work paper, HTML** saves every
 decision with its reference ID, path and document, the reclasses in the import, and the
-sign-off, for the close file. The CSV's columns: External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs. The same export saves the support file beside it (`...-support.html`): every entry in the import, by External ID, with its reason, the decision and who made it, the note and its lines, to attach in NetSuite with the import. Project and Program are the line's ProjectID and Program segments, by
+sign-off, for the close file. The CSV's columns: External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Name (the vendor, NetSuite's entity), Coupa PO Number, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs. The same export saves the support file beside it (`...-support.html`): every entry in the import, by External ID, with its reason, the decision and who made it, the note and its lines, to attach in NetSuite with the import. Project and Program are the line's ProjectID and Program segments, by
 name as the GL export shows them (`Internal CMC`, `00 Non-Specific`); map the two columns to them
 the first time the import is set up in NetSuite. Journal Date, Posting Period, Memo, Reversing Entry, Reversal Date and Line Memo are
 editable on the entry; Subsidiary, Currency and Exchange Rate are shown, not editable. Corrections
@@ -440,8 +477,8 @@ kept in this browser with the review:
 |---|---|---|
 | CapEx Flags | **$5,000** | Serif's PP&E capitalization threshold (Mike's write-up, 12 Oct 2026) |
 | Prepaid Flags | **$25,000** | Serif's prepaid threshold (same write-up), on related charges together |
-| Dept & Entity, account recodes and drafted entries | **$2,500** | The review threshold |
-| Dept & Entity, Department flags | none | Every line off Non-Specific is recoded, whatever its size |
+| Organization & Account, account recodes and drafted entries | **$2,500** | The review threshold |
+| Organization & Account, Department flags | none | Every line off Non-Specific is recoded, whatever its size |
 
 CapEx and Prepaid list every flag from $2,500, so lowering either threshold marks more; a
 prepaid under $25,000 says it stays expense, as a capital bill under $5,000 does. The booked
@@ -506,7 +543,7 @@ To stop a vendor being flagged, add a row to `accepted_exceptions.csv` (`vendor`
 with the other files. Save it as CSV (UTF-8 or Excel's Comma delimited). It is data, not a rule change,
 and it covers only the department and account checks (`T1`, `T4`), not posting lag or tax. Matching
 findings are kept and counted, marked excepted with the reason, and listed under Accepted Exceptions on
-the Dept & Entity page. A row missing `vendor`, `reason` or `approved_by`, or with shifted columns, is
+the Organization & Account page. A row missing `vendor`, `reason` or `approved_by`, or with shifted columns, is
 not applied; rejected rows (with their line numbers), rows that match nothing and an unreadable file are
 printed in the load summary and shown on that page. The file is hashed into the run manifest when it has
 rows; absent or header-only is recorded as such.
