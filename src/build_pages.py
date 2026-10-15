@@ -436,6 +436,7 @@ a.xl{font-size:var(--text--2);color:var(--color-fg-secondary);text-decoration:un
 #tip{position:fixed;z-index:30;pointer-events:none;background-color:var(--color-bg-inverse);color:var(--color-fg-inverse);
   font-size:var(--text--2);line-height:1.45;padding:.55em .75em;border-radius:var(--radius-xs);max-width:22rem;display:none}
 #tip b{color:#fff}
+#tip.sm{font-size:var(--text--2);line-height:1.4;padding:.35em .6em;max-width:17rem;border-radius:var(--radius-xs)}
 main{max-width:96rem;margin:0 auto;padding:var(--spacing-md) var(--spacing-md-lg) var(--spacing-xl)}
 .page[hidden]{display:none}
 .hero{background-color:var(--color-bg-inverse);color:var(--color-fg-inverse);border-radius:var(--radius-sm);padding:var(--spacing-sm-md);margin-bottom:var(--spacing-sm)}
@@ -1200,7 +1201,7 @@ $$('[data-tabbox] > [data-pane]').forEach(x => x.setAttribute('role', 'tabpanel'
 const tip = $('#tip');
 document.addEventListener('mousemove', ev => { const t = ev.target.closest('[data-tip]');
   if (!t){ tip.style.display = 'none'; return; }
-  tip.innerHTML = t.dataset.tip; tip.style.display = 'block';
+  tip.innerHTML = t.dataset.tip; tip.classList.toggle('sm', t.dataset.tipsm !== undefined); tip.style.display = 'block';
   tip.style.left = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8) + 'px';
   tip.style.top = Math.min(ev.clientY + 14, innerHeight - tip.offsetHeight - 8) + 'px'; });
 /* decisions */
@@ -1333,11 +1334,11 @@ function shapeCards(){
 }
 /* thresholds: each page that applies one says so at its top, with its value now */
 const THR_TXT = {
-  thr: DATA.kind === 'coding' ? ['Review threshold', 'account recodes and drafted entries at or over it are marked Review']
-                              : ['Review threshold', 'a line whose change is at or over it is marked Review and needs commentary'],
-  thr_capex: ['CapEx threshold', 'a purchase at or over it is marked Review as a possible capital asset'],
-  thr_prepaid: ['Prepaid threshold', 'a charge at or over it that covers future months is marked Review'],
-  all: ['Department flags', 'no threshold: every one is marked Review, whatever its size']};
+  thr: DATA.kind === 'coding' ? ['Review threshold', 'Recodes of {v} or more are flagged for review.']
+                              : ['Review threshold', 'Lines that moved {v} or more need commentary.'],
+  thr_capex: ['CapEx threshold', 'Purchases of {v} or more are flagged as possible capital assets.'],
+  thr_prepaid: ['Prepaid threshold', 'Charges of {v} or more that cover future months are flagged as possible prepaids.'],
+  all: ['Department flags', 'Every department flag is reviewed, whatever its size.']};
 const PENCIL = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg>';
 function shapeThresholds(){
   $$('.page').forEach(pg => { if (pg.id === 'p-settings') return;
@@ -1348,8 +1349,8 @@ function shapeThresholds(){
     keys.sort((a, b) => (a === 'all') - (b === 'all'));
     const box = document.createElement('div'); box.className = 'thrchips';
     box.innerHTML = keys.map(k => k === 'all'
-      ? '<span class="thc none" data-tip="' + esc(THR_TXT[k][1]) + '"><span class="tl">' + THR_TXT[k][0] + '</span><span class="tv0">No threshold</span></span>'
-      : '<span class="thc" data-thc="' + k + '" data-tip="' + esc(THR_TXT[k][1].replace(/^./, c => c.toUpperCase())) + '."><span class="tl">' + THR_TXT[k][0] + '</span>'
+      ? '<span class="thc none" data-tipsm data-tip="' + esc(THR_TXT[k][1]) + '"><span class="tl">' + THR_TXT[k][0] + '</span><span class="tv0">No threshold</span></span>'
+      : '<span class="thc" data-thc="' + k + '" data-tipsm data-tip=""><span class="tl">' + THR_TXT[k][0] + '</span>'
         + '<button class="tv" data-thedit="' + k + '" aria-label="Change the ' + THR_TXT[k][0] + '"><span data-thrv="' + k + '"></span>' + PENCIL + '</button>'
         + '<span class="def" data-thrdef="' + k + '" hidden></span></span>').join('');
     // beside the page's title: in the hero, or on the title line of a page without one
@@ -1359,6 +1360,7 @@ function shapeThresholds(){
 }
 function paintThresholds(){
   $$('[data-thrv]').forEach(x => { x.textContent = money(thrOf(x.dataset.thrv)); });
+  $$('[data-thc]').forEach(c => { c.dataset.tip = esc(THR_TXT[c.dataset.thc][1].replace('{v}', money(thrOf(c.dataset.thc)))); });
   $$('[data-thrdef]').forEach(x => { const k = x.dataset.thrdef, d = Number(DATA[k]) || DATA.thr, v = thrOf(k);
     x.hidden = v === d; x.innerHTML = v === d ? '' : 'Default ' + money(d) + ' <button class="lk" data-threset="' + k + '">Reset</button>';
     x.closest('.thc').classList.toggle('chg', v !== d); });
