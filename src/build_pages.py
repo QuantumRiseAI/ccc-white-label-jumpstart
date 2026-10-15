@@ -2496,7 +2496,7 @@ def coding():
     summ = "".join('<tr><td><span class="tag ink">%s</span></td><td>%s</td><td>%s</td><td>%s</td><td class="n2">%s</td><td class="mono">%s</td><td class="mono">%s</td><td><span data-sti="%s">Pending</span></td></tr>'
                    % (i[1], e(i[2]), e(i[3]), e(i[4]), money(i[5], True), e(i[6]), e(i[7]), i[1]) for i in items)
     clean_lines = sum(((r.get("detail") or {}).get("count") or 0) for r in clear)
-    hero_ = hero("GL Coding Review, " + PERIOD, "Serif Biomedicines, Inc. &middot; NetSuite Subsidiary 97", [
+    hero_ = hero("GL Coding Review, " + PERIOD, "", [
         ("Total Period Spend", money(spend), "%d vendors billed" % len(billed)),
         ("Flags Identified", str(len(flagged)), "%s &middot; %.1f%% of period spend" % (money(famt), 100 * famt / spend)
          + (" &middot; plus %s, %s" % (count(len(excepted), "accepted exception"), money(exc_amt)) if excepted else "")),
