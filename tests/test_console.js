@@ -104,6 +104,11 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     ok(await p.evaluate(id => S.notes[id] === 'Department per budget owner', id), k + ': Cancel brings the saved note back');
     ok(await p.evaluate(() => { const c = $('#p-sox').lastElementChild; return c.classList.contains('signoff') && c.querySelectorAll('[data-sname]').length === 3
        && !!c.querySelector(DATA.kind === 'coding' ? '[data-wpsave]' : '[data-fluxpack]'); }), k + ': sign-off is one full-width card at the foot of SOX, with the exports');
+    await p.evaluate(() => show('ov')); await p.waitForTimeout(200);
+    const offOv = await p.locator('#tosign').isHidden();
+    await p.evaluate(() => show('sox')); await p.waitForTimeout(300); await p.click('#tosign'); await p.waitForTimeout(900);
+    ok(offOv && await p.evaluate(() => $('#signoff').getBoundingClientRect().top < innerHeight && /Sign Off · \d of 3/.test($('#tosign').textContent)),
+       k + ': the Sign Off button shows on SOX only, scrolls to the sign-off card and counts the signatures');
     if (k === 'pl'){
       // the flux pack: read-only, saved writing only, and says what is still open
       await p.evaluate(() => { show('ov'); });

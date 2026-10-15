@@ -686,6 +686,12 @@ td .draft.open .dt{display:block}
 .ih .dchip{font-size:var(--text--2);color:var(--color-action);background-color:var(--color-action-tint);border:1px solid var(--color-action-tint);border-radius:var(--radius-pill);padding:.1em .6em}
 .foldall{display:flex;gap:var(--spacing-xs);align-items:center;margin:0 0 var(--spacing-xs);font-size:var(--text--1);color:var(--color-fg-secondary)}
 .foldall .lk{margin-left:0;font-size:var(--text--1)}
+.tosign{position:fixed;right:var(--spacing-md);bottom:calc(var(--spacing-md) + env(safe-area-inset-bottom, 0px));z-index:35;display:inline-flex;align-items:center;gap:.5em;
+  background-color:var(--color-action);color:#fff;border:0;border-radius:var(--radius-pill);padding:.65em 1.2em;font-size:var(--text--1);font-weight:600;cursor:pointer;
+  box-shadow:0 6px 18px rgba(30,40,55,.28)}
+.tosign:hover{background-color:var(--color-action-hover)}
+.tosign.done{background-color:var(--color-stark);color:var(--color-action);box-shadow:0 0 0 2px var(--color-action),0 6px 18px rgba(30,40,55,.18)}
+@media print{.tosign{display:none}}
 .ptflag{border-left:3px solid var(--color-warm-gray);background-color:var(--color-bg-primary);border-radius:var(--radius-xs);padding:.45em .8em;margin:0 0 .6em;font-size:var(--text--1);line-height:1.45}
 .draft .who{display:inline-flex;align-items:center;gap:.35em}
 .spk{width:1.05em;height:1.05em;flex:none}
@@ -976,6 +982,7 @@ def shell(title, product, sections, pages, data, js):
             "<nav>" + "".join(nav) + '</nav><div class="icons"><button class="tb pg" data-p="runlog" data-tip="Run log" aria-label="Run log">' + RUNLOG_SVG + "</button>"
             '<button class="tb pg" data-p="settings" data-tip="Settings" aria-label="Settings">'
             + SETTINGS_SVG + '</button></div></header><div id="sharedbar" hidden></div><div id="tip"></div><div id="toast" role="status" hidden></div>'
+            '<button id="tosign" class="tosign" data-tosign hidden><span data-tosignn>Sign Off</span><span aria-hidden="true">&darr;</span></button>'
             '<div id="ask" hidden><div class="askbox" role="dialog" aria-modal="true"><h3></h3><div class="askbody"></div><div class="acts">'
             '<button class="pill solid" data-askok>OK</button><button class="pill" data-askno>Cancel</button></div></div></div><main>' + "".join(pages)
             + page("settings", hero("Settings", "", []) + '<div class="card"><h3>Thresholds</h3>' + "".join(
@@ -1284,7 +1291,7 @@ function show(pid){
   $$('.tg[data-s]').forEach(g => { const on = !!g.querySelector('.tb.pg.cur');
     g.classList.toggle('open', on); g.querySelector('.sub').classList.toggle('shut', !on);
     g.querySelector('.tb.sec').setAttribute('aria-expanded', on ? 'true' : 'false'); });
-  window.scrollTo(0, 0); refresh();
+  window.scrollTo(0, 0); refresh(); if (typeof toSignPaint === 'function') toSignPaint();
 }
 document.addEventListener('click', ev => {
   const s = ev.target.closest('.tb.sec');
@@ -1553,7 +1560,20 @@ function counts(){
       : what === 'inimport' ? String(F.filter(f => f.in_import).length)
       : what === 'nsedit' ? String(F.filter(f => f.path === 'Edited in NetSuite').length) : ''; });
 }
+/* the floating Sign Off button, on the SOX page: down to the sign-off card at its foot,
+   showing how many have signed; out of the way while the card is on screen */
+let signSeen = false;
+function toSignPaint(){ const b = $('#tosign'), c = $('#signoff'); if (!b || !c) return;
+  const n = Object.keys(S.sign).length, of = $$('[data-sname]').length;
+  b.querySelector('[data-tosignn]').textContent = 'Sign Off · ' + n + ' of ' + of;
+  b.classList.toggle('done', n === of && of > 0);
+  b.hidden = c.closest('.page').hidden || signSeen; }
+if ('IntersectionObserver' in window){ const c = $('#signoff');
+  if (c) new IntersectionObserver(es => { signSeen = es.some(x => x.isIntersecting); toSignPaint(); }).observe(c); }
+document.addEventListener('click', ev => { if (!ev.target.closest('[data-tosign]')) return;
+  $('#signoff').scrollIntoView({behavior: 'smooth', block: 'start'}); });
 function signs(){
+  toSignPaint();
   $$('[data-sname]').forEach(n => { const r = n.dataset.sname, s = S.sign[r], row = n.closest('.sign');
     if (s){ n.value = s.name; $('[data-sdate="' + r + '"]').value = s.date; }
     row.classList.toggle('done', !!s); const b = row.querySelector('[data-signbtn]'); if (b) b.textContent = s ? 'Signed' : 'Sign'; });
