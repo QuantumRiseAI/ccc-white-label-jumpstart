@@ -39,6 +39,9 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ## Unreleased: Flagship pass-through bills (SERIF-148)
 
+- **Sign-off you can find**: both consoles end their SOX page with one full-width Sign-Off & Export
+  card in the action blue: the three signatures side by side, and the close's exports beside them
+  (P&L Flux: Commentary CSV and the flux pack; GL Coding Review: the work paper and the NetSuite CSV).
 - **Pass-Through Bills**, a page under Review in the GL Coding Review: each Flagship Labs LLC and
   Flagship Pioneering Labs TPC bill of the month (not the FSP charges, 6901xxx), one card each.
 - **With its cost breakdown** (`--flagship-breakdown`, the Excel attached in Coupa, read by column

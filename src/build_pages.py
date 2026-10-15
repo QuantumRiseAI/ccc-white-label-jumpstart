@@ -773,8 +773,21 @@ details.lines td small{display:block;color:var(--color-fg-secondary)}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.8em var(--spacing-sm);margin-bottom:var(--spacing-sm)}
 .stats .l{font-size:var(--text--2);color:var(--color-fg-secondary)} .stats .x{font-variant-numeric:tabular-nums;font-weight:600}
 .tax{font-size:var(--text--1)} .tax .row{display:flex;justify-content:space-between} .tax .bar{margin:.25em 0 .7em}
-.sign{display:grid;grid-template-columns:10rem 1fr 9rem auto;gap:var(--spacing-2xs);align-items:center;padding:.5em 0;border-bottom:1px solid var(--color-hairline)}
-.sign.done{color:var(--color-fg-secondary)}
+.signoff{overflow:hidden;border:2px solid var(--color-action)}
+.signoff .sob{display:flex;flex-wrap:wrap;align-items:center;gap:var(--spacing-xs) var(--spacing-sm);background-color:var(--color-action);color:#fff;padding:var(--spacing-sm) var(--spacing-sm-md)}
+.signoff .sob h3{margin:0;font-size:var(--text-1);font-weight:500;color:#fff}
+.signoff .sob p{margin:.2em 0 0;font-size:var(--text--1);color:#d9dfe7}
+.signoff .sobtn{margin-left:auto;display:flex;gap:var(--spacing-2xs);flex-wrap:wrap}
+.signoff .sobtn .pill{border-color:#fff;color:#fff}
+.signoff .sobtn .pill.solid{background-color:#fff;color:var(--color-action)}
+.signoff .signs{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:var(--spacing-sm);padding:var(--spacing-sm) var(--spacing-sm-md)}
+.sign{display:grid;grid-template-columns:1fr 8rem;grid-template-areas:"r r" "n d" "b b";gap:.5em;align-items:center;padding:.8em .9em;border:1px solid var(--color-hairline);border-radius:var(--radius-xs);background-color:var(--color-action-tint)}
+.sign b{grid-area:r;font-weight:600}
+.sign [data-sname]{grid-area:n;min-width:0}
+.sign [data-sdate]{grid-area:d;min-width:0}
+.sign [data-signbtn]{grid-area:b;justify-self:start}
+.sign.done{background-color:var(--color-stark);border-color:var(--color-action)}
+.sign.done [data-signbtn]{background-color:var(--color-stark);color:var(--color-action);border-color:var(--color-action)}
 .ck{display:grid;grid-template-columns:auto 1fr;gap:.2em var(--spacing-xs);padding:.8em var(--spacing-sm-md);border-bottom:1px solid var(--color-hairline)}
 .ck .asc{font-family:var(--font-mono);font-size:var(--text--2);color:var(--color-fg-secondary)}
 .ck b{display:block}
@@ -875,6 +888,16 @@ def gap_card():
 def live(what, pid="*"):
     """A header number the page keeps current: an item count, value or tally as decisions are made."""
     return '<span data-pgs="%s:%s"></span>' % (pid, what)
+
+
+def signoff_card(roles, buttons, note):
+    """Sign-off and the close's exports, on one full-width card at the foot of the SOX page:
+    each role signs with a name and a date; the exports carry the signatures."""
+    blocks = "".join('<div class="sign"><b>%s</b><input class="f" data-sname="%s" placeholder="Name, title" aria-label="%s, name">'
+                     '<input class="f" data-sdate="%s" placeholder="Date" aria-label="%s, date"><button class="pill solid" data-signbtn="%s">Sign</button></div>'
+                     % (lab, k, lab, k, lab, k) for k, lab in roles)
+    return ('<div class="card signoff" id="signoff"><div class="sob"><div><h3>Sign-Off &amp; Export</h3><p>%s</p></div><div class="sobtn">%s</div></div>'
+            '<div class="signs">%s</div></div>' % (note, buttons, blocks))
 
 
 def tie_card(months):
@@ -2337,17 +2360,17 @@ def flux():
                + ('<tr class="tot"><td>Total</td><td></td>' + "".join('<td class="n2">%s</td>' % money(x) for x in rp_tot) + '<td class="n2">%s</td></tr>' % money(rp_tot[2] - rp_tot[1]) if rp_rows else "")
                + "</tbody></table></div></div>")
     roles = [("prep", "Prepared by"), ("ctrl", "Controller Review"), ("cfo", "CFO Approval")]
-    sign = "".join('<div class="sign"><b>%s</b><input class="f" data-sname="%s" placeholder="Name"><input class="f" data-sdate="%s" placeholder="Date"><button class="pill" data-signbtn="%s">Sign</button></div>'
-                   % (lab, k, k, k) for k, lab in roles)
+    sign = signoff_card(roles, '<button class="pill" data-fluxcsv>Commentary, CSV</button><button class="pill solid" data-fluxpack>Export flux pack</button>',
+                        "Sign once the close is reviewed. The flux pack carries the summary, the saved commentary, every decision and these signatures.")
     pages.append(page("sox", hero("SOX &amp; GAAP Compliance, ".replace("&amp;", "&") + PERIOD + " Close", "", [
         ("GAAP Items", str(len(asc)), '<span data-ckdone></span>'), ("Sources", str(len(M["inputs"]) + len([x for x in V.get("inputs", []) if x.get("path") not in {y["path"] for y in M["inputs"]}])), "Read as exported"),
         ("Sign-offs", '<span data-signs></span>', ""), ("AI Disclosed", "Yes", "")])
         + '<div class="card"><div class="ch">Tie-Outs</div><div class="tw"><table class="ties"><thead><tr><th>Check</th><th class="n2">Amount</th><th class="n2">Against</th><th>Result</th></tr></thead><tbody>'
         + "".join(ties) + "</tbody></table></div>" + tie_note + "</div>" + rp_card
         + '<div class="split"><div class="card"><div class="ch">GAAP Compliance Checklist</div>' + ck + '</div><div><div class="card"><div class="ch">Source Data Validation</div><div class="tw"><table>'
-          '<thead><tr><th>Report</th><th>File</th><th class="n2">Status</th></tr></thead><tbody>' + src + '</tbody></table></div></div><div class="card"><div class="ch">Management Sign-Off' + PACK_BTNS + '</div><div class="pad">'
-        + sign + '</div></div><div class="card"><div class="pad note"><b>AI disclosure.</b> Figures, variances and proposed entries are computed by the flux engine from the exports listed. '
-          'Commentary and every decision are the reviewer\'s.</div></div></div></div>'))
+          '<thead><tr><th>Report</th><th>File</th><th class="n2">Status</th></tr></thead><tbody>' + src + '</tbody></table></div></div>'
+          '<div class="card"><div class="pad note"><b>AI disclosure.</b> Figures, variances and proposed entries are computed by the flux engine from the exports listed. '
+          'Commentary and every decision are the reviewer\'s.</div></div></div></div>' + sign))
 
     sections = [("Executive Overview", [("ov", "Executive Overview")]),
                 ("Analysis", [("ava", "Actual vs. Actual (MoM)"), ("avb", "Actual vs. Budget"), ("dept", "By Department (MoM)"), ("pay", "Payroll Analytics")]),
@@ -2927,8 +2950,9 @@ def coding():
         ("Review thresholds, by default", "CapEx %s &middot; Prepaid %s &middot; other %s &middot; department flags none" % (money(THR["thr_capex"]), money(THR["thr_prepaid"]), money(thr))),
         ("CapEx flags", str(len(cap_cards))), ("Prepaid flags", str(len(pre_cards))),
         ("Department and account flags", str(len(dcards))), *([("Accepted exceptions", "%d items, %s" % (len(excepted), money(exc_amt, True)))] if excepted else []), ("Vendors with no flags", str(len(clear))), ("New vendors", str(len(news)))])
-    sign = "".join('<div class="sign"><b>%s</b><input class="f" data-sname="%s" placeholder="Name, title"><input class="f" data-sdate="%s" placeholder="Date"><button class="pill" data-signbtn="%s">Sign</button></div>'
-                   % (lab, k, k, k) for k, lab in (("prep", "Prepared by"), ("rev", "Reviewed by"), ("appr", "Approved by")))
+    sign = signoff_card((("prep", "Prepared by"), ("rev", "Reviewed by"), ("appr", "Approved by")),
+                        '<button class="pill" data-wpsave>Work paper, HTML</button><button class="pill solid" data-export>Export to NetSuite, CSV</button>',
+                        "Sign once the review is complete. The work paper carries every decision, the reclasses in the import and these signatures.")
     pages.append(page("sox", hero("SOX Documentation, " + PERIOD, "", [
                           ("Sources", str(len(GLR["manifest"]["inputs"])), "Read as exported"),
                           ("Ledger tie", ("Pass" if not TIE or TIE["passed"] else "Fail") if TIE else "Not run", "%s accounts" % TIE["accounts"] if TIE else "No Income Statement"),
@@ -2936,7 +2960,7 @@ def coding():
                           ("Sign-offs", live("signs"), "Prepared, reviewed, approved")]) + '<div class="card"><div class="ch">Source Citations</div><div class="tw"><table><tbody>' + srcs + "</tbody></table></div></div>"
                       + '<div class="card"><div class="ch">GL Tie-Out</div><div class="tw"><table><tbody>' + tie_rows + "</tbody></table></div></div>"
                       + '<div class="card"><div class="ch">Policy Application Summary</div><div class="tw"><table><tbody>' + pol_rows + "</tbody></table></div></div>"
-                      + '<div class="card"><div class="ch">Management Review &amp; Sign-Off</div><div class="pad">' + sign + "</div></div>"))
+                      + sign))
     pages.append(page("export", hero("Export, " + PERIOD, "", [
                           ("Agreed fixes", live("fixes"), "Approved, modified, recoded or edited"),
                           ("In the import", live("inimport"), "Reclasses ready for the CSV"),

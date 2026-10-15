@@ -102,6 +102,8 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     ok(/Changed since saved/.test(await p.locator('[data-fbar="' + id + '"] .uns').textContent()), k + ': an edit to a saved note is marked');
     await p.click('[data-fincancel="' + id + '"]');
     ok(await p.evaluate(id => S.notes[id] === 'Department per budget owner', id), k + ': Cancel brings the saved note back');
+    ok(await p.evaluate(() => { const c = $('#p-sox').lastElementChild; return c.classList.contains('signoff') && c.querySelectorAll('[data-sname]').length === 3
+       && !!c.querySelector(DATA.kind === 'coding' ? '[data-wpsave]' : '[data-fluxpack]'); }), k + ': sign-off is one full-width card at the foot of SOX, with the exports');
     if (k === 'pl'){
       // the flux pack: read-only, saved writing only, and says what is still open
       await p.evaluate(() => { show('ov'); });
@@ -143,7 +145,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.textContent('#p-export [data-pgs="*:nsedit"]') === '1', 'gl: the Export header counts the item edited in NetSuite');
       ok(/Edited in NetSuite: 1/.test(await p.textContent('[data-fixsum]')) && (await p.textContent('[data-nsrows]')).includes(ns.doc) && (await p.textContent('[data-nsrows]')).includes(ns.ref),
          'gl: Export counts the paths and lists the item edited in NetSuite with its document and reference ID');
-      const [wp] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('[data-wpsave]')]);
+      const [wp] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('#p-export [data-wpsave]')]);
       const wpText = wp ? fs.readFileSync(await wp.path(), 'utf8') : '';
       const wpRow = (wpText.split('<tr>').find(r => r.includes('>' + ns.ref + '<')) || '');
       ok(/Edited in NetSuite/.test(wpRow) && wpRow.includes(ns.doc.replace(/&/g, '&amp;')) && /Finance/.test(wpRow) && !wpText.split('Reclasses in the NetSuite import')[1].includes(ns.ext),
