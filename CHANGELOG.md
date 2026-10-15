@@ -37,6 +37,22 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: Flagship pass-through bills (SERIF-148)
+
+- **Pass-Through Bills**, a page under Review in the GL Coding Review: each Flagship Labs LLC and
+  Flagship Pioneering Labs TPC bill of the month (not the FSP charges, 6901xxx), one card each.
+- **With its cost breakdown** (`--flagship-breakdown`, the Excel attached in Coupa, read by column
+  name): the breakdown tied to the bill and each activity to its booked line, Flagship's accounts
+  mapped to Serif's from the bill, each item checked against the capital and prepaid thresholds,
+  its service period and its account (parking or travel booked as consulting), and the reclass
+  proposed as a Journal Entry for the import. On Sep 2026's INV19269: 13 items tie to $42,845.63;
+  $163.54 of Bay State IT parking moves from General Consulting to Parking; the MacBook and
+  AppleCare are each under $5,000 and the Notion renewal under the prepaid threshold.
+- **Without one**, nothing waits: the card links to Coupa and is decided Reviewed in Coupa, and every
+  other card on that bill says one line may hold several items.
+- `serif_sources.py passthrough` lists the bills and which have a breakdown; the Project asks the
+  reviewer for any it lacks, once, and runs without them.
+
 ## Unreleased: consoles that lead with the decision
 
 - **A grey-blue for actions**: `--color-action` (#3a4a5e) marks the primary action (Save, Accept, the

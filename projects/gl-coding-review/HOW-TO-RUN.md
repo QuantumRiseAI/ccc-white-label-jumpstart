@@ -324,6 +324,13 @@ left on it. Run log and Settings are the icons at the right.
   and what that is worth. A line of the checklist opens its page.
 * **Review**: CapEx Flags, Prepaid Flags, and Dept & Entity.
 * **Confirm**: Reviewed & Cleared, and New This Period.
+
+**Pass-Through Bills** (under Review) lists the month's Flagship Labs LLC and Flagship Pioneering
+Labs TPC bills, each one lump sum of costs Flagship paid for Serif. Give a bill's cost breakdown
+from Coupa (`flagship_breakdown_<invoice>.xlsx`, with `--flagship-breakdown`) and its card ties
+the breakdown to the bill, maps each item to Serif's account, flags capital, prepaid and
+misplaced items, and proposes the reclass. Without one, the card links to Coupa and is decided
+Reviewed in Coupa; nothing waits on it. `python3 serif_sources.py passthrough` lists the bills.
 * **Documentation**: Audit Log, SOX Documentation, and Export.
 
 ### A Card
