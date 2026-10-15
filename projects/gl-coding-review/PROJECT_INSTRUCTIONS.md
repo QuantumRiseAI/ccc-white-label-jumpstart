@@ -24,32 +24,33 @@ name, or missing, and ask for any that are missing before you run anything.
 | Export | What the month needs |
 |---|---|
 | NetSuite Custom General Ledger saved search, `.xls` (or saved as `.xlsx`), named `netsuite_gl_<range>.xls`, or the connector's result for `netsuite_gl_detail.sql` (see The Month through the Connector) | One or more exports that together hold the month, the two months before it and the same month last year. Any date ranges, as long as no month is in two. |
-| Coupa PO line report, `.csv`: the export with all available columns, or the Coupa Data Pull (PO Lines) report | The export for the month's calendar year. The scripts list any column the report lacks or leaves empty under `coupa_coverage.columns_absent` in `run.json` |
+| Coupa PO line report, `.csv`: the export with all available columns, or the Coupa Data Pull (PO Lines) report | The export for the month's calendar year. The scripts list any column the report lacks or leaves empty under `manifest.coupa_coverage.columns_absent` in `run.json` |
 | NetSuite Income Statement by month report, `.xls`, by accounting period (a connector query grouped by transaction date does not tie), named `netsuite_income_statement_by_month_<range>.xls`, or the connector's result for `netsuite_income_statement.sql` (see The Month through the Connector) | Through the month. The ledger is tied to it by account before the review is built |
 | Rolling forecast workbook, `.xlsx` | The plan: `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
 | UKG roster, `.csv` | The newest roster |
 | NetSuite link IDs, `.csv`, named `netsuite_link_ids_<month>.csv` | Optional, for links. The connector's result for `netsuite_link_ids.sql`; see NetSuite Link IDs |
-| Flagship cost breakdowns, `.xlsx`, named `flagship_breakdown_<invoice>.xlsx` | Optional. The breakdown attached in Coupa to a Flagship Labs LLC or Flagship Pioneering Labs TPC bill (NetSuite saved search "FSM\| Unbilled Cost by Customer Detail w Acct V2"); see Flagship Pass-Through Bills |
+| Flagship cost breakdowns, `.xlsx`, named `flagship_breakdown_<invoice>.xlsx` | Optional. The breakdown attached in Coupa to a Flagship Labs LLC or Flagship Pioneering Labs TPC Inc bill (NetSuite saved search "FSM\| Unbilled Cost by Customer Detail w Acct V2"); see Flagship Pass-Through Bills |
 | NetSuite's lists, `.csv`: `netsuite_ref_accounts.csv`, `netsuite_ref_departments.csv`, `netsuite_ref_programs.csv` | Kept with the Project's files and replaced only when NetSuite's accounts, departments or programs change. The import CSV then carries NetSuite's internal IDs; see Importing into NetSuite |
 
 The scripts take every month they need from the exports. If a month is missing, they say
 which; ask the reviewer for that export. Never build a file for the scripts to read; the connector's results, saved as the queries return them, are the one exception.
 
-If `coupa_coverage.columns_absent` in `run.json` lists columns, tell the reviewer before
+If `manifest.coupa_coverage.columns_absent` in `run.json` lists columns, tell the reviewer before
 anything else: name them and the checks they feed (Supplier and Account: every check that
 joins Coupa to the ledger; Received, Approved Invoiced and the statuses: open commitments
 and the accrual population). Ask for the Coupa export with all available columns. Never
-report those checks as clean. If `coupa_coverage.row_limit` is set, the report stopped at that
+report those checks as clean. If `manifest.coupa_coverage.row_limit` is set, the report stopped at that
 many rows and holds only part of the year: say so, and ask for the full export.
 
 ## Flagship Pass-Through Bills
 
-Flagship Labs LLC and Flagship Pioneering Labs TPC bill Serif one lump sum of costs they paid
+Flagship Labs LLC and Flagship Pioneering Labs TPC Inc bill Serif one lump sum of costs they paid
 on Serif's behalf, one line per activity. The items behind it are in a cost breakdown attached
 to the invoice in Coupa. Its FSP charges (6901xxx) are Flagship's own fee, not pass-through.
 
 `serif_sources.py passthrough` lists the month's pass-through bills and says which have a
-breakdown. When any has none, ask the reviewer once, in the same reply as the export list,
+breakdown; it only reads the GL, so run it before your first reply. When any has none, ask the
+reviewer once, in the same reply as the export list,
 whether they have the breakdowns: name each bill with its amount and Coupa link, and say the
 file is the Excel attached to the invoice in Coupa. It is optional. Never wait for it: run
 the review with what you have, and build again with `--flagship-breakdown` when a breakdown
@@ -64,7 +65,8 @@ other card on that bill (CapEx, Prepaid, Dept & Entity) carries a Pass-through b
 one line may hold several items. In drafts, name the bill and the items the breakdown shows.
 
 Disha is confirming with Scott whether department reclasses on these items are in scope; until
-then, propose account reclasses only.
+then, propose account reclasses only. The breakdown shows each item's Flagship department beside
+its account, so the question can be answered from the card.
 
 ## Run It
 
@@ -81,11 +83,11 @@ python3 serif_sources.py tie --period "Sep 2026" --gl netsuite_gl_* \
   --income-statement netsuite_income_statement_by_*
 
 python3 serif_uc1_engine.py --period "Sep 2026" --gl netsuite_gl_* \
-  --coupa coupa_po_lines_2026.csv --pending . --out out
+  --coupa coupa_po_lines_*.csv --pending . --out out
 
 python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_* \
   --plan serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
-  --coupa coupa_po_lines_2026.csv --roster ukg_full_roster_hrbp_<date>.csv \
+  --coupa coupa_po_lines_*.csv --roster ukg_full_roster_*.csv \
   --netsuite-ids netsuite_link_ids_sep2026.csv --keep-names
 
 python3 serif_sources.py passthrough --period "Sep 2026" --gl netsuite_gl_* \
@@ -259,10 +261,9 @@ When the NetSuite connector is connected:
   them now. Use it to see whether a fix the reviewer made in NetSuite is there. Say that it
   was read from NetSuite, and when. What you read is not a finding and changes none. Never
   print a name from it.
-* The scripts still read the month from the saved search export. A connector's results are
-  not that export, so never build a GL file from them for the scripts. When the scripts read
-  the connector's results, these instructions will name the query to run, and you pull the
-  month yourself in place of the uploads.
+* The month's GL and Income Statement can come from the connector: see The Month through the
+  Connector, and pass those saved results to the scripts as they are. Never build any other
+  file for the scripts from what the connector returns.
 
 Coupa has no connector yet. When it has one, the same rules apply.
 
@@ -279,7 +280,15 @@ section opens its pages beside its title.
     or prepaid, each with its proposed Journal Entry; then this month's bills posted to
     fixed-asset or prepaid accounts, to confirm or recode to expense;
   * **Dept & Entity**: department and account recodes, each with its proposed Journal Entry,
-    and any Journal Entry you drafted.
+    and any Journal Entry you drafted;
+  * **Pass-Through Bills**: each Flagship pass-through bill, reviewed against its cost breakdown
+    when one was supplied (see Flagship Pass-Through Bills).
+  Dept & Entity also carries **Same item, two accounts**: an item a vendor billed this month to
+  6410000 Lab Supplies/Consumables or 6415000 Lab Non-Capital Equipment that went only to the
+  other in the six months before. It reads the ledger, so it runs when the Coupa report has no
+  Account column. Either side may be wrong: the card offers the recode back or Coding Stands.
+  Each page shows its threshold beside its title; a long page opens folded to one line per card.
+  The reviewer accepts or edits a draft and saves each note; only saved notes read as finished.
 * **Confirm**: **Reviewed & Cleared**, the vendors no check flagged, and **New This
   Period**, the vendors first seen this month. Both are grouped by department, then account;
   each vendor is confirmed, or recoded with a filled-in Journal Entry and a note. A vendor on
@@ -288,16 +297,14 @@ section opens its pages beside its title.
   and why. A confirmed vendor folds to its name; its name opens it again.
 * **Documentation**: the **Audit Log** (who decided what and when), **SOX Documentation**
   (sources, the GL tie-out and the Income Statement tie, the policies applied and the sign-off), and **Export**, the
-  NetSuite CSV (header fields: Subsidiary, Journal Date, Posting Period, Currency, Exchange Rate,
-  Memo, Reversing Entry, Reversal Date; line fields: Account, Department, Project, Program, Debit,
-  Credit, Line Memo).
+  NetSuite CSV (External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs) and the **Work paper, HTML**. The same export saves the support file beside it (`...-support.html`): every entry in the import, by External ID, with its reason, the decision and who made it, the note and its lines, to attach in NetSuite with the import.
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
   supplied, what each check found, the estimated cost of a run, the inputs and the build
   record. Settings has the thresholds, the decision record (save and load) and **Bring in the
   earlier run's decisions**.
 
 Every flag and vendor card starts with its reference ID, numbered by screen within the close
-(CAPEX-01, FA-01, PREPAID-01, PPD-01, DEPT-01, DRAFT-01, CLEAR-01, NEW-01), and the Memo of its
+(CAPEX-01, FA-01, PREPAID-01, PPD-01, DEPT-01, DRAFT-01, PASS-01, CLEAR-01, NEW-01), and the Memo of its
 Journal Entry starts with the same ID, so the entry in NetSuite ties back to the card. Use the ID
 when you name a card to the reviewer. Each card shows its document with NetSuite and Coupa links, the vendor's last
 three months by account and department with the line descriptions, and its lines, each with its
@@ -536,7 +543,7 @@ keyed by item id:
 
 Item ids start `C-` and `P-` for CapEx and Prepaid flags, `CB-` and `PB-` for bills booked to
 fixed-asset and prepaid accounts, `D-` for Dept & Entity, `DR-` for your drafted entries, and
-`R-` and `N-` for Reviewed & Cleared and New This Period. Notes are the reviewer's own words.
+`R-` and `N-` for Reviewed & Cleared and New This Period, and `PT-` for Pass-Through Bills. Notes are the reviewer's own words.
 
 ## Requests
 
@@ -765,7 +772,9 @@ runs in a Project.
 | `netsuite_link_ids_<month>.csv`, `netsuite_link_ids.sql` | The month's NetSuite link IDs, and the query that pulls them |
 | `coupa_po_lines_<year>.csv` | Coupa PO line export for the calendar year |
 | `serif_rolling_forecast_2026-08.xlsx` | The rolling forecast workbook whose prior cut is the plan |
-| `ukg_full_roster_hrbp_<date>.csv` | UKG roster: department per person, for the requester flag. Personal data. |
+| `ukg_full_roster_*.csv` | UKG roster: department per person, for the requester flag. Personal data. |
+| `flagship_breakdown_<invoice>.xlsx` | A Flagship pass-through bill's cost breakdown, from Coupa: optional, for Pass-Through Bills |
+| `netsuite_ref_accounts.csv`, `netsuite_ref_departments.csv`, `netsuite_ref_programs.csv` | NetSuite's lists, for internal IDs in the import CSV; optional |
 | `serif-*.md` | Chart of accounts, vendor coding baseline, policy rules |
 
 Header-only templates are feeds Serif has not sent. Each one's absence turns a check off:

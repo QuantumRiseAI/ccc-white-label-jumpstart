@@ -31,7 +31,7 @@ Statement again. Then:
 ```sh
 python3 serif_uc1_engine.py --period "Sep 2026" \
   --gl      netsuite_gl_* \
-  --coupa   coupa_po_lines_2026.csv \
+  --coupa   coupa_po_lines_*.csv \
   --pending . \
   --out     out
 ```
@@ -44,8 +44,8 @@ month in two exports is refused.
 python3 serif_views.py out/sep2026/run.json \
   --gl     netsuite_gl_* \
   --plan   serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
-  --coupa  coupa_po_lines_2026.csv \
-  --roster ukg_full_roster_hrbp_<date>.csv \
+  --coupa  coupa_po_lines_*.csv \
+  --roster ukg_full_roster_*.csv \
   --keep-names
 ```
 
@@ -101,7 +101,7 @@ If Python is missing, ask Claude to install it. On Windows that is usually
 
 ## Each Month
 
-Serif sends four exports, uploaded as they are:
+Serif sends these exports, uploaded as they are (link IDs, Flagship cost breakdowns and NetSuite's lists are optional):
 
 1. The NetSuite Custom General Ledger saved search, exported as `.xls` (an `.xlsx` saved
    from it also reads), named `netsuite_gl_<range>.xls`. Columns are found by name, so a
@@ -191,9 +191,9 @@ imports.
 
 * Today the connector pulls the month's link IDs (below), and Claude can look up a document
   as NetSuite holds it now, for example to see that a fix you made is there.
-* The month's GL still comes from the saved search export. Once the scripts read the
-  connector's results, Claude pulls the month itself and the uploads stop. Until then,
-  attach the exports.
+* The month's GL and Income Statement can come from the connector: Claude runs
+  `netsuite_gl_detail.sql` and `netsuite_income_statement.sql` and the scripts read the saved
+  results, in place of uploading those two exports.
 * Coupa has no connector yet. When it has one, it is read-only too.
 
 To connect the NetSuite connector and set its tool permissions, see [`CONNECT-NETSUITE.md`](CONNECT-NETSUITE.md).
@@ -322,16 +322,15 @@ left on it. Run log and Settings are the icons at the right.
   vendors, how many flags are resolved, the tie to NetSuite's Income Statement (every account,
   or the ones that differ), and the close checklist: each page, what is open on it
   and what that is worth. A line of the checklist opens its page.
-* **Review**: CapEx Flags, Prepaid Flags, and Dept & Entity.
+* **Review**: CapEx Flags, Prepaid Flags, Dept & Entity, and Pass-Through Bills.
+  * **Pass-Through Bills** lists the month's Flagship Labs LLC and Flagship Pioneering Labs TPC Inc
+    bills, each one lump sum of costs Flagship paid for Serif. Give a bill's cost breakdown from
+    Coupa (`flagship_breakdown_<invoice>.xlsx`, with `--flagship-breakdown`) and its card ties the
+    breakdown to the bill, maps each item to Serif's account, flags capital, prepaid and misplaced
+    items, and proposes the reclass. Without one, the card links to Coupa and is decided Reviewed in
+    Coupa; nothing waits on it. `python3 serif_sources.py passthrough` lists the bills.
 * **Confirm**: Reviewed & Cleared, and New This Period.
-
-**Pass-Through Bills** (under Review) lists the month's Flagship Labs LLC and Flagship Pioneering
-Labs TPC bills, each one lump sum of costs Flagship paid for Serif. Give a bill's cost breakdown
-from Coupa (`flagship_breakdown_<invoice>.xlsx`, with `--flagship-breakdown`) and its card ties
-the breakdown to the bill, maps each item to Serif's account, flags capital, prepaid and
-misplaced items, and proposes the reclass. Without one, the card links to Coupa and is decided
-Reviewed in Coupa; nothing waits on it. `python3 serif_sources.py passthrough` lists the bills.
-* **Documentation**: Audit Log, SOX Documentation, and Export.
+* **Documentation**: Audit Log, SOX Documentation (with the **Sign-Off & Export** card at its foot), and Export.
 
 ### A Card
 
@@ -417,10 +416,7 @@ until then it is marked Not saved. Edit opens it again, and Cancel brings back w
 recoded with a note, as edited: the reclasses still to book. Items marked Edited in NetSuite are
 not in it; Export lists them, with the count of each path, and **Work paper, HTML** saves every
 decision with its reference ID, path and document, the reclasses in the import, and the
-sign-off, for the close file. Header columns: External ID, Subsidiary (Serif Biomedicines, Inc.),
-Journal Date, Posting Period (the close month), Currency (USD), Exchange Rate (1), Memo (with the
-note), Reversing Entry (Y/N) and Reversal Date. Line columns: Account, Department, Project, Program,
-Debit, Credit and Line Memo. Project and Program are the line's ProjectID and Program segments, by
+sign-off, for the close file. The CSV's columns: External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs. The same export saves the support file beside it (`...-support.html`): every entry in the import, by External ID, with its reason, the decision and who made it, the note and its lines, to attach in NetSuite with the import. Project and Program are the line's ProjectID and Program segments, by
 name as the GL export shows them (`Internal CMC`, `00 Non-Specific`); map the two columns to them
 the first time the import is set up in NetSuite. Journal Date, Posting Period, Memo, Reversing Entry, Reversal Date and Line Memo are
 editable on the entry; Subsidiary, Currency and Exchange Rate are shown, not editable. Corrections

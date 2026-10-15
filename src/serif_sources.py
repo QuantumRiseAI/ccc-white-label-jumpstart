@@ -1372,11 +1372,12 @@ def passthrough_bills(by_period, period) -> list[dict]:
     bills = {}
     for line in by_period.get(period, []):
         code = line["account_code"] or ""
-        if (not PASSTHROUGH_VENDORS.match(line.get("vendor_or_name") or "") or not code[:1] in "5678"
+        if (not PASSTHROUGH_VENDORS.match(line.get("vendor_or_name") or "") or not code or code[0] not in "5678"
                 or code.startswith(FSP_ACCOUNTS) or "bill" not in (line.get("txn_type") or "").lower()):
             continue
         b = bills.setdefault(line["document_number"], {
             "document": line["document_number"], "vendor": line["vendor_or_name"], "date": line.get("date") or "",
+            "txn_type": "Bill Credit" if "credit" in (line.get("txn_type") or "").lower() else "Bill",
             "coupa_url": line.get("coupa_url") or "", "internal_id": line.get("internal_id") or "", "lines": {}})
         b["coupa_url"] = b["coupa_url"] or line.get("coupa_url") or ""
         k = (code, line.get("department") or "")
@@ -1414,7 +1415,7 @@ def read_flagship_breakdown(path) -> list[dict]:
     for r in rows[head + 1:]:
         if not any(str(c).strip() for c in r):
             continue
-        first, amt = str(r[0]).strip() if r else "", _float(get(r, "amount"))
+        first, amt = str(r[0]).strip() if r else "", _float(re.sub(r"[$,\s]", "", get(r, "amount")).replace("(", "-").replace(")", ""))
         if first.lower().startswith("total"):
             if get(r, "invoice"):
                 stated[get(r, "invoice")] = amt
@@ -1436,7 +1437,7 @@ def read_flagship_breakdowns(paths) -> dict:
     out = {}
     for p in paths or []:
         if not os.path.exists(p):
-            if "*" in p:
+            if any(c in p for c in "*?["):     # a pattern the shell found no file for
                 continue
             raise SystemExit(f"Not found: {p}")
         for b in read_flagship_breakdown(p):

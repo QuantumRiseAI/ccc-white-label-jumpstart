@@ -37,6 +37,31 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: the import with its support, and the September review fixes
+
+- **SERIF-152, as far as Serif's answers allow**: a percent of the comparison can be added to the
+  P&L Flux review threshold in Settings (off until Serif chooses; Disha's practice is 20% over a
+  dollar floor); the coding console flags **Same item, two accounts** (Lab Supplies/Consumables
+  against Lab Non-Capital Equipment, from the ledger alone, two in Sep 2026: TaqMan master mix and
+  depth filters); a pass-through breakdown shows each item's Flagship department.
+- **The NetSuite import with its support file** (SERIF-153): one export, in both consoles, saves the
+  import CSV and beside it `...-support.html`: every entry in the import by External ID, with its
+  reason, the decision and who made it, the reviewer's note, the source document and its lines,
+  plus the items fixed in NetSuite (not imported) and the sign-off.
+- **Pass-through review**: an activity maps to its booked line by account before amount, and may span
+  departments; an item reads as one kind of T&E; a refund's reclass runs the other way with no
+  negative amounts; service periods read in more memo shapes; a breakdown that does not add to its
+  own Total row says so; amounts with commas or dollar signs read; credit memos are labelled as such;
+  a draft on a pass-through card sets only a decision the card offers.
+- **Notes and drafts**: line summaries drafted from the ledger keep their NetSuite and Coupa links; a
+  line whose only note is its own computed summary still needs commentary; notes written before
+  notes were saved count as saved; a Routine item reads Pending; page names carry no badge.
+- **Runs as written**: a balance sheet or NetSuite list given as a pattern that matches no file is
+  taken as not supplied; the instructions name the Coupa and roster files by pattern, leave out
+  `--forecast` without the month's cut, run the pass-through check before the first reply, give the
+  import CSV's real columns and `manifest.coupa_coverage`, and no longer say the connector's GL
+  cannot be read.
+
 ## Unreleased: Flagship pass-through bills (SERIF-148)
 
 - **Sign-off you can find**: both consoles end their SOX page with one full-width Sign-Off & Export
