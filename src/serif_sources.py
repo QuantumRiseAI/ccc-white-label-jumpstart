@@ -1349,6 +1349,101 @@ def links(gl_lines, coupa_rows, po_numbers=(), id_rows=()) -> dict:
             "docs": docs, "po_ids": po_ids}
 
 
+# ---------- Flagship pass-through bills ----------
+# Flagship Labs LLC and Flagship Pioneering Labs TPC bill Serif one lump sum of costs they
+# paid on Serif's behalf, one line per activity. The items behind a bill are in a cost
+# breakdown attached to the invoice in Coupa (NetSuite saved search "FSM| Unbilled Cost by
+# Customer Detail w Acct V2"). The FSP charges (6901xxx) are Flagship's own service fee.
+PASSTHROUGH_VENDORS = re.compile(r"^flagship (labs llc|pioneering labs tpc)\b", re.I)
+FSP_ACCOUNTS = "6901"
+BREAKDOWN_HEADERS = {
+    "invoice": ["Invoice"], "amount": ["Amount"], "date": ["Date"], "type": ["Type"],
+    "acct_no": ["Account (Line): Number", "Account: Number"],
+    "acct_name": ["Account (Line): Name (GL-style)", "Account (Line): Name", "Account: Name"],
+    "vendor": ["Entity: Name", "Vendor"], "document": ["Document Number"],
+    "header_memo": ["Header Memo"], "memo": ["Line Item Memo", "Memo"],
+    "department": ["Department: Name"], "project": ["Projects: Name"], "employee": ["Employee Name"]}
+
+
+def passthrough_bills(by_period, period) -> list[dict]:
+    """-> [{document, vendor, date, amount, coupa_url, internal_id, lines: [{account_code,
+    account_leaf, department, project, program, amount}]}]: the month's Flagship pass-through
+    bills, largest first, with their expense lines added up by account and department."""
+    bills = {}
+    for line in by_period.get(period, []):
+        code = line["account_code"] or ""
+        if (not PASSTHROUGH_VENDORS.match(line.get("vendor_or_name") or "") or not code[:1] in "5678"
+                or code.startswith(FSP_ACCOUNTS) or "bill" not in (line.get("txn_type") or "").lower()):
+            continue
+        b = bills.setdefault(line["document_number"], {
+            "document": line["document_number"], "vendor": line["vendor_or_name"], "date": line.get("date") or "",
+            "coupa_url": line.get("coupa_url") or "", "internal_id": line.get("internal_id") or "", "lines": {}})
+        b["coupa_url"] = b["coupa_url"] or line.get("coupa_url") or ""
+        k = (code, line.get("department") or "")
+        x = b["lines"].setdefault(k, {"account_code": code, "account_leaf": line.get("account_leaf") or "", "department": k[1],
+                                      "project": line.get("project") or "", "program": line.get("program") or "", "amount": 0.0})
+        x["amount"] = round(x["amount"] + line["amount"], 2)
+    out = []
+    for b in bills.values():
+        b["lines"] = sorted(b["lines"].values(), key=lambda x: -abs(x["amount"]))
+        b["amount"] = round(sum(x["amount"] for x in b["lines"]), 2)
+        out.append(b)
+    return sorted(out, key=lambda b: -abs(b["amount"]))
+
+
+def _breakdown_date(value):
+    v = str(value or "").strip()
+    if re.fullmatch(r"\d+(\.\d+)?", v):          # a spreadsheet serial
+        from datetime import date, timedelta
+        return (date(1899, 12, 30) + timedelta(days=int(float(v)))).isoformat()
+    return v[:10]
+
+
+def read_flagship_breakdown(path) -> list[dict]:
+    """-> [{invoice, lines: [...], total, stated_total, path}], one per invoice in the file:
+    a Flagship cost breakdown as exported from NetSuite and attached in Coupa. Columns are
+    found by name; the title rows above the header and the Total row are passed over."""
+    rows = list(_gl_sheet_rows(path))
+    head = next((i for i, r in enumerate(rows) if {"Amount", "Invoice"} <= {str(c).strip() for c in r}), None)
+    if head is None:
+        raise SystemExit(f"{os.path.basename(path)} is not a Flagship cost breakdown: no row with Amount and Invoice columns.")
+    names = [str(c).strip() for c in rows[head]]
+    col = {f: next((names.index(o) for o in opts if o in names), None) for f, opts in BREAKDOWN_HEADERS.items()}
+    get = lambda r, f: (str(r[col[f]]).strip() if col[f] is not None and col[f] < len(r) and r[col[f]] is not None else "")
+    by_inv, stated = {}, {}
+    for r in rows[head + 1:]:
+        if not any(str(c).strip() for c in r):
+            continue
+        first, amt = str(r[0]).strip() if r else "", _float(get(r, "amount"))
+        if first.lower().startswith("total"):
+            if get(r, "invoice"):
+                stated[get(r, "invoice")] = amt
+            continue
+        if not get(r, "invoice") and not get(r, "acct_no"):
+            continue
+        by_inv.setdefault(get(r, "invoice"), []).append({
+            "date": _breakdown_date(get(r, "date")), "type": get(r, "type"), "vendor": get(r, "vendor"),
+            "acct_no": get(r, "acct_no").split(".")[0], "acct_name": get(r, "acct_name").split(":")[-1].strip(),
+            "document": get(r, "document"), "header_memo": get(r, "header_memo"), "memo": get(r, "memo"),
+            "department": get(r, "department"), "project": get(r, "project"), "employee": get(r, "employee"),
+            "amount": round(amt, 2)})
+    return [{"invoice": inv, "lines": ls, "total": round(sum(l["amount"] for l in ls), 2),
+             "stated_total": stated.get(inv), "path": path} for inv, ls in by_inv.items()]
+
+
+def read_flagship_breakdowns(paths) -> dict:
+    """{invoice: breakdown} from every file given; a pattern that matched no file is passed over."""
+    out = {}
+    for p in paths or []:
+        if not os.path.exists(p):
+            if "*" in p:
+                continue
+            raise SystemExit(f"Not found: {p}")
+        for b in read_flagship_breakdown(p):
+            out[b["invoice"]] = b
+    return out
+
+
 def main(argv=None):
     """`python3 serif_sources.py tie`: the Income Statement tie, run before either console."""
     import argparse
@@ -1362,7 +1457,24 @@ def main(argv=None):
                    help="the NetSuite Income Statement by month report or the connector's result; "
                         "given several, the first that holds every month tied is used")
     t.add_argument("--prior", action="store_true", help="tie the month before as well (the P&L Flux)")
+    pt = sub.add_parser("passthrough", help="list the month's Flagship pass-through bills, and which have a cost breakdown")
+    pt.add_argument("--period", required=True)
+    pt.add_argument("--gl", nargs="+", required=True)
+    pt.add_argument("--breakdown", nargs="*", default=[], help="Flagship cost breakdowns already supplied")
     args = ap.parse_args(argv)
+    if args.cmd == "passthrough":
+        period = shift(args.period.strip(), 0)
+        bills = passthrough_bills(read_gl(args.gl)[0], period)
+        have = read_flagship_breakdowns(args.breakdown)
+        if not bills:
+            print(f"No Flagship pass-through bills in {period}.")
+            return 0
+        print(f"Flagship pass-through bills in {period}: {len(bills)}. Ask the reviewer for each one's cost breakdown "
+              "from Coupa if they have it; the review runs without it.")
+        for b in bills:
+            print(f"  {b['document']}  {b['vendor']}  {b['date']}  ${b['amount']:,.2f}  "
+                  + ("breakdown supplied" if b["document"] in have else "no breakdown") + (f"  {b['coupa_url']}" if b["coupa_url"] else ""))
+        return 0
     period = shift(args.period.strip(), 0)
     months = [period, shift(period, -1)] if args.prior else [period]
     by_period, _ = read_gl(args.gl)

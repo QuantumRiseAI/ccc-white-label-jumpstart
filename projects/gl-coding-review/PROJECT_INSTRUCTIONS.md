@@ -29,6 +29,7 @@ name, or missing, and ask for any that are missing before you run anything.
 | Rolling forecast workbook, `.xlsx` | The plan: `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
 | UKG roster, `.csv` | The newest roster |
 | NetSuite link IDs, `.csv`, named `netsuite_link_ids_<month>.csv` | Optional, for links. The connector's result for `netsuite_link_ids.sql`; see NetSuite Link IDs |
+| Flagship cost breakdowns, `.xlsx`, named `flagship_breakdown_<invoice>.xlsx` | Optional. The breakdown attached in Coupa to a Flagship Labs LLC or Flagship Pioneering Labs TPC bill (NetSuite saved search "FSM\| Unbilled Cost by Customer Detail w Acct V2"); see Flagship Pass-Through Bills |
 | NetSuite's lists, `.csv`: `netsuite_ref_accounts.csv`, `netsuite_ref_departments.csv`, `netsuite_ref_programs.csv` | Kept with the Project's files and replaced only when NetSuite's accounts, departments or programs change. The import CSV then carries NetSuite's internal IDs; see Importing into NetSuite |
 
 The scripts take every month they need from the exports. If a month is missing, they say
@@ -40,6 +41,30 @@ joins Coupa to the ledger; Received, Approved Invoiced and the statuses: open co
 and the accrual population). Ask for the Coupa export with all available columns. Never
 report those checks as clean. If `coupa_coverage.row_limit` is set, the report stopped at that
 many rows and holds only part of the year: say so, and ask for the full export.
+
+## Flagship Pass-Through Bills
+
+Flagship Labs LLC and Flagship Pioneering Labs TPC bill Serif one lump sum of costs they paid
+on Serif's behalf, one line per activity. The items behind it are in a cost breakdown attached
+to the invoice in Coupa. Its FSP charges (6901xxx) are Flagship's own fee, not pass-through.
+
+`serif_sources.py passthrough` lists the month's pass-through bills and says which have a
+breakdown. When any has none, ask the reviewer once, in the same reply as the export list,
+whether they have the breakdowns: name each bill with its amount and Coupa link, and say the
+file is the Excel attached to the invoice in Coupa. It is optional. Never wait for it: run
+the review with what you have, and build again with `--flagship-breakdown` when a breakdown
+arrives.
+
+With a breakdown, the bill's card on **Pass-Through Bills** ties the breakdown to the bill and
+each activity to its booked line, maps Flagship's accounts to Serif's from the bill itself,
+checks each item against the capital and prepaid thresholds, its service period and its
+account (parking or travel booked as consulting), and proposes the reclass. Without one, the
+card says a breakdown would show more, links to Coupa, and is decided Reviewed in Coupa; every
+other card on that bill (CapEx, Prepaid, Dept & Entity) carries a Pass-through bill line, since
+one line may hold several items. In drafts, name the bill and the items the breakdown shows.
+
+Disha is confirming with Scott whether department reclasses on these items are in scope; until
+then, propose account reclasses only.
 
 ## Run It
 
@@ -63,8 +88,12 @@ python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_* \
   --coupa coupa_po_lines_2026.csv --roster ukg_full_roster_hrbp_<date>.csv \
   --netsuite-ids netsuite_link_ids_sep2026.csv --keep-names
 
+python3 serif_sources.py passthrough --period "Sep 2026" --gl netsuite_gl_* \
+  --breakdown flagship_breakdown_*.xlsx
+
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
   --gl netsuite_gl_* --income-statement netsuite_income_statement_by_* \
+  --flagship-breakdown flagship_breakdown_*.xlsx \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 

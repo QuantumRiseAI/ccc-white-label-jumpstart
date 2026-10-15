@@ -217,7 +217,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       const refs = await p.evaluate(() => [...document.querySelectorAll('[data-item]')].map(x => ({id: x.dataset.item, amt: Math.abs(Number(x.dataset.amt)),
         shown: (x.querySelector(':scope > .ih > .ref') || {}).textContent || '', ref: refOf(x.dataset.item)})));
       ok(refs.length > 0 && refs.length === await p.evaluate(() => Object.keys(DATA.ref).length) && refs.every(r => r.shown && r.shown === r.ref), 'gl: every card shows its reference ID in its header (' + refs.length + ')');
-      ok(refs.every(r => /^(CAPEX|FA|PREPAID|PPD|DEPT|DRAFT|CLEAR|NEW)-\d{2,}$/.test(r.ref)) && new Set(refs.map(r => r.ref)).size === refs.length, 'gl: reference IDs are PREFIX-NN and unique');
+      ok(refs.every(r => /^(CAPEX|FA|PREPAID|PPD|DEPT|DRAFT|PASS|CLEAR|NEW)-\d{2,}$/.test(r.ref)) && new Set(refs.map(r => r.ref)).size === refs.length, 'gl: reference IDs are PREFIX-NN and unique');
       ok(['CAPEX', 'PREPAID', 'PPD', 'DEPT'].every(s => refs.some(r => r.ref === s + '-01')) && refs.some(r => r.ref.startsWith('CAPEX-') && r.id.startsWith('C-'))
         && refs.some(r => r.ref.startsWith('PREPAID-') && r.id.startsWith('P-')) && refs.some(r => r.ref.startsWith('PPD-') && r.id.startsWith('PB-'))
         && refs.some(r => r.ref.startsWith('DEPT-') && r.id.startsWith('D-')), 'gl: CapEx, Prepaid and Dept & Entity cards are numbered by screen');

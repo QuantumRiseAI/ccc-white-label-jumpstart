@@ -48,6 +48,8 @@ ap.add_argument("--coding-record", help="the GL Coding Review decision record (J
 ap.add_argument("--coding-drafts", help="the GL Coding Review's drafts.json, with --coding-record: Journal Entries Claude drafted there, so a decision on one can be applied")
 ap.add_argument("--drafts", help="Claude's drafts.json for the console being built (with --only)")
 ap.add_argument("--out", help="output folder")
+ap.add_argument("--flagship-breakdown", nargs="+", action="extend", default=[], metavar="XLSX",
+                help="cost breakdowns of Flagship pass-through bills, from Coupa: each bill with one is reviewed item by item")
 ap.add_argument("--netsuite-ref", nargs="+", default=[], metavar="CSV",
                 help="NetSuite's lists from the connector (netsuite_ref_accounts.csv, netsuite_ref_departments.csv, "
                      "netsuite_ref_programs.csv): the import CSV then carries internal IDs")
@@ -361,6 +363,88 @@ def je_lines(lines, src=None):
              "debit": round(l.get("debit") or 0, 2), "credit": round(l.get("credit") or 0, 2)} for l in lines]
 
 
+# ---------- Flagship pass-through bills: the breakdown, item by item ----------
+MONTHS = {m.lower(): i for i, m in enumerate(calendar.month_abbr) if m}
+MONTHS.update({m.lower(): i for i, m in enumerate(calendar.month_name) if m})
+MONTHS["sept"] = 9
+
+
+def service_end(text):
+    """(year, month) a memo's service period ends, or None: '7/15/26-6/1/27', '11/1/2026 - 10/31/2027',
+    'July 2026 - June 2027', 'May - Dec 2026'."""
+    t = text or ""
+    m = re.search(r"\d{1,2}/\d{1,2}/(\d{2,4})\s*[-\u2013]\s*(\d{1,2})/\d{1,2}/(\d{2,4})", t)
+    if m:
+        y = int(m.group(3)); return (y + 2000 if y < 100 else y, int(m.group(2)))
+    m = re.search(r"([A-Za-z]{3,9})\.?\s*(\d{4})?\s*[-\u2013]\s*([A-Za-z]{3,9})\.?\s*(\d{4})", t)
+    if m and m.group(1).lower() in MONTHS and m.group(3).lower() in MONTHS:
+        return (int(m.group(4)), MONTHS[m.group(3).lower()])
+    return None
+
+
+def one_month(text):
+    """True when a memo names a single month's charge ('Monthly', 'Aug 2026' and no range)."""
+    t = text or ""
+    if re.search(r"\bmonthly\b", t, re.I):
+        return True
+    return bool(re.search(r"\b(%s)\.?\s+\d{4}\b" % "|".join(MONTHS), t, re.I)) and service_end(t) is None
+
+
+T_AND_E = (("parking", "Parking"), ("airfare|flight|hotel|lodging|uber|lyft|taxi|mileage|travel", "Travel"))
+
+
+def review_breakdown(bill, bd, thr_capex, thr_prepaid, period):
+    """A pass-through bill read against its cost breakdown. -> {ties, groups, items, reclass, notes}:
+    the breakdown's total against the bill's, each activity (Flagship account) against the booked
+    line it adds up to, and each item against the capital and prepaid thresholds, its service
+    period and the account its kind of cost belongs on. reclass: the lines of the entry that
+    moves the items found on the wrong account."""
+    py, pm = int(period[-4:]), list(calendar.month_abbr).index(period[:3])
+    groups, free = {}, list(bill["lines"])
+    for l in bd["lines"]:
+        g = groups.setdefault(l["acct_no"], {"acct_no": l["acct_no"], "acct_name": re.sub(r"^[\d.]+\s*-\s*", "", l["acct_name"]), "amount": 0.0, "booked": None})
+        g["amount"] = round(g["amount"] + l["amount"], 2)
+    for g in sorted(groups.values(), key=lambda g: -abs(g["amount"])):
+        hit = next((x for x in free if abs(x["amount"] - g["amount"]) < 0.01), None)
+        if hit:
+            g["booked"] = hit; free.remove(hit)
+    leaf = {v.lower(): k for k, v in ACC.items()}
+    items, reclass, notes = [], defaultdict(float), []
+    for l in bd["lines"]:
+        g = groups[l["acct_no"]]; b = g["booked"]
+        acct = b["account_code"] if b else ""
+        text = " ".join(x for x in (l["header_memo"], l["memo"]) if x)
+        flags = []
+        kind = (g["acct_name"] + " " + (b or {}).get("account_leaf", "")).lower()
+        if "equipment" in kind and abs(l["amount"]) >= thr_capex:
+            flags.append(("capital", "%s or more on non-capital equipment: may be a capital asset" % money(thr_capex)))
+        end = None if one_month(l["header_memo"]) else (service_end(l["header_memo"]) or service_end(l["memo"]))
+        future = end is not None and end > (py, pm)
+        if future and abs(l["amount"]) >= thr_prepaid:
+            flags.append(("prepaid", "covers months after %s and is %s or more: a prepaid" % (period, money(thr_prepaid))))
+        for pat, name in T_AND_E:
+            to = leaf.get(name.lower())
+            if to and acct and to != acct and re.search(r"\b(%s)\b" % pat, text, re.I):
+                flags.append(("account", "%s cost on %s %s: belongs on %s %s" % (name, acct, acct_name(acct), to, acct_name(to))))
+                reclass[(acct, b["department"], to)] += l["amount"]
+        items.append(dict(l, serif=acct, flags=flags, future=future, end=end))
+    eq = [i for i in items if "equipment" in (groups[i["acct_no"]]["acct_name"] + " " + ((groups[i["acct_no"]]["booked"] or {}).get("account_leaf") or "")).lower()]
+    if eq and not any(f[0] == "capital" for i in eq for f in i["flags"]):
+        notes.append("Non-capital equipment: %s; each is under the %s capital threshold, so expensed is right."
+                     % ("; ".join("%s %s" % (i["memo"] or i["header_memo"], money(i["amount"], True)) for i in eq), money(thr_capex)))
+    for i in items:
+        if i["future"] and not any(f[0] == "prepaid" for f in i["flags"]):
+            notes.append("%s, %s, runs to %s %d; under the %s prepaid threshold it stays expensed."
+                         % (i["header_memo"] or i["memo"], money(i["amount"], True), calendar.month_abbr[i["end"][1]], i["end"][0], money(thr_prepaid)))
+    ties = abs(bd["total"] - bill["amount"]) < 0.01 and all(g["booked"] for g in groups.values())
+    lines = []
+    for (frm, dept, to), amt in sorted(reclass.items()):
+        src = next((x for x in bill["lines"] if x["account_code"] == frm and x["department"] == dept), {})
+        lines += [{"account": to, "department": dept, "debit": round(amt, 2), "project": src.get("project"), "program": src.get("program")},
+                  {"account": frm, "department": dept, "credit": round(amt, 2), "project": src.get("project"), "program": src.get("program"), "reverses_line": True}]
+    return {"ties": ties, "groups": list(groups.values()), "items": items, "reclass": lines, "notes": notes}
+
+
 def proj_prog(x):
     """A line's Project, with its Program under it, as NetSuite names them."""
     return "%s<small>%s</small>" % (e(x.get("project") or "") or "&ndash;", e(x.get("program") or "") or "&ndash;")
@@ -382,7 +466,7 @@ def je_finish(je):
 
 
 # The GL Coding Review's reference IDs: one prefix per screen, by the prefix of the item id.
-REF_SCREENS = {"C": "CAPEX", "CB": "FA", "P": "PREPAID", "PB": "PPD", "D": "DEPT", "DR": "DRAFT", "R": "CLEAR", "N": "NEW"}
+REF_SCREENS = {"C": "CAPEX", "CB": "FA", "P": "PREPAID", "PB": "PPD", "D": "DEPT", "DR": "DRAFT", "R": "CLEAR", "N": "NEW", "PT": "PASS"}
 MEMO_MAX = 999   # NetSuite's limit on a Journal Entry Memo, body and line
 
 
@@ -602,6 +686,7 @@ td .draft.open .dt{display:block}
 .ih .dchip{font-size:var(--text--2);color:var(--color-action);background-color:var(--color-action-tint);border:1px solid var(--color-action-tint);border-radius:var(--radius-pill);padding:.1em .6em}
 .foldall{display:flex;gap:var(--spacing-xs);align-items:center;margin:0 0 var(--spacing-xs);font-size:var(--text--1);color:var(--color-fg-secondary)}
 .foldall .lk{margin-left:0;font-size:var(--text--1)}
+.ptflag{border-left:3px solid var(--color-warm-gray);background-color:var(--color-bg-primary);border-radius:var(--radius-xs);padding:.45em .8em;margin:0 0 .6em;font-size:var(--text--1);line-height:1.45}
 .draft .who{display:inline-flex;align-items:center;gap:.35em}
 .spk{width:1.05em;height:1.05em;flex:none}
 .ih .dchip{display:inline-flex;align-items:center;gap:.3em}
@@ -1339,8 +1424,9 @@ function shapeCards(){
     const kv = ib.querySelector(':scope > .kv'), dr = ib.querySelector('.draft'), ac = ib.querySelector(':scope > .acts');
     const why = ib.querySelector(':scope > .why'), pol = ib.querySelector(':scope > .pol');
     let at = kv;
-    if (dr && kv){ kv.after(dr); at = dr; }
-    else if (why && kv){ kv.after(why); at = why; }
+    const pf = ib.querySelector(':scope > .ptflag'); if (pf && kv){ kv.after(pf); at = pf; }
+    if (dr && at){ at.after(dr); at = dr; }
+    else if (why && at){ at.after(why); at = why; }
     if (ac && at) at.after(ac);
     if (dr && why){ const f = fold(why, 'Why it was flagged'); if (pol) f.appendChild(pol); }
     else if (pol && !why){ fold(pol, 'Policy'); }
@@ -1367,7 +1453,8 @@ const THR_TXT = {
                               : ['Review threshold', 'Lines that moved {v} or more need commentary.'],
   thr_capex: ['CapEx threshold', 'Purchases of {v} or more are flagged as possible capital assets.'],
   thr_prepaid: ['Prepaid threshold', 'Charges of {v} or more that cover future months are flagged as possible prepaids.'],
-  all: ['Department recodes', 'A department recode is reviewed whatever its size.']};
+  all: ['Department recodes', 'A department recode is reviewed whatever its size.'],
+  allpass: ['Pass-through bills', 'Every pass-through bill is reviewed, whatever its size.']};
 const PENCIL = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg>';
 function shapeThresholds(){
   $$('.page').forEach(pg => { if (pg.id === 'p-settings') return;
@@ -1375,9 +1462,9 @@ function shapeThresholds(){
     pg.querySelectorAll('.item[data-thr]').forEach(x => { if (keys.indexOf(x.dataset.thr) < 0) keys.push(x.dataset.thr); });
     if (pg.querySelector('tr[data-var], [data-cm]') && keys.indexOf('thr') < 0) keys.unshift('thr');
     if (!keys.length) return;
-    keys.sort((a, b) => (a === 'all') - (b === 'all'));
+    keys.sort((a, b) => a.startsWith('all') - b.startsWith('all'));
     const box = document.createElement('div'); box.className = 'thrchips';
-    box.innerHTML = keys.map(k => k === 'all'
+    box.innerHTML = keys.map(k => k.startsWith('all')
       ? '<span class="thc none" data-tipsm data-tip="' + esc(THR_TXT[k][1]) + '"><span class="tl">' + THR_TXT[k][0] + '</span><span class="tv0">Always reviewed</span></span>'
       : '<span class="thc" data-thc="' + k + '" data-tipsm data-tip=""><span class="tl">' + THR_TXT[k][0] + '</span>'
         + '<button class="tv" data-thedit="' + k + '" aria-label="Change the ' + THR_TXT[k][0] + '"><span data-thrv="' + k + '"></span>' + PENCIL + '</button>'
@@ -1572,7 +1659,7 @@ document.addEventListener('click', ev => { const h = ev.target.closest('.item.fo
    (data-thr names it; "all" is always reviewed) */
 const thrOf = k => Number(S[k]) || DATA[k] || S.thr || DATA.thr;
 function marks(){
-  $$('.item[data-thr]').forEach(x => { const k = x.dataset.thr, hi = k === 'all' || Number(x.dataset.tamt || x.dataset.amt) >= thrOf(k);
+  $$('.item[data-thr]').forEach(x => { const k = x.dataset.thr, hi = k.startsWith('all') || Number(x.dataset.tamt || x.dataset.amt) >= thrOf(k);
     x.classList.toggle('hi', hi); const g = x.querySelector(':scope > .ih > [data-rev]'); if (g) g.hidden = !hi; });
   $$('[data-thrin]').forEach(t => { if (document.activeElement !== t) t.value = thrOf(t.dataset.thrin).toLocaleString('en-US'); });
   if (typeof paintThresholds === 'function') paintThresholds();
@@ -2400,7 +2487,26 @@ def coding():
     # threshold, Prepaid at its prepaid threshold (12 Oct 2026), the rest at thr. A Department
     # flag has none ("all"): every line off Non-Specific is recoded, whatever its size.
     THR = {"thr": thr, "thr_capex": 5000.0, "thr_prepaid": 25000.0}
-    over = lambda k, a: k == "all" or (a or 0) >= THR[k]
+    # Flagship pass-through bills: each reviewed item by item where its cost breakdown was
+    # supplied; without one, the bill and every card on it say a breakdown would show more.
+    PT_BILLS = SS.passthrough_bills(by_period, PERIOD)
+    PT_BD = SS.read_flagship_breakdowns(A.flagship_breakdown)
+    PT_REV = {b["document"]: review_breakdown(b, PT_BD[b["document"]], THR["thr_capex"], THR["thr_prepaid"], PERIOD)
+              for b in PT_BILLS if b["document"] in PT_BD}
+
+    def pt_flag(document):
+        """The line on another card for a pass-through bill: what its breakdown shows, or that it would show more."""
+        if document not in {b["document"] for b in PT_BILLS}:
+            return ""
+        rv = PT_REV.get(document)
+        if not rv:
+            return ('<div class="ptflag"><b>Pass-through bill.</b> One line here may hold several items. Attach its cost breakdown from Coupa '
+                    'to review them; see Pass-Through Bills.</div>')
+        n = sum(1 for i in rv["items"] if i["flags"])
+        return ('<div class="ptflag"><b>Pass-through bill, breakdown supplied.</b> %d items%s; %s. See Pass-Through Bills.%s</div>'
+                % (len(rv["items"]), ", tying to the bill" if rv["ties"] else ", not tying to the bill",
+                   "%d to act on" % n if n else "none to reclass", (" " + en(" ".join(rv["notes"]))) if rv["notes"] else ""))
+    over = lambda k, a: k.startswith("all") or (a or 0) >= THR[k]
     vend = next(t for t in V["tables"] if t["id"] == "vendors")
     vrows = [r for s in vend["sections"] for r in s["rows"]]
     billed = [r for r in vrows if round(r.get("amount") or 0)]
@@ -2454,6 +2560,8 @@ def coding():
             v_ = {"clear": "reject", "entry": "approve"}.get(dv["recommend"])
             more = draft("ven:" + iid, txt(dv.get("note")), iid, iid if v_ else None, v_,
                          {"reject": "Coding stands: reject the recode.", "approve": "Approve the recode."}.get(v_, "Ask the owner.")) + more
+        if doc and not iid.startswith("PT-"):
+            more = pt_flag(doc["document"]) + more
         amts[iid] = amount or 0
         # thr names the screen's threshold, which the console marks Review against as
         # the reviewer changes it (tamt, when the test is on more than the card's
@@ -2686,6 +2794,45 @@ def coding():
                      (("confirm", "Confirm Vendor &amp; Coding"), ("recode", "Recode This Line"), ("netsuite", "Edited in NetSuite")))
     ncards = by_dept(news, new_card)
 
+    pt_cards = []
+    for b in PT_BILLS:
+        iid = sid("PT", b["document"])
+        rv = PT_REV.get(b["document"])
+        booked = "<br>".join("%s %s" % (coding_(x["account_code"], x["department"]), '<span class="mono">' + money(x["amount"], True) + "</span>") for x in b["lines"])
+        doc = {"type": "Bill", "document": b["document"], "text": "Pass-through, " + count(len(b["lines"]), "activity line"), "date": b["date"]}
+        if rv:
+            flagged_items = [i for i in rv["items"] if i["flags"]]
+            why = ("The breakdown&rsquo;s %d items total %s%s. " % (len(rv["items"]), money(PT_BD[b["document"]]["total"], True),
+                   " and tie to the bill, each activity to its booked line" if rv["ties"] else
+                   ", against the bill&rsquo;s %s: they do not tie, so read it before relying on it" % money(b["amount"], True))
+                   + ("".join(" %s, %s: %s." % (e(i["header_memo"] or i["memo"]), money(i["amount"], True), e(f[1])) for i in flagged_items for f in i["flags"]) or " No item is on the wrong account, a capital asset or a prepaid.")
+                   + (" " + en(" ".join(rv["notes"])) if rv["notes"] else ""))
+            rows = "".join('<tr%s><td class="mono">%s</td><td>%s</td><td>%s<small>%s</small></td><td><span class="code">%s</span><small>%s</small></td><td>%s</td><td class="n2">%s</td><td>%s</td></tr>'
+                           % (' class="crit"' if i["flags"] else "", e(i["date"]), e(i["vendor"]), e(i["header_memo"]), e(i["memo"]), e(i["acct_no"]),
+                              e(next(g["acct_name"] for g in rv["groups"] if g["acct_no"] == i["acct_no"])), coding_(i["serif"]) if i["serif"] else "&ndash;",
+                              money(i["amount"], True), "; ".join(e(f[1]) for f in i["flags"]) or "")
+                           for i in rv["items"])
+            table = ('<details class="lines"><summary>Breakdown (%d)</summary><div class="tw"><table><thead><tr><th>Date</th><th>Vendor</th><th>Item</th><th>Flagship account</th>'
+                     '<th>Serif account</th><th class="n2">Amount</th><th>Flag</th></tr></thead><tbody>%s</tbody></table></div></details>' % (len(rv["items"]), rows))
+            status = "Supplied: %d items, %s" % (len(rv["items"]), "ties" if rv["ties"] else "does not tie")
+            if rv["reclass"]:
+                je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": b["date"], "memo": "Reclass %s %s items to their accounts, from its cost breakdown" % (b["vendor"], b["document"]),
+                           "lines": je_lines(rv["reclass"])}
+                rec = "<br>".join(coding_(l["account"], l["department"]) + ' <span class="mono">' + money(l["debit"], True) + "</span>" for l in je[iid]["lines"] if l["debit"])
+                acts_, more_ = FLAG_ACTS, je_editor(iid, je[iid]["lines"])
+            else:
+                rec, acts_, more_ = "None: the coding stands", (("confirm", "Reviewed, Coding Stands"), ("modify", "Modify")), ""
+            ask = ""
+        else:
+            why = ("Flagship bills these costs as one lump sum, one line per activity. The items behind each line, and whether any is a capital asset, "
+                   "a prepaid or on the wrong account, are in the cost breakdown attached to the invoice in Coupa. Attach the breakdown to review it item by item, "
+                   "or open it in Coupa and note what you found.")
+            table, status, rec, more_ = "", "Not supplied", "Breakdown needed to tell", ""
+            acts_, ask = (("confirm", "Reviewed in Coupa"),), "What you checked in the Coupa breakdown"
+        amts[iid] = b["amount"]
+        items.append(("pass", iid, "Pass-through", b["vendor"], b["document"], b["amount"], "", ""))
+        pt_cards.append(card(iid, b["vendor"], b["amount"], True, booked, rec, doc,
+                             '<div><div class="l">Breakdown</div><div class="x">%s</div></div>' % e(status), why, "", acts_, table, more_, thr="allpass", ask=ask))
     flagged = [i for i in items]
     famt = sum(i[5] for i in flagged)
     by_type = [("CapEx missed", [i for i in items if i[0] == "capex"]), ("Prepaid missed", [i for i in items if i[0] == "prepaid"]), ("Dept / account mismatch", [i for i in items if i[0] == "dept"])]
@@ -2741,6 +2888,14 @@ def coding():
                           ("Open", live("open", "dept"), live("openamt", "dept") + " to decide")])
                       + ('<p class="note">%s on an account other than the item\'s usual one, under %s: %s in all, not listed.</p>' % (count(len(small), "Coupa PO line"), money(thr), money(sum(f["amount_at_risk"] for f in small), True)) if small else "")
                       + "".join(dcards) + exc_html))
+    if PT_BILLS:
+        pages.append(page("pass", hero("Pass-Through Bills, " + PERIOD, "", [
+                              ("Bills", str(len(PT_BILLS)), money(sum(b["amount"] for b in PT_BILLS), True) + " from Flagship Labs LLC and TPC"),
+                              ("Breakdowns", "%d of %d" % (len(PT_REV), len(PT_BILLS)), "Supplied from Coupa"),
+                              ("Decided", live("done", "pass"), "Bills on this page"),
+                              ("Open", live("open", "pass"), live("openamt", "pass") + " to review")])
+                          + '<div class="legend">Each bill is one lump sum of costs Flagship paid for Serif. With its cost breakdown from Coupa, each item is checked '
+                            'against the capital and prepaid thresholds, its service period and its account; without one, review it in Coupa.</div>' + "".join(pt_cards)))
     big = lambda rs: [r for r in rs if (r.get("amount") or 0) >= thr]
     pages.append(page("clear", hero("Reviewed &amp; Cleared, ".replace("&amp;", "&") + PERIOD, "", [
                           ("Vendors", str(len(clear)), money(sum(r["amount"] for r in clear), True) + ", no check flagged them"),
@@ -2791,7 +2946,7 @@ def coding():
                       '<div class="card"><div class="ch">Edited in NetSuite<span class="r note">Fixed on the bill or Journal Entry itself; resolved, and not in the CSV</span></div>'
                       '<div class="tw"><table><thead><tr><th>Ref ID</th><th>Item</th><th>Document</th><th class="n2">Amount</th><th>Note</th><th>Decided</th></tr></thead><tbody data-nsrows></tbody></table></div></div>'))
     sections = [("Overview", [("ov", "Overview")]),
-                ("Review", [("capex", "CapEx Flags"), ("prepaid", "Prepaid Flags"), ("dept", "Dept & Entity")]),
+                ("Review", [("capex", "CapEx Flags"), ("prepaid", "Prepaid Flags"), ("dept", "Dept & Entity")] + ([("pass", "Pass-Through Bills")] if PT_BILLS else [])),
                 ("Confirm", [("clear", "Reviewed & Cleared"), ("new", "New This Period")]),
                 ("Documentation", [("audit", "Audit Log"), ("sox", "SOX Documentation"), ("export", "Export")])]
     SKIPPED.extend("vendor note for " + k for k in (RAW_DRAFTS.get("vendors") or {}) if k not in used_ven)
