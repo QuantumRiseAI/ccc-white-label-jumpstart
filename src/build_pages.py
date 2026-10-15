@@ -508,7 +508,7 @@ def je_finish(je):
 
 
 # The GL Coding Review's reference IDs: one prefix per screen, by the prefix of the item id.
-REF_SCREENS = {"C": "CAPEX", "CB": "FA", "P": "PREPAID", "PB": "PPD", "D": "DEPT", "DR": "DRAFT", "R": "CLEAR", "N": "NEW", "PT": "PASS"}
+REF_SCREENS = {"C": "CAPEX", "CB": "FA", "P": "PREPAID", "PB": "PPD", "D": "DEPT", "DR": "DRAFT", "VC": "CODING", "R": "CLEAR", "N": "NEW", "PT": "PASS"}
 MEMO_MAX = 999   # NetSuite's limit on a Journal Entry Memo, body and line
 
 
@@ -2650,17 +2650,19 @@ def coding():
     PT_REV = {b["document"]: review_breakdown(b, PT_BD[b["document"]], THR["thr_capex"], THR["thr_prepaid"], PERIOD)
               for b in PT_BILLS if b["document"] in PT_BD}
 
-    def pt_flag(document):
-        """The line on another card for a pass-through bill: what its breakdown shows, or that it would show more."""
+    def pt_flag(document, named=False):
+        """The line on another card for a pass-through bill: what its breakdown shows, or that it would show more.
+        A card covering several bills names the bill each line is about."""
         if document not in {b["document"] for b in PT_BILLS}:
             return ""
-        rv = PT_REV.get(document)
+        kind = next((b.get("txn_type") or "Bill" for b in PT_BILLS if b["document"] == document), "Bill")
+        rv, who = PT_REV.get(document), ("%s %s: " % (e(kind), e(document))) if named else ""
         if not rv:
-            return ('<div class="ptflag"><b>Pass-through bill.</b> One line here may hold several items. Attach its cost breakdown from Coupa '
-                    'to review them; see Pass-Through Bills.</div>')
+            return ('<div class="ptflag"><b>%sPass-through bill.</b> One line here may hold several items. Attach its cost breakdown from Coupa '
+                    'to review them; see Pass-Through Bills.</div>' % who)
         n = sum(1 for i in rv["items"] if i["flags"])
-        return ('<div class="ptflag"><b>Pass-through bill, breakdown supplied.</b> %d items%s; %s. See Pass-Through Bills.%s</div>'
-                % (len(rv["items"]), ", tying to the bill" if rv["ties"] else ", not tying to the bill",
+        return ('<div class="ptflag"><b>%sPass-through bill, breakdown supplied.</b> %d items%s; %s. See Pass-Through Bills.%s</div>'
+                % (who, len(rv["items"]), ", tying to the bill" if rv["ties"] else ", not tying to the bill",
                    "%d to act on" % n if n else "none to reclass", (" " + en(" ".join(rv["notes"]))) if rv["notes"] else ""))
     over = lambda k, a: k.startswith("all") or (a or 0) >= THR[k]
     vend = next(t for t in V["tables"] if t["id"] == "vendors")
@@ -2831,7 +2833,8 @@ def coding():
 
     # Dept & Entity: department and account recodes, from the coding findings and their entries
     dcards = []
-    for x in drafted_entries():
+    drafted = drafted_entries()
+    for x in drafted:
         iid = sid("DR", x["memo"], x["debits"])
         je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"]), "reverses": x.get("reverses")}
         items.append(("dept", iid, "Draft", ", ".join(sorted({l["vendor"] for l in x["lines"] if l["vendor"]})) or x["memo"], x["memo"], x["debits"], "", ""))
@@ -2894,7 +2897,7 @@ def coding():
                 seen[(l.get("vendor_or_name") or "", norm(l["description"]))][l["account_code"]] += abs(l["amount"])
     # A line another Dept & Entity entry already moves is left to that entry.
     moved = {(d, l.get("account")) for f in dfind for l in (ents.get(f["finding_id"]) or {}).get("lines", []) for d in (l.get("documents") or [])}
-    flips = defaultdict(list)
+    flips, same_item_codings = defaultdict(list), set()
     for l in by_period.get(PERIOD, []):
         k = (l.get("vendor_or_name") or "", norm(l.get("description")))
         if (l["document_number"], l["account_code"]) in moved:
@@ -2908,6 +2911,7 @@ def coding():
         by_dept = defaultdict(float)
         for l in ls:
             by_dept[l.get("department") or ""] += l["amount"]
+            same_item_codings.add((vname, now, l.get("department") or ""))
         src = {"project": ls[0].get("project"), "program": ls[0].get("program")}
         je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": ls[0].get("date") or "", "memo": "Recode %s %s from %s to %s, as billed before" % (vname, ls[0]["description"][:40], now, before),
                    "lines": je_lines([x for d, v in sorted(by_dept.items()) if round(v, 2)
@@ -2930,16 +2934,18 @@ def coding():
         c = max(r.get("by_coding") or [{"account": "", "department": "", "current": 0}], key=lambda x: abs(x.get("current") or 0))
         return c.get("department") or "Non-Specific", c["account"], c.get("current") or r["amount"]
 
-    def vcard(iid, r, tag, why, actions, checks=False):
+    def vcard(iid, r, tag, why, actions, checks=False, flag=False, move=None):
+        """A vendor card. `move`, for a flag, names the codings the card is about: their lines, the
+        Journal Entry moving them, its memo, amount and document."""
         dept, a, camt = coding_of(r)
         dv = (RAW_DRAFTS.get("vendors") or {}).get(r["vendor"]) or {}
         dh = ""
-        if dv.get("recommend") in ("clear", "question", "entry"):
+        doc = (move or {}).get("doc") or line_doc(r["vendor"])
+        if dv.get("recommend") in ("clear", "question", "entry") and (not move or note_fits(r["vendor"], dv, doc)):
             used_ven.add(r["vendor"])
             v_ = {"clear": "confirm", "entry": "recode"}.get(dv["recommend"])
             dh = draft("ven:" + iid, txt(dv.get("note")), iid, iid if v_ else None, v_,
                        {"confirm": "Confirm.", "recode": "Recode."}.get(v_, "Ask the owner."))
-        doc = line_doc(r["vendor"])
         if doc:
             nsdoc[iid] = doc["type"] + " " + doc["document"]
         cur = "<br>".join(coding_(c["account"], c.get("department")) for c in (r.get("by_coding") or []) if round(c.get("current") or 0)) or coding_(a)
@@ -2948,14 +2954,16 @@ def coding():
         je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": (doc or {}).get("date") or "", "memo": "Recode %s from %s %s" % (r["vendor"], a, dept),
                    "lines": je_lines([{"account": a, "department": dept, "debit": camt}, {"account": a, "department": dept, "credit": camt, "reverses_line": True}],
                                      dict(zip(("project", "program"), pp.pop())) if len(pp) == 1 else None), "when": "recode"}
-        amts[iid] = r["amount"] or 0
-        return ('<div class="item" data-item="%s" data-amt="%s"><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span><span class="tag%s">%s</span></div>'
+        if move:
+            je[iid].update(memo=move["memo"], lines=je_lines(move["lines"]))
+        amts[iid] = (move["amount"] if move else r["amount"]) or 0
+        return ('<div class="item" data-item="%s" data-amt="%s"%s><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span><span class="tag%s">%s</span></div>'
                 '<div class="ib"><div class="kv"><div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Document / item</div><div class="x">%s%s</div></div>'
                 '<div><div class="l">%s</div><div class="x">%s</div></div></div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
-                % (iid, round(r["amount"] or 0, 2), iid, e(r["vendor"]), money(r["amount"], True), " hi" if tag == "Review" else (" plain" if not tag else ""), tag, cur,
+                % (iid, round(amts[iid], 2), ' data-flag data-thr="thr"' if flag else "", iid, e(r["vendor"]), money(amts[iid], True), " hi" if tag == "Review" else (" plain" if not tag else ""), tag, cur,
                    (e(doc["type"] + " " + doc["document"]) + "<small>" + e(doc["text"]) + "</small>") if doc else "&ndash;", doc_links(doc["document"]) if doc else "",
                    "Lines this month", str(((r.get("detail") or {}).get("count") or 0)), (why if checks else '<div class="why">' + why + "</div>") if why else "",
-                   dh + history(r["vendor"]), je_editor(iid, je[iid]["lines"], "recode"), lines_html(r["vendor"]), acts(iid, r["vendor"], actions), iid))
+                   "".join(pt_flag(d, True) for d in dict.fromkeys(str(i["document"]) for i in (r.get("detail") or {}).get("items") or [])) + dh + history(r["vendor"]), je_editor(iid, je[iid]["lines"], "recode"), lines_html(r["vendor"]), acts(iid, r["vendor"], actions), iid))
 
     def by_dept(rs, make):
         tree = defaultdict(lambda: defaultdict(list))
@@ -2999,6 +3007,87 @@ def coding():
                      "<b>Assessment:</b> " + en(fl.get("why") or "") + ((" <b>Action:</b> " + en(fl.get("do"))) if fl.get("do") else ""),
                      (("confirm", "Confirm Vendor &amp; Coding"), ("recode", "Recode This Line"), ("netsuite", "Edited in NetSuite")))
     ncards = by_dept(news, new_card)
+
+    # A vendor whose coding changed from its last months, or that is coded off the plan,
+    # is flagged in the run with no screen of its own. Each gets a vendor card on Dept &
+    # Entity: the coding stands (Confirm) or is recoded with a filled-in Journal Entry.
+    VC_FLAGS = {"changed": "Coding changed", "plan": "Coded off plan"}
+    # A coding another card already moves (CapEx, Prepaid, a Dept & Entity entry, Same item)
+    # is left to that card, and a new vendor is on New This Period: one bill, one card.
+    carded = {(r_["vendor"], r_["from_account"], r_["department"]) for k in screen for r_ in screen[k]}
+    for f in dfind:
+        x = ents.get(f["finding_id"])
+        t = f.get("transaction") or {}
+        vn = t.get("vendor_or_name") or ""
+        carded |= {(vn, l["account"], l.get("department") or "") for l in (x or {}).get("lines", []) if l.get("reverses_line") or l.get("credit")}
+        if t.get("account_code"):
+            carded.add((vn, t["account_code"], t.get("department") or ""))
+    carded |= same_item_codings
+    # Pass-through bills are reviewed on Pass-Through Bills, and an entry Claude drafted moves its own lines.
+    carded |= {(b["vendor"], l["account_code"], l.get("department") or "") for b in PT_BILLS for l in b["lines"]}
+    carded |= {(l.get("vendor") or "", l["account"], l.get("department") or "") for x in drafted for l in x["lines"] if l.get("credit")}
+    vc_cards = []
+    vc = []
+    for r in vrows:
+        fls = sorted((f for f in r.get("flags") or [] if f.get("id") in VC_FLAGS), key=lambda f: f["id"] != "changed")
+        if not fls or any(f.get("id") == "new" for f in r["flags"]):
+            continue
+        cods = {(c["account"], c.get("department") or ""): c for c in r.get("by_coding") or [] if round(c.get("current") or 0, 2)}
+        keys = {}
+        for f in fls:
+            if f["id"] == "changed":
+                ks = [(m.get("account"), m.get("department") or "") for m in f.get("match") or []]
+            else:
+                planned = {(q.get("account"), q.get("department") or "") for m in f.get("match") or [] for q in m.get("not") or []}
+                ks = [k for k in cods if k not in planned]
+            for k in ks:
+                if k in cods and (r["vendor"],) + k not in carded:
+                    keys.setdefault(k, f["id"])
+        if keys:
+            vc.append((r, fls, keys, cods))
+    for r, fls, keys, cods in sorted(vc, key=lambda x: -sum(abs(x[3][k]["current"]) for k in x[2])):
+        # Where the lines go back to: the coding the vendor used before, or the planned one.
+        hist = lambda c: abs(c.get("prior") or 0) + abs(c.get("prior2") or 0)
+        past = [c for c in r.get("by_coding") or [] if (c["account"], c.get("department") or "") not in keys and hist(c) > 0.005]
+        before = max(past, key=hist) if past else None
+        before = (before["account"], before.get("department") or "") if before else None
+        plan = max(r.get("planned") or [], key=lambda q: q.get("amount") or 0, default=None)
+        plan_to = (plan.get("account"), plan.get("department") or "") if plan else None
+        its = (r.get("detail") or {}).get("items") or []
+        lines = []
+        ch = next((f.get("before") for f in fls if f["id"] == "changed" and f.get("before")), None)
+        usual = (ch["account"], ch.get("department") or "") if ch else None
+        for k, why_id in keys.items():
+            # A coding the vendor used in earlier months is its usual one: the plan may be what is
+            # wrong, so the entry leaves it. The plan is the target only for a coding never used.
+            used = hist(cods[k]) > 0.005
+            to = (usual or before or plan_to) if why_id == "changed" else (k if used else plan_to or k)
+            v = round(cods[k]["current"], 2)
+            if to == k:
+                continue
+            pp = {(i.get("project") or "", i.get("program") or "") for i in its if i["account"] == k[0] and (i.get("department") or "") == k[1]}
+            src = dict(zip(("project", "program"), next(iter(pp)))) if len(pp) == 1 else {}
+            lines += [dict(src, account=to[0], department=to[1] or "Non-Specific", **{("debit" if v > 0 else "credit"): abs(v)}),
+                      dict(src, account=k[0], department=k[1] or "Non-Specific", reverses_line=True, **{("credit" if v > 0 else "debit"): abs(v)})]
+        amt = round(sum(abs(cods[k]["current"]) for k in keys), 2)
+        if not lines:
+            # Nothing to move without the reviewer: the entry stays as booked until edited.
+            lines = [x for k in keys for x in ({"account": k[0], "department": k[1] or "Non-Specific", "debit": abs(cods[k]["current"])},
+                                               {"account": k[0], "department": k[1] or "Non-Specific", "credit": abs(cods[k]["current"]), "reverses_line": True})]
+        on = [i for i in its if (i["account"], i.get("department") or "") in keys]
+        top = max(on, key=lambda i: abs(i.get("amount") or 0), default=None)
+        doc = {"type": top.get("type") or "Bill", "document": str(top["document"]), "text": top.get("text") or "", "date": top.get("date") or ""} if top else None
+        tos = sorted({(l["account"], l["department"]) for l in lines if not l.get("reverses_line")})
+        memo = "Recode %s from %s to %s" % (r["vendor"], ", ".join("%s %s" % (a_, d_ or "Non-Specific") for a_, d_ in keys), ", ".join("%s %s" % t_ for t_ in tos))
+        iid = sid("VC", r["vendor"])
+        items.append(("dept", iid, " / ".join(VC_FLAGS[f["id"]] for f in fls), r["vendor"], (doc or {}).get("text") or "", amt,
+                      ", ".join(a_ for a_, _ in keys), ", ".join(a_ for a_, _ in tos)))
+        vc_cards.append(vcard(iid, r, "Review" if amt >= thr else "Routine",
+                              " ".join("<b>%s:</b> %s%s" % (VC_FLAGS[f["id"]], en(f.get("why") or ""), (" <b>Action:</b> " + en(f["do"])) if f.get("do") else "") for f in fls)
+                              + " The entry moves %s on %s to %s; edit it if the lines belong elsewhere." % (money(amt, True), ", ".join("%s / %s" % (a_, d_ or "Non-Specific") for a_, d_ in keys),
+                                                                                                            ", ".join("%s / %s" % t_ for t_ in tos)),
+                              (("confirm", "Confirm, Coding Stands"), ("recode", "Recode This Line"), ("netsuite", "Edited in NetSuite")),
+                              flag=True, move={"lines": lines, "memo": memo, "amount": amt, "doc": doc}))
 
     pt_cards = []
     for b in PT_BILLS:
@@ -3088,12 +3177,14 @@ def coding():
                            e(f["excepted"]["reason"]), e(f["excepted"]["approved_by"] + (", " + f["excepted"]["approved_on"] if f["excepted"].get("approved_on") else "")))
                                for f in excepted)))
     pages.append(page("dept", hero("Dept &amp; Entity Flags, ".replace("&amp;", "&") + PERIOD, "", [
-                          ("Flags", str(len(dcards)), money(sum(i[5] for i in items if i[0] == "dept"), True)),
+                          ("Flags", str(len(dcards) + len(vc_cards)), money(sum(i[5] for i in items if i[0] == "dept"), True)),
                           ("Drafted entries", str(sum(1 for i in items if i[0] == "dept" and i[2] == "Draft")), "Journal Entries Claude drafted"),
                           ("Decided", live("done", "dept"), "Items on this page"),
                           ("Open", live("open", "dept"), live("openamt", "dept") + " to decide")])
                       + ('<p class="note">%s on an account other than the item\'s usual one, under %s: %s in all, not listed.</p>' % (count(len(small), "Coupa PO line"), money(thr), money(sum(f["amount_at_risk"] for f in small), True)) if small else "")
-                      + "".join(dcards) + exc_html))
+                      + "".join(dcards)
+                      + (('<h4 class="dh">Coding changed or off plan<span class="note">%s &middot; confirm the coding or recode it</span></h4>' % count(len(vc_cards), "vendor")) + "".join(vc_cards) if vc_cards else "")
+                      + exc_html))
     if PT_BILLS:
         pages.append(page("pass", hero("Pass-Through Bills, " + PERIOD, "", [
                               ("Bills", str(len(PT_BILLS)), money(sum(b["amount"] for b in PT_BILLS), True) + " from Flagship Labs LLC and TPC"),
@@ -3132,7 +3223,7 @@ def coding():
         ("Vendors billed this month", str(len(billed))), ("P&amp;L lines this month", format(pl_lines_now, ",")),
         ("Review thresholds, by default", "CapEx %s &middot; Prepaid %s &middot; other %s &middot; department flags none" % (money(THR["thr_capex"]), money(THR["thr_prepaid"]), money(thr))),
         ("CapEx flags", str(len(cap_cards))), ("Prepaid flags", str(len(pre_cards))),
-        ("Department and account flags", str(len(dcards))), *([("Accepted exceptions", "%d items, %s" % (len(excepted), money(exc_amt, True)))] if excepted else []), ("Vendors with no flags", str(len(clear))), ("New vendors", str(len(news)))])
+        ("Department and account flags", str(len(dcards))), ("Coding changed or off plan", str(len(vc_cards))), *([("Accepted exceptions", "%d items, %s" % (len(excepted), money(exc_amt, True)))] if excepted else []), ("Vendors with no flags", str(len(clear))), ("New vendors", str(len(news)))])
     sign = signoff_card((("prep", "Prepared by"), ("rev", "Reviewed by"), ("appr", "Approved by")),
                         '<button class="pill" data-wpsave>Work paper, HTML</button><button class="pill solid" data-export>Export to NetSuite, CSV</button>',
                         "Sign once the review is complete. The work paper carries every decision, the reclasses in the import and these signatures.")

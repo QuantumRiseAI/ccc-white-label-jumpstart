@@ -422,7 +422,10 @@ For each adjustment over the threshold, recommend **Approve** (`book`) or **Reje
 * **Accruals**: cite the Coupa PO and what was received for a receipt accrual. A
   billing-pattern accrual is an estimate: say so, and name who confirms the work was done.
 * **Prepaids and Capital**: say what the item is and what term or useful life the invoice
-  shows. If the invoice is needed, say so.
+  shows. If the invoice is needed, say so. A bill that a Journal Entry in the month already
+  moves off its account, with a memo naming the bill's document number, is not proposed: the
+  close entry has booked it. Before recommending any adjustment, read the month's journals for
+  one that already books it, and if one does, recommend Reject and name the journal.
 * **Reclassifications**: say what the document is and where it belongs. A journal with no
   vendor (`F8.VENDOR_DROPPED`) is often Serif's own close entry, such as a prepaid release or
   an accrual reversal; NetSuite shows no name on any journal line. Read its memo and say what

@@ -48,7 +48,7 @@ from collections import defaultdict
 import serif_sources as sources
 
 ENGINE_VERSION = "0.8.0"
-RULESET_VERSION = "2026.10-uc2-flux-serif-thresholds"
+RULESET_VERSION = "2026.10-uc2-flux-serif-thresholds+journal-moved"
 ENTITY = "FL87 Serif Biomedicines, Inc."
 
 # THE TWO LAYERS
@@ -1003,6 +1003,46 @@ def vendor_dropped_findings(gl_lines, history, leaves, period, seq):
     return findings
 
 
+def moved_by_journal(gl_lines):
+    """The bill lines a Journal Entry in the month already moves off their account. The
+    journal lines on the bill's account whose memo or description names its document number
+    must, together, take the bill off: their net is the bill's total there the other way, or
+    each line they move is matched by its own journal line and the net is those lines the other
+    way. A move between departments on the account, or a reclass reversed later in the month,
+    nets to nothing and moves nothing. Serif's close entries say what they move ("Capitalize
+    freezer VWR International LLC bill 8822578887 ..."); a bill already moved is not proposed
+    again."""
+    named = defaultdict(list)
+    for j in gl_lines:
+        if j.get("txn_type") == "Journal":
+            named[j["account_code"]].append((num(j["amount"]),
+                                             " ".join((j.get("memo") or "", j.get("description") or ""))))
+    docs = defaultdict(list)
+    for t in gl_lines:
+        doc = (t.get("document_number") or "").strip()
+        if t.get("txn_type") == "Bill" and len(doc) >= 4 and named.get(t["account_code"]):
+            docs[(doc, t["account_code"])].append(t)
+    moved = set()
+    for (doc, code), lines in docs.items():
+        says = re.compile(r"(?<![\w-])" + re.escape(doc) + r"(?![\w-])")
+        js = [a for a, text in named[code] if says.search(text)]
+        if not js:
+            continue
+        net = sum(js)
+        if abs(net + sum(num(t["amount"]) for t in lines)) < 0.005:
+            moved.update(id(t) for t in lines)
+            continue
+        pool, hit = list(js), []
+        for t in lines:
+            i = next((i for i, a in enumerate(pool) if abs(a + num(t["amount"])) < 0.005), None)
+            if i is not None:
+                pool.pop(i)
+                hit.append(t)
+        if hit and abs(net + sum(num(t["amount"]) for t in hit)) < 0.005:
+            moved.update(id(t) for t in hit)
+    return moved
+
+
 def prepaid_findings(gl_lines, history, leaves, period, seq):
     """A charge that pays for months ahead, expensed in one. Related charges for
     the same good or service are aggregated, per policy, and listed from the
@@ -1014,8 +1054,9 @@ def prepaid_findings(gl_lines, history, leaves, period, seq):
     annual payment from a monthly one."""
     months = sorted(history, key=period_key)[-6:]
     groups = defaultdict(list)
+    moved = moved_by_journal(gl_lines)
     for t in gl_lines:
-        if t.get("txn_type") != "Bill" or not is_pl(t["account_code"]):
+        if t.get("txn_type") != "Bill" or not is_pl(t["account_code"]) or id(t) in moved:
             continue
         groups[((t.get("vendor_or_name") or "").strip(), t["account_code"])].append(t)
     findings = []
@@ -1074,8 +1115,9 @@ def capex_findings(gl_lines, leaves, period, seq):
     decides the queue. Each says whether it goes to Capital in Process or to its
     fixed asset account, and why (capex_placement)."""
     docs = defaultdict(list)
+    moved = moved_by_journal(gl_lines)
     for t in gl_lines:
-        if t.get("txn_type") == "Bill" and t["account_code"] in CAPEX_REVIEW:
+        if t.get("txn_type") == "Bill" and t["account_code"] in CAPEX_REVIEW and id(t) not in moved:
             docs[((t.get("vendor_or_name") or "").strip(), t.get("document_number", ""),
                   t["account_code"])].append(t)
     findings = []

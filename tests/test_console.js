@@ -250,10 +250,34 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       const refs = await p.evaluate(() => [...document.querySelectorAll('[data-item]')].map(x => ({id: x.dataset.item, amt: Math.abs(Number(x.dataset.amt)),
         shown: (x.querySelector(':scope > .ih > .ref') || {}).textContent || '', ref: refOf(x.dataset.item)})));
       ok(refs.length > 0 && refs.length === await p.evaluate(() => Object.keys(DATA.ref).length) && refs.every(r => r.shown && r.shown === r.ref), 'gl: every card shows its reference ID in its header (' + refs.length + ')');
-      ok(refs.every(r => /^(CAPEX|FA|PREPAID|PPD|DEPT|DRAFT|PASS|CLEAR|NEW)-\d{2,}$/.test(r.ref)) && new Set(refs.map(r => r.ref)).size === refs.length, 'gl: reference IDs are PREFIX-NN and unique');
+      ok(refs.every(r => /^(CAPEX|FA|PREPAID|PPD|DEPT|DRAFT|CODING|PASS|CLEAR|NEW)-\d{2,}$/.test(r.ref)) && new Set(refs.map(r => r.ref)).size === refs.length, 'gl: reference IDs are PREFIX-NN and unique');
       ok(['CAPEX', 'PREPAID', 'PPD', 'DEPT'].every(s => refs.some(r => r.ref === s + '-01')) && refs.some(r => r.ref.startsWith('CAPEX-') && r.id.startsWith('C-'))
         && refs.some(r => r.ref.startsWith('PREPAID-') && r.id.startsWith('P-')) && refs.some(r => r.ref.startsWith('PPD-') && r.id.startsWith('PB-'))
         && refs.some(r => r.ref.startsWith('DEPT-') && r.id.startsWith('D-')), 'gl: CapEx, Prepaid and Dept & Entity cards are numbered by screen');
+      // a vendor flagged Coding changed or Coded off plan has a card on Dept & Entity, numbered CODING-NN,
+      // unless another card already moves that coding or the vendor is new this month
+      { const run = JSON.parse(fs.readFileSync(B + 'out/aug2026/gl-coding-review/run.json', 'utf8'));
+        const vt = run.views.tables.find(t => t.id === 'vendors'), rows = vt.sections.flatMap(s => s.rows);
+        const flagged = rows.filter(r => (r.flags || []).some(f => f.id === 'changed' || f.id === 'plan')).map(r => r.vendor);
+        const got = await p.evaluate(() => [...document.querySelectorAll('#p-dept [data-item^="VC-"]')].map(x => { const j = DATA.je[x.dataset.item];
+          return {id: x.dataset.item, v: x.querySelector('.ih b').textContent, flag: x.hasAttribute('data-flag'), ref: refOf(x.dataset.item),
+            acts: [...x.querySelectorAll('[data-v]')].map(b => b.dataset.v).join(','), amt: Number(x.dataset.amt),
+            dr: j.lines.reduce((s, l) => s + l.debit, 0), cr: j.lines.reduce((s, l) => s + l.credit, 0),
+            moves: j.lines.some(l => l.debit) && j.lines.filter(l => l.debit).every(d => !j.lines.some(c => c.credit && c.account === d.account && c.department === d.department))}; }));
+        const newv = await p.evaluate(() => [...document.querySelectorAll('[data-item^="N-"] .ih b')].map(b => b.textContent));
+        ok(got.length > 0 && got.every(g => flagged.includes(g.v) && g.flag && /^CODING-\d{2}$/.test(g.ref) && g.acts === 'confirm,recode,netsuite'),
+          'gl: vendors flagged Coding changed or Coded off plan have a Dept & Entity card, CODING-NN, Confirm or Recode (' + got.length + ' of ' + flagged.length + ')');
+        ok(!got.some(g => newv.includes(g.v)), 'gl: a vendor new this month is on New This Period only');
+        const capped = await p.evaluate(() => [...document.querySelectorAll('[data-item^="C-"], [data-item^="P-"]')].map(x => x.querySelector('.ih b').textContent));
+        ok(got.every(g => Math.abs(g.dr - g.cr) < 0.01 && Math.abs(Math.max(g.dr, g.cr) - Math.abs(g.amt)) < 0.01),
+          'gl: each such card\'s entry balances and moves the card\'s amount');
+        const tgt = await p.evaluate(() => [...document.querySelectorAll('#p-dept [data-item^="VC-"]')].map(x => ({v: x.querySelector('.ih b').textContent,
+          to: DATA.je[x.dataset.item].lines.filter(l => l.debit).map(l => l.account + '|' + l.department), from: DATA.je[x.dataset.item].lines.filter(l => l.credit).map(l => l.account + '|' + l.department)})));
+        const allowed = v => { const r = rows.find(x => x.vendor === v), ch = (r.flags.find(f => f.id === 'changed') || {}).before;
+          return new Set([...(ch ? [ch.account + '|' + (ch.department || 'Non-Specific')] : []), ...(r.planned || []).map(q => q.account + '|' + (q.department || 'Non-Specific')),
+            ...(r.by_coding || []).filter(c => Math.abs(c.prior || 0) + Math.abs(c.prior2 || 0) > 0.005).map(c => c.account + '|' + (c.department || 'Non-Specific'))]); };
+        ok(got.some(g => g.moves) && tgt.every(t => t.to.every(c => t.from.includes(c) || allowed(t.v).has(c))),
+          'gl: each entry moves the flagged codings to the vendor\'s usual coding or the plan, or leaves them for the reviewer (' + got.filter(g => g.moves).length + ' of ' + got.length + ' move)');}
       ok(Object.values(refs.reduce((m, r) => { const [s, n] = r.ref.split('-'); (m[s] = m[s] || [])[Number(n) - 1] = r; return m; }, {}))
         .every(xs => Array.from(xs).every((r, i) => r && (!i || xs[i - 1].amt >= r.amt))), 'gl: within a screen, numbered from 01 with no gaps, largest amount first');
       ok(await p.evaluate(() => Object.keys(DATA.je).every(id => refOf(id) && DATA.je[id].memo.startsWith(refOf(id) + ' | ') && / \| Aug'26$/.test(DATA.je[id].memo)

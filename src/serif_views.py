@@ -1076,14 +1076,18 @@ def vendors_table(current, prior, prior2, prior_year, periods, findings, account
                 for book in (pri, pr2, py):
                     for k, v in book.get(vendor, {}).items():
                         before[k] += abs(v[0])
+                usual = None
                 if before:
-                    k = max(sorted(before), key=lambda c: before[c])
-                    why.append("Its bills before went to %s / %s." % (A(k[0]), k[1] or "no department"))
+                    usual = max(sorted(before), key=lambda c: before[c])
+                    why.append("Its bills before went to %s / %s." % (A(usual[0]), usual[1] or "no department"))
                 flags.append(_flag("changed", "Coding changed", sum(abs(v[0]) for _, v in fresh), why,
                                    ["Read the lines on the new coding.",
                                     "If the coding is wrong, reclass the lines.",
                                     "If it is right, choose Cleared."],
                                    match=[{"account": k[0], "department": k[1]} for k, _ in fresh]))
+                if usual:
+                    # Where a recode would send the lines back to.
+                    flags[-1]["before"] = {"account": usual[0], "department": usual[1]}
         for f in by_finding.get(vendor, []):
             flags.append(_flag(f["rule_id"], FLAG_LABELS.get(f["rule_id"], f["rule_id"]),
                                f.get("amount_at_risk") or 0, finding_id=f["finding_id"],
