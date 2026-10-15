@@ -581,6 +581,14 @@ td .draft.open .dt{display:block}
 .ih .dchip{font-size:var(--text--2);color:var(--color-fg-secondary);border:1px solid var(--color-hairline);border-radius:var(--radius-pill);padding:.1em .6em}
 .foldall{display:flex;gap:var(--spacing-xs);align-items:center;margin:0 0 var(--spacing-xs);font-size:var(--text--1);color:var(--color-fg-secondary)}
 .foldall .lk{margin-left:0;font-size:var(--text--1)}
+.fin{border-left:3px solid var(--color-dark-gray);padding:.2em 0 .2em .8em;margin:.3em 0 .5em}
+.fin .ft{white-space:pre-line;line-height:1.5;color:var(--color-fg-primary)}
+.esum .fin .ft{font-size:var(--text-0);line-height:1.6;max-width:80ch}
+.fin .fm{display:flex;gap:.8em;align-items:baseline;margin-top:.35em;font-size:var(--text--2);color:var(--color-fg-secondary)}
+.fin .fm .lk{margin-left:0}
+.fbar{display:flex;gap:.8em;align-items:center;margin:.35em 0 .5em}
+.fbar .lk{margin-left:0}
+.fbar .uns{font-size:var(--text--2);color:var(--color-red-text)}
 .xtra{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);margin:0 0 .4em;overflow:hidden}
 .item .xtra > details.fold,.item .xtra > details.lines{border:0;border-radius:0;margin:0}
 .item .xtra > details + details{border-top:1px solid var(--color-hairline)}
@@ -833,9 +841,9 @@ const KEY = 'serif-console::' + DATA.kind + '::' + DATA.run;
    log. The thresholds are this browser's settings: thr, and on the GL Coding Review
    thr_capex and thr_prepaid, each falling back to the build's default, so a state saved
    with thr alone keeps it and takes the CapEx and Prepaid defaults. */
-const STORES = ['dec', 'notes', 'je', 'jh', 'ck', 'sign', 'log'];
+const STORES = ['dec', 'notes', 'fin', 'je', 'jh', 'ck', 'sign', 'log'];
 const refOf = id => (DATA.ref || {})[id] || '';
-let S = {dec: {}, notes: {}, sign: {}, ck: {}, je: {}, jh: {}, log: {}, thr: DATA.thr};
+let S = {dec: {}, notes: {}, fin: {}, sign: {}, ck: {}, je: {}, jh: {}, log: {}, thr: DATA.thr};
 try { S = Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
 if (Array.isArray(S.log)){ const o = {}; S.log.forEach((l, i) => { o[String(l.at).replace(/[^0-9]/g, '') + i] = l; }); S.log = o; }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1060,7 +1068,7 @@ function saveRecord(){
 function planRecord(rec){
   const here = {dec: new Set($$('[data-item],[data-jerow]').map(x => x.dataset.item || x.dataset.jerow)), ck: new Set($$('[data-ckrow]').map(x => x.dataset.ckrow)),
                 sign: new Set($$('[data-sname]').map(x => x.dataset.sname)), notes: new Set($$('[data-note]').map(x => x.dataset.note))};
-  here.je = new Set(Object.keys(DATA.je)); here.jh = here.je; here.log = null;
+  here.je = new Set(Object.keys(DATA.je)); here.jh = here.je; here.fin = here.notes; here.log = null;
   const p = {take: {}, add: 0, kept: 0, missed: 0};
   STORES.forEach(n => { p.take[n] = [];
     Object.keys(rec[n] || {}).forEach(k => { const v = rec[n][k];
@@ -1136,7 +1144,7 @@ document.addEventListener('click', ev => {
     if (DATA.je[id].proposal){ delete S.dec[id]; delete S.notes[id]; logAdd({id, label: 'Propose entry', v: 'cleared', note: ''}); }
     save(); refresh(); return; }
   const u = ev.target.closest('[data-use]');
-  if (u){ if (blocked()) return; const d = DATA.drafts[u.dataset.use]; S.notes[d.target] = d.note;
+  if (u){ if (blocked()) return; const d = DATA.drafts[u.dataset.use]; S.notes[d.target] = d.note; finalize(d.target);
     if (d.item && d.v) S.dec[d.item] = {v: d.v, at: new Date().toISOString(), by_uid: Shared.uid()};
     logAdd({id: d.item || d.target, label: 'Claude draft used', v: d.v || 'used', note: d.note}); save(); refresh(); return; }
   if (ev.target.closest('[data-recsave]')){ saveRecord(); return; }
@@ -1148,7 +1156,9 @@ document.addEventListener('click', ev => {
 document.addEventListener('change', ev => { if (ev.target.id === 'recfile' && ev.target.files[0]){ loadRecord(ev.target.files[0]); ev.target.value = ''; } });
 document.addEventListener('input', ev => {
   const t = ev.target;
-  if (t.dataset.note !== undefined){ S.notes[t.dataset.note] = t.value; t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; save(); return; }
+  if (t.dataset.note !== undefined){ S.notes[t.dataset.note] = t.value; EDIT.add(t.dataset.note);
+    const bar = $('[data-fbar="' + CSS.escape(t.dataset.note) + '"]'); if (bar){ bar.hidden = !t.value.trim();
+      bar.querySelector('.uns').textContent = S.fin[t.dataset.note] ? 'Changed since saved' : 'Not saved'; } t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; save(); return; }
   if (t.dataset.jef || t.dataset.jeh){ editJE(t); return; }
   if (t.dataset.thrin){ const v = Number(String(t.value).replace(/[^0-9.]/g, '')); if (isFinite(v) && v > 0){ S[t.dataset.thrin] = v; save(); refresh(); } }
 });
@@ -1198,6 +1208,7 @@ function paintItems(){
     if (!d.item){ const t = $('textarea[data-note="' + d.target + '"]'); if (t) t.hidden = !x.hidden && document.activeElement !== t; }
     const m = x.querySelector('[data-dmore]'), dt = x.querySelector('.dt');
     if (m && x.closest('td') && dt.offsetParent) m.hidden = !x.classList.contains('open') && dt.scrollHeight <= dt.clientHeight + 2; });
+  paintNotes();
   $$('textarea.c').forEach(t => { if (t.offsetParent && t.value){ t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; } });
   $$('details.fold.je').forEach(f => { const b = f.querySelector('[data-jebal]'), t = f.querySelector('[data-jesum]'); if (b && t) t.textContent = b.textContent; });
 }
@@ -1214,6 +1225,43 @@ function openJE(id){ const d = S.dec[id]; if (!d || ['approve', 'modify', 'recod
   const el = $('[data-item="' + id + '"]'); if (!el) return;
   el.querySelectorAll('details.fold.je').forEach(f => f.open = true);
   if (el.dataset.autofold === '1') el.classList.add('unfold'); }
+/* notes: written, then saved. A saved note reads as finished text, with who saved it and
+   when; Edit opens it again, and until it is saved again it is marked Not saved. */
+const EDIT = new Set();
+const savedNote = k => { const f = S.fin[k], n = String(S.notes[k] || ''); return !!f && !!n.trim() && f.text === n; };
+function finalize(k){ S.fin[k] = {text: String(S.notes[k] || ''), at: new Date().toISOString(), by_uid: Shared.uid()}; EDIT.delete(k); }
+function shapeNotes(){
+  $$('textarea.c[data-note]').forEach(t => { const k = t.dataset.note, at = t.closest('.acts') || t;
+    const fin = document.createElement('div'); fin.className = 'fin'; fin.dataset.fin = k; fin.hidden = true;
+    fin.innerHTML = '<div class="ft"></div><div class="fm"><span class="by"></span><button class="lk" data-finedit="' + esc(k) + '">Edit</button></div>';
+    const bar = document.createElement('div'); bar.className = 'fbar'; bar.dataset.fbar = k; bar.hidden = true;
+    bar.innerHTML = '<button class="pill sm solid" data-finsave="' + esc(k) + '">Save</button><button class="lk" data-fincancel="' + esc(k) + '">Cancel</button><span class="uns">Not saved</span>';
+    at.after(bar); at.after(fin); });
+}
+function paintNotes(){
+  $$('textarea.c[data-note]').forEach(t => { const k = t.dataset.note, fin = $('[data-fin="' + CSS.escape(k) + '"]'), bar = $('[data-fbar="' + CSS.escape(k) + '"]');
+    if (!fin || !bar) return;
+    const done = savedNote(k) && !EDIT.has(k), n = String(S.notes[k] || '');
+    if (done){ t.hidden = true; fin.hidden = false; fin.querySelector('.ft').textContent = n;
+      const f = S.fin[k], who = f.by_uid ? Shared.name(f.by_uid) : '';
+      fin.querySelector('.by').textContent = 'Saved' + (who ? ' by ' + who : '') + ' · ' + new Date(f.at).toLocaleString('en-US', {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'}); }
+    else fin.hidden = true;
+    bar.hidden = done || t.hidden || !n.trim();
+    bar.querySelector('.uns').textContent = S.fin[k] ? 'Changed since saved' : 'Not saved'; });
+}
+document.addEventListener('click', ev => {
+  const sv = ev.target.closest('[data-finsave]');
+  if (sv){ if (blocked()) return; const k = sv.dataset.finsave; finalize(k); logAdd({id: k, label: 'Note saved', v: 'saved', note: S.notes[k] || ''}); save(); refresh(); return; }
+  const cn = ev.target.closest('[data-fincancel]');
+  if (cn){ const k = cn.dataset.fincancel; EDIT.delete(k); if (S.fin[k]) S.notes[k] = S.fin[k].text; else delete S.notes[k]; save(); refresh(); return; }
+  const fe = ev.target.closest('[data-finedit]');
+  if (fe){ if (blocked()) return; const k = fe.dataset.finedit; EDIT.add(k); refresh();
+    const t = $('textarea[data-note="' + CSS.escape(k) + '"]'); if (t){ t.hidden = false; t.focus(); } return; }
+});
+// Cmd or Ctrl + Enter saves the note being written.
+document.addEventListener('keydown', ev => { const t = ev.target;
+  if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter' && t.matches && t.matches('textarea.c[data-note]') && String(t.value).trim()){
+    ev.preventDefault(); const b = $('[data-finsave="' + CSS.escape(t.dataset.note) + '"]'); if (b) b.click(); } });
 function shapeCards(){
   $$('.item > .ib').forEach(ib => {
     const kv = ib.querySelector(':scope > .kv'), dr = ib.querySelector('.draft'), ac = ib.querySelector(':scope > .acts');
@@ -1242,7 +1290,7 @@ function shapeCards(){
 }
 document.addEventListener('click', ev => {
   const ed = ev.target.closest('[data-edit]');
-  if (ed){ if (blocked()) return; const d = DATA.drafts[ed.dataset.edit]; S.notes[d.target] = S.notes[d.target] || d.note; save(); refresh();
+  if (ed){ if (blocked()) return; const d = DATA.drafts[ed.dataset.edit]; S.notes[d.target] = S.notes[d.target] || d.note; EDIT.add(d.target); save(); refresh();
     const t = $('textarea[data-note="' + d.target + '"]'); if (t){ t.hidden = false; t.focus(); } return; }
   const mo = ev.target.closest('[data-dmore]');
   if (mo){ const dr = mo.closest('.draft'); dr.classList.toggle('open'); mo.textContent = dr.classList.contains('open') ? 'Show less' : 'Show all'; return; }
@@ -1370,7 +1418,7 @@ function checklist(){
     pg.querySelectorAll('[data-item]').forEach(x => { total++; if (!decided(x.dataset.item)){ open++; value += Number(x.dataset.amt) || 0; } });
     /* A page's other comparisons (year on year, year to date) restate its lines; they count once, on the first. */
     pg.querySelectorAll('tr[data-var]').forEach(tr => { if (tr.closest('[data-alt]')) return; const a = Math.abs(Number(tr.dataset.var) || 0); if (a < thr) return;
-      total++; const t = tr.querySelector('textarea[data-note]'); if (!t || !(S.notes[t.dataset.note] || '').trim()){ open++; value += a; } });
+      total++; const t = tr.querySelector('textarea[data-note]'); if (!t || !savedNote(t.dataset.note)){ open++; value += a; } });
     $$('#p-' + pid + ' [data-jerow]').filter(r => jeEdited(r.dataset.jerow)).forEach(r => { total++; });
     jeOpen(pid).forEach(r => { open++; value += jeOf(r.dataset.jerow).lines.reduce((a, l) => a + (Number(l.debit) || 0), 0); });
     if (!total) return;
@@ -2094,7 +2142,7 @@ function refresh(){
   $$('[data-ckdone]').forEach(x => { const v = Object.values(S.ck); x.textContent = v.filter(y => y === 'ok').length + ' reviewed · ' + v.filter(y => y === 'flag').length + ' to follow up'; });
   $$('[data-signs]').forEach(x => x.textContent = Object.keys(S.sign).filter(k => k !== 'prep').length + ' / 2');
 }
-shapeCards(); show('ov');
+shapeCards(); shapeNotes(); show('ov');
 """
     pages.append(runlog(PLR, "flux", read=[("Also read", "GL Coding Review run %s and its decision record %s, saved %s" % (
         GLR["manifest"]["run_id"], hashlib.sha256(open(A.coding_record, "rb").read()).hexdigest()[:16], str(CODING_REC.get("saved_at") or "")[:16].replace("T", " ")))]
@@ -2550,7 +2598,7 @@ function workPaper(){
   download('serif-' + DATA.kind + '-work-paper-' + DATA.slug + '.html', html, 'text/html');
 }
 document.addEventListener('click', ev => { if (ev.target.closest('[data-wpsave]')) workPaper(); });
-shapeCards(); show('ov');
+shapeCards(); shapeNotes(); show('ov');
 """
     pages.append(runlog(GLR, "coding"))
     return shell("Serif GL Coding Review - " + PERIOD, "GL Coding Review", sections, pages, dict(data, docs=nsdoc), js)

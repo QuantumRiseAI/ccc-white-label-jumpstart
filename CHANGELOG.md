@@ -47,6 +47,11 @@ serif-pl-flux-aug2026-v1.8.2.html
   Recommended. Why it was flagged (when there is a draft), the Journal Entry, the last three months
   and the lines fold into one list beneath. Approving, modifying, recoding or editing in NetSuite
   opens the Journal Entry. A folded card's header carries Claude's recommendation.
+- **Saved notes**: commentary, the executive summary and every card note are saved with Save (or
+  Cmd+Enter) and then read as finished text, with who saved them and when; until then they are marked
+  Not saved, and an edit to a saved note is marked Changed since saved. Edit opens a saved note again,
+  Cancel brings back what was saved, and Accept on a draft saves it. Saved notes travel in the decision
+  record and the shared review (`fin`), and a line's commentary counts as written once it is saved.
 - **Long pages**: a page of more than 12 cards (Dept & Entity's 172 in Sep 2026) opens folded to one
   line each, with Expand all and Collapse all; a confirmed card still folds.
 - **Vendor notes on the right cards**: a note that names some of the vendor's bills goes on those

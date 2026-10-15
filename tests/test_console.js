@@ -91,6 +91,17 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     ok(await p.evaluate(id => !jeReady(id), id), k + ': a Modified entry waits for its note');
     await p.fill('[data-note="' + id + '"]', 'Department per budget owner');
     ok(await p.evaluate(id => jeReady(id), id), k + ': with a note the entry is ready');
+    // A note is written, then saved: saved, it reads as finished text; Edit and Cancel bring the saved text back.
+    ok(await p.locator('[data-fbar="' + id + '"] .uns').isVisible(), k + ': a note being written is marked Not saved');
+    await p.click('[data-finsave="' + id + '"]');
+    ok(await p.locator('[data-fin="' + id + '"]').isVisible() && await p.locator('textarea[data-note="' + id + '"]').isHidden()
+       && /Department per budget owner/.test(await p.locator('[data-fin="' + id + '"] .ft').textContent()), k + ': Save shows the note as saved text');
+    await p.reload(); await p.waitForTimeout(400); await p.evaluate(() => show(DATA.kind === 'coding' ? 'capex' : 'adj'));
+    ok(await p.locator('[data-fin="' + id + '"]').isVisible(), k + ': a saved note stays saved after a reload');
+    await p.click('[data-finedit="' + id + '"]'); await p.fill('textarea[data-note="' + id + '"]', 'Changed');
+    ok(/Changed since saved/.test(await p.locator('[data-fbar="' + id + '"] .uns').textContent()), k + ': an edit to a saved note is marked');
+    await p.click('[data-fincancel="' + id + '"]');
+    ok(await p.evaluate(id => S.notes[id] === 'Department per budget owner', id), k + ': Cancel brings the saved note back');
     const [dl] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
     let csvText = ''; if (dl){ const f = await dl.path(); csvText = fs.readFileSync(f, 'utf8'); }
     ok(/Finance/.test(csvText) && /Department per budget owner/.test(csvText), k + ': the CSV carries the edit and the note');
@@ -262,7 +273,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       await p.evaluate(() => show('capex'));
       const cx = await p.evaluate(() => $$('#p-capex [data-flag]').map(x => { const pl = x.querySelector('[data-placed]'), nt = x.querySelector('textarea[data-note]');
         return {id: x.dataset.item, text: x.querySelector('.why').textContent, to: DATA.je[x.dataset.item].lines.find(l => Number(l.debit)).account, memo: DATA.je[x.dataset.item].memo,
-                kind: pl ? pl.dataset.placed : '', note: nt && !nt.hidden ? nt.placeholder : '', name: x.querySelector('.ih b').textContent}; }));
+                kind: pl ? pl.dataset.placed : '', note: nt && !nt.hidden ? nt.placeholder : (x.querySelector('[data-fin]:not([hidden])') ? 'saved' : ''), name: x.querySelector('.ih b').textContent}; }));
       ok(cx.length > 0 && cx.every(c => c.kind && (['buildout', 'not_in_service', 'no_account'].includes(c.kind) ? c.to === '1505000' && /Capital in Process/.test(c.memo) : /^15[1-9]\d{4}$/.test(c.to) && /in service: fixed asset/.test(c.memo))),
          'gl: every CapEx card says where it goes, Capital in Process or a fixed asset account, on the card and in its Memo');
       const rt = cx.find(c => c.name === 'Red Thread Spaces LLC') || {}, rp = cx.find(c => c.name === 'Repligen Corporation') || {};
@@ -270,7 +281,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
          'gl: the office desk expansion goes to Capital in Process as build-out work, and asks when the space is in use');
       ok(rp.kind === 'in_service' && rp.to === '1510000' && /policy places it in service at the invoice date/.test(rp.text) && /no in-service date\. Ask when it went into use/.test(rp.text) && /under the \$5,000 capitalization threshold/.test(rp.text),
          'gl: a lab purchase goes to 1510000 Lab Equipment - New, in service at the invoice date, and asks the in-service date');
-      ok(cx.every(c => c.note === 'In-service date, and a note'), 'gl: each CapEx card keeps its note open for the in-service date');
+      ok(cx.every(c => c.note === 'In-service date, and a note' || c.note === 'saved'), 'gl: each CapEx card keeps its note open for the in-service date, or shows it saved');
     }
     if (k === 'pl'){
       // a variance row proposes an entry: the row's account, an offset to fill, the memo from the review; it joins the same CSV

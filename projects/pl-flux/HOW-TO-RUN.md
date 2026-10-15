@@ -357,7 +357,10 @@ Commentary is the deliverable. A line at or over the threshold is marked Review 
 commentary; the close checklist counts it open until it has some. Actual vs. Actual, Actual
 vs. Budget, By Department and Balance Sheet Flux each take commentary on their lines. A draft
 from Claude sits on its line with **Accept**, which copies it into the field, and **Edit**, which
-copies it to change; a long draft shows its first lines, with Show all.
+copies it to change; a long draft shows its first lines, with Show all. Written commentary, the
+summary and every note are saved with **Save** (or Cmd+Enter) and then read as finished text, with
+who saved them and when; until then they are marked Not saved. Edit opens a saved note again, and
+Cancel brings back what was saved. A line's commentary counts as written once it is saved.
 
 Actual vs. Actual (MoM) also shows each account's average over the 3 and 6 months before.
 By Department ends with **Credits in Expense Accounts**: every account and department whose
