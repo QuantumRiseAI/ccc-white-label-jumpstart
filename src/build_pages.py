@@ -191,7 +191,7 @@ dept_acct_vendor = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))
 for i, lines in enumerate((gl_now, gl_prior)):
     for l in lines:
         if PNL(l["account_code"]):
-            dept_acct_vendor[(l["department"] or "Non-Specific", l["account_code"])][(l.get("vendor_or_name") or "").strip() or "(blank)"][i] += l["amount"]
+            dept_acct_vendor[(l["department"] or "Non-Specific", l["account_code"])][(l.get("vendor_or_name") or "").strip() or "Journals, no vendor"][i] += l["amount"]
 ytd = sum(l["amount"] for p, ls in by_period.items() if p.endswith(PERIOD[-4:]) and SS.period_key(p) <= SS.period_key(PERIOD)
           for l in ls if l["account_code"][:1] in "67")
 gl_6x = sum(l["amount"] for l in gl_now if l["account_code"][:1] == "6")
@@ -315,12 +315,18 @@ def txt(v):
     return str(v).strip() if v is not None else ""
 
 
+SPARK = '<svg class="spk" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7 1.5l1.5 4 4 1.5-4 1.5-1.5 4-1.5-4-4-1.5 4-1.5z"/><path d="M12.5 10l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>'
+
+
 def draft(key, note, target, item=None, v=None, label=""):
     """Claude's draft beside the item it belongs to. It counts for nothing until
     the reviewer uses it, which copies it into the note (and the decision)."""
     DRAFTS[key] = {"note": note, "target": target, "item": item, "v": v}
-    return ('<div class="draft" data-draft="%s"><span class="tag">Drafted by Claude</span>%s<span class="dt">%s</span>'
-            '<button class="lk" data-use="%s">Use this</button></div>' % (e(key), (" <b>" + e(label) + "</b>") if label else "", e(note), e(key)))
+    # Accept takes the draft as written (and its decision); Edit puts it in the note to change.
+    return ('<div class="draft" data-draft="%s"><div class="dhd"><span class="who">%sDraft</span>%s<span class="dacts">'
+            '<button class="pill sm solid" data-use="%s">Accept</button><button class="pill sm" data-edit="%s">Edit</button></span></div>'
+            '<div class="dt">%s</div><button class="lk more" data-dmore hidden>Show all</button></div>'
+            % (e(key), SPARK, ('<b class="rec">' + e(label) + "</b>") if label else "", e(key), e(key), e(note)))
 
 
 def drafted_entries(fids_ok=None):
@@ -335,7 +341,7 @@ def drafted_entries(fids_ok=None):
         if not lines or abs(dr - cr) >= 0.005 or not all(l["account"] for l in lines):
             SKIPPED.append("Journal Entry %d (%s): does not balance or has a line with no account" % (i, txt(x.get("memo"))[:60]))
             continue
-        out.append({"entry_id": "SERIF-DRAFT-%d" % i, "finding_id": "draft-%d" % i, "kind": "Drafted by Claude", "date": txt(x.get("date")),
+        out.append({"entry_id": "SERIF-DRAFT-%d" % i, "finding_id": "draft-%d" % i, "kind": "Draft", "date": txt(x.get("date")),
                     "memo": txt(x.get("memo")), "reverses": txt(x.get("reverses")), "support": txt(x.get("reason")), "lines": lines, "debits": dr, "credits": cr})
     return out
 
@@ -423,6 +429,16 @@ a.xl{font-size:var(--text--2);color:var(--color-fg-secondary);text-decoration:un
 .sub.shut{max-width:0;opacity:0;pointer-events:none}
 .n{font-size:var(--text--2);background-color:var(--color-red-text);color:#fff;border-radius:var(--radius-pill);padding:.05em .5em;font-variant-numeric:tabular-nums}
 .n:empty{display:none}
+.n.soft{background-color:var(--color-mid-gray)}
+.n.ok,.tb.cur .n.ok{background:none;color:var(--color-warm-gray);padding:0 .2em}
+.tb.cur .n.soft{background-color:var(--color-mid-gray)}
+.tieline{background-color:var(--color-stark);border-radius:var(--radius-sm);margin-bottom:var(--spacing-sm);font-size:var(--text--1)}
+.tieline > summary{display:flex;align-items:baseline;gap:.6em;padding:.65em var(--spacing-sm-md);cursor:pointer;list-style:none}
+.tieline > summary::-webkit-details-marker{display:none}
+.tieline .ok{color:var(--color-action);font-weight:700}
+.tieline .more{margin-left:auto;color:var(--color-fg-secondary);text-decoration:underline;font-size:var(--text--2)}
+.tieline[open] .more{visibility:hidden}
+.tieline > .note{padding:0 var(--spacing-sm-md) .7em calc(var(--spacing-sm-md) + 1.3em)}
 .tb.cur .n{background-color:var(--color-red-text)}
 .icons{display:flex;gap:var(--spacing-3xs);margin-left:auto;flex:none}
 .icons .tb{padding:0 .55em}
@@ -430,9 +446,12 @@ a.xl{font-size:var(--text--2);color:var(--color-fg-secondary);text-decoration:un
 #tip{position:fixed;z-index:30;pointer-events:none;background-color:var(--color-bg-inverse);color:var(--color-fg-inverse);
   font-size:var(--text--2);line-height:1.45;padding:.55em .75em;border-radius:var(--radius-xs);max-width:22rem;display:none}
 #tip b{color:#fff}
+#tip.sm{font-size:var(--text--2);line-height:1.4;padding:.35em .6em;max-width:17rem;border-radius:var(--radius-xs)}
 main{max-width:96rem;margin:0 auto;padding:var(--spacing-md) var(--spacing-md-lg) var(--spacing-xl)}
 .page[hidden]{display:none}
 .hero{background-color:var(--color-bg-inverse);color:var(--color-fg-inverse);border-radius:var(--radius-sm);padding:var(--spacing-sm-md);margin-bottom:var(--spacing-sm)}
+.hero.slim{padding-block:var(--spacing-xs)}
+.hero.slim h1{margin:0}
 .hero h1{font-size:var(--text-2);font-weight:500;color:#fff;margin:0 0 .2em;letter-spacing:-0.01em}
 .hero .sub2{color:var(--color-warm-gray);font-size:var(--text--1);margin:0 0 var(--spacing-xs)}
 .hero .ht{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:var(--spacing-xs)}
@@ -490,20 +509,25 @@ tr.crit td:first-child,tr.mat td:first-child{padding-left:1.1em}
 .unf{color:var(--color-red-text)}
 .cm{color:var(--color-fg-primary);line-height:1.45;margin-bottom:.35em}
 textarea.c{width:100%;min-height:2.1em;resize:vertical;border:1px solid var(--color-hairline);border-radius:var(--radius-xs);padding:.35em .5em;font-size:var(--text--1);background:none}
-textarea.c:focus,input.f:focus{outline:2px solid var(--color-vivid);outline-offset:1px}
+:root{--color-action:#3a4a5e;--color-action-hover:#2c3948;--color-action-tint:#eef1f5}
+textarea.c:focus,input.f:focus{outline:2px solid var(--color-action);outline-offset:1px}
 input.f{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);padding:.4em .55em;font-size:var(--text--1);background:none}
 .pill{display:inline-flex;align-items:center;gap:.35em;border:1px solid var(--color-dark-gray);border-radius:var(--radius-pill);padding:.4em 1em;
   background:none;cursor:pointer;font-size:var(--text--1);white-space:nowrap}
-.pill.solid{background-color:var(--color-dark-gray);color:#fff}
+.pill.solid{background-color:var(--color-action);border-color:var(--color-action);color:#fff}
+.pill.solid:hover{background-color:var(--color-action-hover)}
 .pill.on{background-color:var(--color-dark-gray);color:#fff}
 .pill:disabled{opacity:.4;cursor:default}
 .tag{display:inline-block;font-size:var(--text--2);font-weight:600;letter-spacing:.03em;text-transform:uppercase;border-radius:var(--radius-xs);
   padding:.15em .5em;border:1px solid var(--color-hairline);color:var(--color-fg-secondary);white-space:nowrap}
 .tag.hi{border-color:var(--color-red-text);color:var(--color-red-text)}
 .tag.ink{background-color:var(--color-dark-gray);border-color:var(--color-dark-gray);color:#fff}
-.stp{margin-left:auto;font-size:var(--text--2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--color-fg-secondary)}
-.stp.done{color:var(--color-dark-gray)}
-.stp.rej{color:var(--color-red-text)}
+.stp{margin-left:auto;font-size:var(--text--2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--color-fg-secondary);
+  border:1px solid var(--color-hairline);border-radius:var(--radius-pill);padding:.15em .7em;white-space:nowrap}
+.stp.rv{border-color:var(--color-red-text);color:var(--color-red-text)}
+.item > .ih > .tag:not(.ink){display:none}
+.stp.done{background-color:var(--color-dark-gray);border-color:var(--color-dark-gray);color:#fff}
+.stp.rej{border-color:var(--color-dark-gray);color:var(--color-dark-gray)}
 .item{background-color:var(--color-stark);border-radius:var(--radius-sm);margin-bottom:var(--spacing-xs);border-left:3px solid var(--color-warm-gray)}
 .item.hi{border-left-color:var(--color-red-text)}
 .item.done{border-left-color:var(--color-dark-gray)}
@@ -548,13 +572,80 @@ tr.jr > td{padding:.4em .8em}
 .jee input.num{text-align:right;font-variant-numeric:tabular-nums;max-width:12ch}
 .jee .jh [data-jebal]{text-transform:none;letter-spacing:0}
 .jee.edited{border-color:var(--color-dark-gray)}
-.draft{display:flex;gap:var(--spacing-2xs);align-items:baseline;flex-wrap:wrap;background-color:var(--color-bg-primary);border-radius:var(--radius-xs);
-  padding:.5em .7em;margin:0 0 .6em;font-size:var(--text--1);line-height:1.45}
-.draft .dt{flex:1 1 16rem}
+.draft{border:1px solid var(--color-hairline);border-left:3px solid var(--color-action);border-radius:var(--radius-xs);background-color:var(--color-action-tint);
+  padding:.55em .8em .65em;margin:0 0 .7em;font-size:var(--text--1);line-height:1.5}
+.draft .dhd{display:flex;align-items:center;gap:.4em .7em;flex-wrap:wrap;margin-bottom:.35em}
+.draft .who{font-size:var(--text--2);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--color-action)}
+.draft .rec{font-weight:600}
+.draft .dacts{margin-left:auto;display:flex;gap:.4em}
+.pill.sm{padding:.2em .8em;font-size:var(--text--2)}
+.draft .dt{white-space:pre-line}
+td .draft .dt{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+td .draft.open .dt{display:block}
+.draft .lk.more{margin:.3em 0 0}
 .esum{padding:var(--spacing-sm) var(--spacing-sm-md);display:grid;gap:var(--spacing-xs)}
-.esum .dt{white-space:pre-line;line-height:1.5}
+.esum .draft{font-size:var(--text-0);padding:.8em 1em}
+.esum .dt{line-height:1.5}
 .esum textarea.c{font-size:var(--text-0);line-height:1.5}
-.draft .lk{margin-left:0}
+.xtra > details.fold{margin:0 0 .6em;border:1px solid var(--color-hairline);border-radius:var(--radius-xs)}
+.xtra > details.fold > summary{cursor:pointer;font-size:var(--text--2);text-transform:uppercase;letter-spacing:.04em;color:var(--color-fg-secondary);
+  padding:.5em .8em;display:flex;gap:.6em;align-items:center}
+.xtra > details.fold > summary .sumx{text-transform:none;letter-spacing:0;color:var(--color-fg-primary)}
+.xtra > details.fold[open] > summary{border-bottom:1px solid var(--color-hairline)}
+.xtra > details.fold > .why,.xtra > details.fold > .pol{margin:.6em .8em}
+.xtra > details.fold > .hist,.xtra > details.fold > .jee{margin:0;border:0;border-radius:0}
+.xtra > details.fold > .jee > .jh{display:none}
+.ib > .acts{margin:0 0 .8em}
+.pill.rec{border-width:2px;border-color:var(--color-action);font-weight:600}
+.pill.rec::after{content:"Recommended";font-size:var(--text--2);font-weight:400;color:var(--color-action);margin-left:.2em}
+.pill.rec.on::after{color:inherit}
+.ih .dchip{font-size:var(--text--2);color:var(--color-action);background-color:var(--color-action-tint);border:1px solid var(--color-action-tint);border-radius:var(--radius-pill);padding:.1em .6em}
+.foldall{display:flex;gap:var(--spacing-xs);align-items:center;margin:0 0 var(--spacing-xs);font-size:var(--text--1);color:var(--color-fg-secondary)}
+.foldall .lk{margin-left:0;font-size:var(--text--1)}
+.draft .who{display:inline-flex;align-items:center;gap:.35em}
+.spk{width:1.05em;height:1.05em;flex:none}
+.ih .dchip{display:inline-flex;align-items:center;gap:.3em}
+.thrchips{display:flex;flex-wrap:wrap;gap:.4em;margin-left:auto;align-items:center;font-size:var(--text--2);font-weight:400;letter-spacing:0}
+.thc{display:inline-flex;align-items:center;gap:.5em;border:1px solid var(--color-hairline);background-color:var(--color-stark);border-radius:var(--radius-pill);padding:.2em .35em .2em .8em;white-space:nowrap}
+.thc .tl{color:var(--color-fg-secondary);text-transform:uppercase;letter-spacing:.04em}
+.thc .tv{display:inline-flex;align-items:center;gap:.35em;border:0;border-radius:var(--radius-pill);background-color:var(--color-action-tint);color:var(--color-action);
+  font-weight:600;font-size:var(--text--1);font-variant-numeric:tabular-nums;padding:.15em .6em;cursor:pointer}
+.thc .tv:hover{background-color:var(--color-action);color:#fff}
+.thc .tv svg{width:.85em;height:.85em}
+.thc .tv0{color:var(--color-fg-secondary);padding:.15em .6em .15em 0}
+.thc input.thin{width:8ch;font:inherit;font-size:var(--text--1);font-weight:600;color:var(--color-action);border:1px solid var(--color-action);border-radius:var(--radius-pill);padding:.1em .6em;text-align:right}
+.thc .def{color:var(--color-red-text);padding-right:.4em}
+.thc .def .lk{margin-left:.3em;font-size:var(--text--2);color:var(--color-red-text)}
+.thc.chg{border-color:var(--color-red-text)}
+.hhead{display:flex;align-items:center;flex-wrap:wrap;gap:var(--spacing-xs);margin-bottom:var(--spacing-xs)}
+.hhead h1{margin:0}
+.hhead.plain{margin:var(--spacing-sm) 0 0}
+.hhead.plain h3{margin:0}
+.hero .thc{background-color:rgba(255,255,255,.07);border-color:rgba(255,255,255,.14)}
+.hero .thc .tl{color:var(--color-warm-gray)}
+.hero .thc .tv{background-color:rgba(255,255,255,.12);color:#fff}
+.hero .thc .tv:hover{background-color:#fff;color:var(--color-dark-gray)}
+.hero .thc.chg{border-color:#ff8a66} .hero .thc .def,.hero .thc .def .lk{color:#ff8a66}
+
+.fin{border-left:3px solid var(--color-dark-gray);padding:.2em 0 .2em .8em;margin:.3em 0 .5em}
+.fin .ft{white-space:pre-line;line-height:1.5;color:var(--color-fg-primary)}
+.esum .fin .ft{font-size:var(--text-0);line-height:1.5}
+.fin .fm{display:flex;gap:.8em;align-items:baseline;margin-top:.35em;font-size:var(--text--2);color:var(--color-fg-secondary)}
+.fin .fm .lk{margin-left:0}
+.fbar{display:flex;gap:.8em;align-items:center;margin:.35em 0 .5em}
+.fbar .lk{margin-left:0}
+.fbar .uns{font-size:var(--text--2);color:var(--color-red-text)}
+.xtra{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);margin:0 0 .4em;overflow:hidden}
+.item .xtra > details.fold,.item .xtra > details.lines{border:0;border-radius:0;margin:0}
+.item .xtra > details + details{border-top:1px solid var(--color-hairline)}
+.xtra > details.fold > summary,.xtra > details.lines > summary{list-style:none}
+.xtra > details.fold > summary::-webkit-details-marker,.xtra > details.lines > summary::-webkit-details-marker{display:none}
+.xtra > details.fold > summary::before,.xtra > details.lines > summary::before{content:"";width:.45em;height:.45em;border-right:1.5px solid currentColor;
+  border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s;flex:none}
+.xtra > details.fold[open] > summary::before,.xtra > details.lines[open] > summary::before{transform:rotate(45deg)}
+.xtra > details.lines{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);margin:0 0 .6em}
+.xtra > details.lines > summary{display:flex;gap:.6em;align-items:center;padding:.5em .8em;font-size:var(--text--2);text-transform:uppercase;letter-spacing:.04em}
+.xtra > details.lines[open] > summary{border-bottom:1px solid var(--color-hairline)}
 .lk{margin-left:auto;border:0;background:none;padding:0;font-size:var(--text--2);color:var(--color-fg-secondary);text-decoration:underline;cursor:pointer}
 .dh{font-size:var(--text-1);font-weight:500;margin:var(--spacing-md) 0 var(--spacing-3xs);display:flex;align-items:baseline;gap:var(--spacing-xs)}
 .dh .note{font-size:var(--text--1)}
@@ -674,7 +765,10 @@ def runlog(run, kind, also=None, read=()):
     rec.extend(read)
     out.append('<div class="card"><h3>Build record</h3><div class="tw"><table><tbody>'
                + "".join('<tr><td>%s</td><td class="mono">%s</td></tr>' % (e(a), e(b)) for a, b in rec) + "</tbody></table></div></div>")
-    return page("runlog", "<h3>Run Log</h3>" + "".join(out))
+    return page("runlog", hero("Run Log", "", [("Inputs read", str(len(files)), "Files the engine and schedules read"),
+                                               ("Checks run", str(len(m.get("rules_run") or [])), "%d not run" % len(m.get("rules_not_run") or [])),
+                                               ("Run", '<span class="mono">%s</span>' % e(m.get("run_id") or ""), e(str(m.get("generated_at") or "")[:16].replace("T", " ")) + " UTC"),
+                                               ("Engine", e(m.get("engine_version") or ""), "Console " + VERSION)]) + "".join(out))
 
 
 def gap_card():
@@ -693,6 +787,11 @@ def gap_card():
             % (len(GAPS), "" if len(GAPS) == 1 else "s", "has" if len(GAPS) == 1 else "have", e(PERIOD), rows))
 
 
+def live(what, pid="*"):
+    """A header number the page keeps current: an item count, value or tally as decisions are made."""
+    return '<span data-pgs="%s:%s"></span>' % (pid, what)
+
+
 def tie_card(months):
     """The Income Statement tie, at the top of a console's first page, and any month-end gap."""
     return tie_card_only(months) + gap_card()
@@ -705,8 +804,9 @@ def tie_card_only(months):
     bad = [f for f in TIE["failed"] if f["month"] in months]
     tot = " &middot; ".join("%s net: ledger %s, Income Statement %s" % (e(m), money(TIE["totals"][m]["ledger"], True), money(TIE["totals"][m]["report"], True)) for m in months)
     if not bad:
-        return ('<div class="card tiebar" data-tie="pass"><div class="pad"><b>Ties to NetSuite&rsquo;s Income Statement</b><span>%s, %d accounts, every account ties</span>'
-                '<span class="note">%s &middot; %s</span></div></div>' % (e(" and ".join(months)), TIE["accounts"], tot, e(TIE["report"])))
+        return ('<details class="tieline tiebar" data-tie="pass"><summary><span class="ok" aria-hidden="true">&#10003;</span><b>Ties to NetSuite&rsquo;s Income Statement</b>'
+                '<span>%s &middot; %d accounts</span><span class="more">Details</span></summary><div class="note">%s &middot; %s</div></details>'
+                % (e(" and ".join(months)), TIE["accounts"], tot, e(TIE["report"])))
     bad.sort(key=lambda f: -abs(f["difference"]))
     rows = "".join('<tr><td>%s</td><td><span class="code">%s</span>%s</td><td class="n2">%s</td><td class="n2">%s</td><td class="n2 unf">%s</td></tr>'
                    % (e(f["month"]), e(f["code"]), e(f["name"]), money(f["ledger"], True), money(f["report"], True), money(f["difference"], True)) for f in bad)
@@ -733,8 +833,8 @@ def tie_row(months):
 
 
 def hero(title, sub, tiles):
-    return ('<div class="hero"><h1>' + e(title) + "</h1>" + ('<p class="sub2">' + sub + "</p>" if sub else "")
-            + '<div class="ht">' + "".join('<div><div class="k">%s</div><div class="v">%s</div><div class="s">%s</div></div>' % t for t in tiles) + "</div></div>")
+    return ('<div class="hero%s"><h1>' % ("" if tiles else " slim") + e(title) + "</h1>" + ('<p class="sub2">' + sub + "</p>" if sub else "")
+            + ('<div class="ht">' + "".join('<div><div class="k">%s</div><div class="v">%s</div><div class="s">%s</div></div>' % t for t in tiles) + "</div>" if tiles else "") + "</div>")
 
 
 CHECKLIST = ('<div class="card"><div class="ch">Close checklist</div><div class="tw"><table class="cl"><thead><tr><th>Page</th><th>Status</th>'
@@ -751,14 +851,17 @@ def page(pid, inner):
 
 def shell(title, product, sections, pages, data, js):
     nav = []
+    # A badge is red for decisions due; a page of routine confirmations counts in grey.
+    soft = {"clear", "new"} if data.get("kind") == "coding" else set()
+    sc = lambda pid: "n soft" if pid in soft else "n"
     for si, (stitle, items) in enumerate(sections):
         if len(items) == 1:
             pid, label = items[0][:2]
-            nav.append('<div class="tg"><button class="tb pg" data-p="%s">%s<span class="n" data-c="%s"></span></button></div>' % (pid, e(label), pid))
+            nav.append('<div class="tg"><button class="tb pg" data-p="%s">%s<span class="%s" data-c="%s"></span></button></div>' % (pid, e(label), sc(pid), pid))
         else:
-            sub = "".join('<button class="tb pg" data-p="%s">%s<span class="n" data-c="%s"></span></button>' % (pid, e(label), pid) for pid, label in items)
-            nav.append('<div class="tg" data-s="%d"><button class="tb sec" data-s="%d" aria-expanded="false" aria-controls="sub%d">%s<span class="n" data-cs="%d"></span></button>'
-                       '<div class="sub shut" data-s="%d" id="sub%d" role="group" aria-label="%s">%s</div></div>' % (si, si, si, e(stitle), si, si, si, e(stitle), sub))
+            sub = "".join('<button class="tb pg" data-p="%s">%s<span class="%s" data-c="%s"></span></button>' % (pid, e(label), sc(pid), pid) for pid, label in items)
+            nav.append('<div class="tg" data-s="%d"><button class="tb sec" data-s="%d" aria-expanded="false" aria-controls="sub%d">%s<span class="%s" data-cs="%d"></span></button>'
+                       '<div class="sub shut" data-s="%d" id="sub%d" role="group" aria-label="%s">%s</div></div>' % (si, si, si, e(stitle), "n soft" if all(i[0] in soft for i in items) else "n", si, si, si, e(stitle), sub))
     return ("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
             "<title>" + e(title) + "</title><style>" + CSS + "</style></head><body>"
             '<header class="top"><div class="brand">' + DS.LOGO + "<b>" + e(product) + "</b><span>" + e(PERIOD) + "</span></div>"
@@ -767,14 +870,14 @@ def shell(title, product, sections, pages, data, js):
             + SETTINGS_SVG + '</button></div></header><div id="sharedbar" hidden></div><div id="tip"></div><div id="toast" role="status" hidden></div>'
             '<div id="ask" hidden><div class="askbox" role="dialog" aria-modal="true"><h3></h3><div class="askbody"></div><div class="acts">'
             '<button class="pill solid" data-askok>OK</button><button class="pill" data-askno>Cancel</button></div></div></div><main>' + "".join(pages)
-            + page("settings", '<div class="card"><h3>Settings</h3>' + "".join(
+            + page("settings", hero("Settings", "", []) + '<div class="card"><h3>Thresholds</h3>' + "".join(
                        '<div class="pad setcard"><label for="%s"%s>%s</label><span>$</span><input class="f" id="%s" data-thrin="%s" inputmode="numeric" style="width:9ch">%s</div>'
                        % (i, ' style="min-width:9.5rem"' if n else "", lab, i, k, n)
                        for i, k, lab, n in ((("thr", "thr", "Review threshold", ""),) if data.get("kind") != "coding" else (
-                           ("thr", "thr", "Review threshold", '<span class="note">Dept &amp; Entity account recodes, and drafted entries</span>'),
+                           ("thr", "thr", "Account recode threshold", '<span class="note">Dept &amp; Entity account recodes, and drafted entries</span>'),
                            ("thrcapex", "thr_capex", "CapEx threshold", '<span class="note">CapEx Flags</span>'),
                            ("thrprepaid", "thr_prepaid", "Prepaid threshold", '<span class="note">Prepaid Flags</span>'))))
-                   + ('<div class="pad setcard"><span class="note">Department flags have no threshold: each is marked Review, whatever its size.</span></div>'
+                   + ('<div class="pad setcard"><span class="note">Department recodes are always reviewed, whatever their size.</span></div>'
                       if data.get("kind") == "coding" else "") + "</div>"
                    '<div class="card"><h3>Decision record</h3><div class="pad acts"><button class="pill" data-recsave>Save decision record</button>'
                    '<button class="pill" data-recload>Load decision record</button><input type="file" id="recfile" accept=".json,application/json" hidden>'
@@ -796,9 +899,9 @@ const KEY = 'serif-console::' + DATA.kind + '::' + DATA.run;
    log. The thresholds are this browser's settings: thr, and on the GL Coding Review
    thr_capex and thr_prepaid, each falling back to the build's default, so a state saved
    with thr alone keeps it and takes the CapEx and Prepaid defaults. */
-const STORES = ['dec', 'notes', 'je', 'jh', 'ck', 'sign', 'log'];
+const STORES = ['dec', 'notes', 'fin', 'je', 'jh', 'ck', 'sign', 'log'];
 const refOf = id => (DATA.ref || {})[id] || '';
-let S = {dec: {}, notes: {}, sign: {}, ck: {}, je: {}, jh: {}, log: {}, thr: DATA.thr};
+let S = {dec: {}, notes: {}, fin: {}, sign: {}, ck: {}, je: {}, jh: {}, log: {}, thr: DATA.thr};
 try { S = Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
 if (Array.isArray(S.log)){ const o = {}; S.log.forEach((l, i) => { o[String(l.at).replace(/[^0-9]/g, '') + i] = l; }); S.log = o; }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1023,7 +1126,7 @@ function saveRecord(){
 function planRecord(rec){
   const here = {dec: new Set($$('[data-item],[data-jerow]').map(x => x.dataset.item || x.dataset.jerow)), ck: new Set($$('[data-ckrow]').map(x => x.dataset.ckrow)),
                 sign: new Set($$('[data-sname]').map(x => x.dataset.sname)), notes: new Set($$('[data-note]').map(x => x.dataset.note))};
-  here.je = new Set(Object.keys(DATA.je)); here.jh = here.je; here.log = null;
+  here.je = new Set(Object.keys(DATA.je)); here.jh = here.je; here.fin = here.notes; here.log = null;
   const p = {take: {}, add: 0, kept: 0, missed: 0};
   STORES.forEach(n => { p.take[n] = [];
     Object.keys(rec[n] || {}).forEach(k => { const v = rec[n][k];
@@ -1099,9 +1202,9 @@ document.addEventListener('click', ev => {
     if (DATA.je[id].proposal){ delete S.dec[id]; delete S.notes[id]; logAdd({id, label: 'Propose entry', v: 'cleared', note: ''}); }
     save(); refresh(); return; }
   const u = ev.target.closest('[data-use]');
-  if (u){ if (blocked()) return; const d = DATA.drafts[u.dataset.use]; S.notes[d.target] = d.note;
+  if (u){ if (blocked()) return; const d = DATA.drafts[u.dataset.use]; S.notes[d.target] = d.note; finalize(d.target);
     if (d.item && d.v) S.dec[d.item] = {v: d.v, at: new Date().toISOString(), by_uid: Shared.uid()};
-    logAdd({id: d.item || d.target, label: 'Claude draft used', v: d.v || 'used', note: d.note}); save(); refresh(); return; }
+    logAdd({id: d.item || d.target, label: 'Draft used', v: d.v || 'used', note: d.note}); save(); refresh(); return; }
   if (ev.target.closest('[data-recsave]')){ saveRecord(); return; }
   if (ev.target.closest('[data-recload]')){ if (!blocked()) $('#recfile').click(); return; }
   if (ev.target.closest('[data-carry]')){ if (!blocked()) carryRun(); return; }
@@ -1111,7 +1214,9 @@ document.addEventListener('click', ev => {
 document.addEventListener('change', ev => { if (ev.target.id === 'recfile' && ev.target.files[0]){ loadRecord(ev.target.files[0]); ev.target.value = ''; } });
 document.addEventListener('input', ev => {
   const t = ev.target;
-  if (t.dataset.note !== undefined){ S.notes[t.dataset.note] = t.value; save(); return; }
+  if (t.dataset.note !== undefined){ S.notes[t.dataset.note] = t.value; EDIT.add(t.dataset.note);
+    const bar = $('[data-fbar="' + CSS.escape(t.dataset.note) + '"]'); if (bar){ bar.hidden = !t.value.trim();
+      bar.querySelector('.uns').textContent = S.fin[t.dataset.note] ? 'Changed since saved' : 'Not saved'; } t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; save(); return; }
   if (t.dataset.jef || t.dataset.jeh){ editJE(t); return; }
   if (t.dataset.thrin){ const v = Number(String(t.value).replace(/[^0-9.]/g, '')); if (isFinite(v) && v > 0){ S[t.dataset.thrin] = v; save(); refresh(); } }
 });
@@ -1123,7 +1228,7 @@ $$('[data-tabbox] > [data-pane]').forEach(x => x.setAttribute('role', 'tabpanel'
 const tip = $('#tip');
 document.addEventListener('mousemove', ev => { const t = ev.target.closest('[data-tip]');
   if (!t){ tip.style.display = 'none'; return; }
-  tip.innerHTML = t.dataset.tip; tip.style.display = 'block';
+  tip.innerHTML = t.dataset.tip; tip.classList.toggle('sm', t.dataset.tipsm !== undefined); tip.style.display = 'block';
   tip.style.left = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8) + 'px';
   tip.style.top = Math.min(ev.clientY + 14, innerHeight - tip.offsetHeight - 8) + 'px'; });
 /* decisions */
@@ -1133,6 +1238,8 @@ function decide(id, v, label){
   const cur = S.dec[id];
   if (cur && cur.v === v) delete S.dec[id];
   else S.dec[id] = {v, at: new Date().toISOString(), by_uid: Shared.uid()};
+  if (S.dec[id]) openJE(id);
+  if (S.dec[id] && v === 'confirm'){ const el = $('[data-item="' + id + '"]'); if (el) el.classList.remove('unfold'); }
   logAdd({id, label: label || id, v: S.dec[id] ? v : 'cleared', note: S.notes[id] || ''});
   save(); refresh();
 }
@@ -1140,26 +1247,201 @@ const decided = id => !!S.dec[id] && (['modify', 'recode'].indexOf(S.dec[id].v) 
 function paintItems(){
   $$('[data-item]').forEach(el => { const id = el.dataset.item, d = S.dec[id];
     el.classList.toggle('done', !!d);
-    const fold = !!d && d.v === 'confirm';
+    const fold = (!!d && d.v === 'confirm') || el.dataset.autofold === '1';
     if (!fold) el.classList.remove('unfold');
     el.classList.toggle('folded', fold && !el.classList.contains('unfold'));
     el.classList.toggle('foldable', fold);
+    el.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('rec', REC[id] === b.dataset.v));
+    // one status: Review while it waits and is marked for review, Pending while it waits under it, then the decision
+    const rv = el.classList.contains('hi') || Array.from(el.querySelectorAll(':scope > .ih > .tag:not(.ink):not(.plain)')).some(t => !t.hidden && t.textContent.trim());
     const st = el.querySelector('.stp'); if (st){ st.textContent = d ? (LABEL[d.v] || d.v) + ((['modify','recode'].indexOf(d.v) > -1 && !(S.notes[id]||'').trim()) ? ', add a note' : '')
-      + (d.by_uid ? ' · ' + Shared.name(d.by_uid) : '') : 'Pending';
-      st.className = 'stp' + (d ? (d.v === 'reject' || d.v === 'none' ? ' rej' : ' done') : ''); }
+      + (d.by_uid ? ' · ' + Shared.name(d.by_uid) : '') : rv ? 'Review' : 'Pending';
+      st.className = 'stp' + (d ? (d.v === 'reject' || d.v === 'none' ? ' rej' : ' done') : rv ? ' rv' : ''); }
     el.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('on', !!d && d.v === b.dataset.v));
     const nt = el.querySelector('textarea[data-note]'); if (nt){ nt.hidden = nt.dataset.ask === undefined && !(d && ['modify','recode','netsuite','reject','none'].indexOf(d.v) > -1) && !(S.notes[id]||'').trim();
       if (document.activeElement !== nt) nt.value = S.notes[id] || ''; } });
   $$('textarea.c[data-note]').forEach(t => { if (!t.closest('[data-item]') && document.activeElement !== t) t.value = S.notes[t.dataset.note] || ''; });
   paintJE();
-  $$('[data-draft]').forEach(x => { const d = (DATA.drafts || {})[x.dataset.draft]; if (d) x.hidden = !!String(S.notes[d.target] || '').trim(); });
+  $$('[data-draft]').forEach(x => { const d = (DATA.drafts || {})[x.dataset.draft]; if (!d) return;
+    x.hidden = !!String(S.notes[d.target] || '').trim();
+    // An empty note box waits behind a draft until Edit.
+    if (!d.item){ const t = $('textarea[data-note="' + d.target + '"]'); if (t) t.hidden = !x.hidden && document.activeElement !== t; }
+    const m = x.querySelector('[data-dmore]'), dt = x.querySelector('.dt');
+    if (m && x.closest('td') && dt.offsetParent) m.hidden = !x.classList.contains('open') && dt.scrollHeight <= dt.clientHeight + 2; });
+  paintNotes();
+  $$('textarea.c').forEach(t => { if (t.offsetParent && t.value){ t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; } });
+  $$('details.fold.je').forEach(f => { const b = f.querySelector('[data-jebal]'), t = f.querySelector('[data-jesum]'); if (b && t) t.textContent = b.textContent; });
 }
+/* cards: the facts, Claude's draft and the decision first; the rest folded away */
+const REC = {};
+Object.values(DATA.drafts || {}).forEach(d => { if (d.item && d.v) REC[d.item] = d.v; });
+function fold(el, title, extra){
+  const d = document.createElement('details'); d.className = 'fold';
+  d.innerHTML = '<summary>' + title + (extra ? ' <span class="sumx">' + extra + '</span>' : '') + '</summary>';
+  el.parentNode.insertBefore(d, el); d.appendChild(el); return d;
+}
+// A card approved, modified, recoded or edited in NetSuite shows the Journal Entry that will go to NetSuite.
+function openJE(id){ const d = S.dec[id]; if (!d || ['approve', 'modify', 'recode', 'netsuite'].indexOf(d.v) < 0) return;
+  const el = $('[data-item="' + id + '"]'); if (!el) return;
+  el.querySelectorAll('details.fold.je').forEach(f => f.open = true);
+  if (el.dataset.autofold === '1') el.classList.add('unfold'); }
+/* notes: written, then saved. A saved note reads as finished text, with who saved it and
+   when; Edit opens it again, and until it is saved again it is marked Not saved. */
+const SPARK = '<svg class="spk" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7 1.5l1.5 4 4 1.5-4 1.5-1.5 4-1.5-4-4-1.5 4-1.5z"/><path d="M12.5 10l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>';
+const EDIT = new Set();
+const savedNote = k => { const f = S.fin[k], n = String(S.notes[k] || ''); return !!f && !!n.trim() && f.text === n; };
+function finalize(k){ S.fin[k] = {text: String(S.notes[k] || ''), at: new Date().toISOString(), by_uid: Shared.uid()}; EDIT.delete(k); }
+function shapeNotes(){
+  // A line's computed summary is a draft like any other: Accept or Edit it, or write your own.
+  // Where an AI draft sits on the line, it stands in for the summary.
+  $$('td > .cm').forEach(cm => { const td = cm.parentElement, t = td.querySelector(':scope > textarea.c[data-note]');
+    if (!t || td.closest('[data-item]')) return;
+    if (td.querySelector('.draft')){ cm.hidden = true; return; }
+    const note = cm.innerText.replace(/\s+\n/g, '\n').trim(); if (!note) return;
+    const key = 'auto:' + t.dataset.note; DATA.drafts = DATA.drafts || {}; DATA.drafts[key] = {note: note, target: t.dataset.note};
+    const d = document.createElement('div'); d.className = 'draft auto'; d.dataset.draft = key;
+    d.innerHTML = '<div class="dhd"><span class="who">' + SPARK + 'Draft</span><span class="dacts"><button class="pill sm solid" data-use="' + esc(key) + '">Accept</button>'
+      + '<button class="pill sm" data-edit="' + esc(key) + '">Edit</button></span></div><div class="dt"></div><button class="lk more" data-dmore hidden>Show all</button>';
+    d.querySelector('.dt').textContent = note; cm.replaceWith(d); });
+  $$('textarea.c[data-note]').forEach(t => { const k = t.dataset.note, at = t.closest('.acts') || t;
+    const fin = document.createElement('div'); fin.className = 'fin'; fin.dataset.fin = k; fin.hidden = true;
+    fin.innerHTML = '<div class="ft"></div><div class="fm"><span class="by"></span><button class="lk" data-finedit="' + esc(k) + '">Edit</button></div>';
+    const bar = document.createElement('div'); bar.className = 'fbar'; bar.dataset.fbar = k; bar.hidden = true;
+    bar.innerHTML = '<button class="pill sm solid" data-finsave="' + esc(k) + '">Save</button><button class="lk" data-fincancel="' + esc(k) + '">Cancel</button><span class="uns">Not saved</span>';
+    at.after(bar); at.after(fin); });
+}
+function paintNotes(){
+  $$('textarea.c[data-note]').forEach(t => { const k = t.dataset.note, fin = $('[data-fin="' + CSS.escape(k) + '"]'), bar = $('[data-fbar="' + CSS.escape(k) + '"]');
+    if (!fin || !bar) return;
+    const done = savedNote(k) && !EDIT.has(k), n = String(S.notes[k] || '');
+    if (done){ t.hidden = true; fin.hidden = false; fin.querySelector('.ft').textContent = n;
+      const f = S.fin[k], who = f.by_uid ? Shared.name(f.by_uid) : '';
+      fin.querySelector('.by').textContent = 'Saved' + (who ? ' by ' + who : '') + ' · ' + new Date(f.at).toLocaleString('en-US', {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'}); }
+    else fin.hidden = true;
+    bar.hidden = done || t.hidden || !n.trim();
+    bar.querySelector('.uns').textContent = S.fin[k] ? 'Changed since saved' : 'Not saved'; });
+}
+document.addEventListener('click', ev => {
+  const sv = ev.target.closest('[data-finsave]');
+  if (sv){ if (blocked()) return; const k = sv.dataset.finsave; finalize(k); logAdd({id: k, label: 'Note saved', v: 'saved', note: S.notes[k] || ''}); save(); refresh(); return; }
+  const cn = ev.target.closest('[data-fincancel]');
+  if (cn){ const k = cn.dataset.fincancel; EDIT.delete(k); if (S.fin[k]) S.notes[k] = S.fin[k].text; else delete S.notes[k]; save(); refresh(); return; }
+  const fe = ev.target.closest('[data-finedit]');
+  if (fe){ if (blocked()) return; const k = fe.dataset.finedit; EDIT.add(k); refresh();
+    const t = $('textarea[data-note="' + CSS.escape(k) + '"]'); if (t){ t.hidden = false; t.focus(); } return; }
+});
+// Cmd or Ctrl + Enter saves the note being written.
+document.addEventListener('keydown', ev => { const t = ev.target;
+  if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter' && t.matches && t.matches('textarea.c[data-note]') && String(t.value).trim()){
+    ev.preventDefault(); const b = $('[data-finsave="' + CSS.escape(t.dataset.note) + '"]'); if (b) b.click(); } });
+function shapeCards(){
+  $$('.item > .ib').forEach(ib => {
+    const kv = ib.querySelector(':scope > .kv'), dr = ib.querySelector('.draft'), ac = ib.querySelector(':scope > .acts');
+    const why = ib.querySelector(':scope > .why'), pol = ib.querySelector(':scope > .pol');
+    let at = kv;
+    if (dr && kv){ kv.after(dr); at = dr; }
+    else if (why && kv){ kv.after(why); at = why; }
+    if (ac && at) at.after(ac);
+    if (dr && why){ const f = fold(why, 'Why it was flagged'); if (pol) f.appendChild(pol); }
+    else if (pol && !why){ fold(pol, 'Policy'); }
+    ib.querySelectorAll(':scope > .jee:not([data-when])').forEach(j => { fold(j, 'Journal Entry', '<span data-jesum></span>').classList.add('je'); });
+    ib.querySelectorAll(':scope > .hist').forEach(h => fold(h, 'Last three months'));
+    const ds = ib.querySelectorAll(':scope > details.fold, :scope > details.lines');
+    if (ds.length){ const g = document.createElement('div'); g.className = 'xtra'; ds[0].before(g); ds.forEach(d => g.appendChild(d)); }
+    const it = ib.parentElement, lab = dr && dr.querySelector('.rec');
+    if (lab){ const c = document.createElement('span'); c.className = 'dchip'; c.innerHTML = SPARK + esc(lab.textContent.replace(/[.:].*$/, ''));
+      it.querySelector('.ih .stp').before(c); }
+  });
+  // A page of many cards opens folded to their headers.
+  $$('.page').forEach(pg => { const its = pg.querySelectorAll('[data-item]'); if (its.length <= 12) return;
+    its.forEach(x => x.dataset.autofold = '1');
+    const bar = document.createElement('div'); bar.className = 'foldall';
+    bar.innerHTML = '<span>' + its.length + ' items, folded to one line each.</span><button class="lk" data-foldall="0">Expand all</button><button class="lk" data-foldall="1">Collapse all</button>';
+    its[0].parentNode.insertBefore(bar, its[0]); });
+  Object.keys(S.dec || {}).forEach(openJE);
+  shapeThresholds();
+}
+/* thresholds: each page that applies one says so at its top, with its value now */
+const THR_TXT = {
+  thr: DATA.kind === 'coding' ? ['Account recodes', 'Account recodes and drafted entries of {v} or more are flagged for review.']
+                              : ['Review threshold', 'Lines that moved {v} or more need commentary.'],
+  thr_capex: ['CapEx threshold', 'Purchases of {v} or more are flagged as possible capital assets.'],
+  thr_prepaid: ['Prepaid threshold', 'Charges of {v} or more that cover future months are flagged as possible prepaids.'],
+  all: ['Department recodes', 'A department recode is reviewed whatever its size.']};
+const PENCIL = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg>';
+function shapeThresholds(){
+  $$('.page').forEach(pg => { if (pg.id === 'p-settings') return;
+    const keys = [];
+    pg.querySelectorAll('.item[data-thr]').forEach(x => { if (keys.indexOf(x.dataset.thr) < 0) keys.push(x.dataset.thr); });
+    if (pg.querySelector('tr[data-var], [data-cm]') && keys.indexOf('thr') < 0) keys.unshift('thr');
+    if (!keys.length) return;
+    keys.sort((a, b) => (a === 'all') - (b === 'all'));
+    const box = document.createElement('div'); box.className = 'thrchips';
+    box.innerHTML = keys.map(k => k === 'all'
+      ? '<span class="thc none" data-tipsm data-tip="' + esc(THR_TXT[k][1]) + '"><span class="tl">' + THR_TXT[k][0] + '</span><span class="tv0">Always reviewed</span></span>'
+      : '<span class="thc" data-thc="' + k + '" data-tipsm data-tip=""><span class="tl">' + THR_TXT[k][0] + '</span>'
+        + '<button class="tv" data-thedit="' + k + '" aria-label="Change the ' + THR_TXT[k][0] + '"><span data-thrv="' + k + '"></span>' + PENCIL + '</button>'
+        + '<span class="def" data-thrdef="' + k + '" hidden></span></span>').join('');
+    // beside the page's title: in the hero, or on the title line of a page without one
+    const hero = pg.querySelector(':scope > .hero'), t = hero ? hero.querySelector('h1') : pg.querySelector(':scope > h3');
+    if (t){ const row = document.createElement('div'); row.className = hero ? 'hhead' : 'hhead plain'; t.before(row); row.append(t, box); }
+    else pg.prepend(box); });
+}
+function paintThresholds(){
+  $$('[data-thrv]').forEach(x => { x.textContent = money(thrOf(x.dataset.thrv)); });
+  $$('[data-thc]').forEach(c => { c.dataset.tip = esc(THR_TXT[c.dataset.thc][1].replace('{v}', money(thrOf(c.dataset.thc)))); });
+  $$('[data-thrdef]').forEach(x => { const k = x.dataset.thrdef, d = Number(DATA[k]) || DATA.thr, v = thrOf(k);
+    x.hidden = v === d; x.innerHTML = v === d ? '' : 'Default ' + money(d) + ' <button class="lk" data-threset="' + k + '">Reset</button>';
+    x.closest('.thc').classList.toggle('chg', v !== d); });
+}
+// A threshold is changed where it shows: its value becomes a field; Enter or leaving it keeps
+// the new value, Escape leaves it as it was.
+document.addEventListener('click', ev => {
+  const ed = ev.target.closest('[data-thedit]');
+  if (ed){ if (blocked()) return; const k = ed.dataset.thedit, inp = document.createElement('input');
+    inp.className = 'thin'; inp.inputMode = 'numeric'; inp.value = thrOf(k).toLocaleString('en-US'); inp.setAttribute('aria-label', ed.getAttribute('aria-label'));
+    let fin = false;
+    const done = keep => { if (fin) return; fin = true; const v = Number(String(inp.value).replace(/[^0-9.]/g, ''));
+      inp.replaceWith(ed); if (keep && isFinite(v) && v > 0 && v !== thrOf(k)){ S[k] = v; logAdd({id: k, label: THR_TXT[k][0], v: money(v), note: ''}); save(); refresh(); } };
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(true); else if (e.key === 'Escape') done(false); });
+    inp.addEventListener('blur', () => done(true));
+    ed.replaceWith(inp); inp.focus(); inp.select(); return; }
+  const rs = ev.target.closest('[data-threset]');
+  if (rs){ if (blocked()) return; const k = rs.dataset.threset; if (k === 'thr') S.thr = DATA.thr; else delete S[k];
+    logAdd({id: k, label: THR_TXT[k][0], v: 'default', note: ''}); save(); refresh(); }
+});
+document.addEventListener('click', ev => {
+  const ed = ev.target.closest('[data-edit]');
+  if (ed){ if (blocked()) return; const d = DATA.drafts[ed.dataset.edit]; S.notes[d.target] = S.notes[d.target] || d.note; EDIT.add(d.target); save(); refresh();
+    const t = $('textarea[data-note="' + d.target + '"]'); if (t){ t.hidden = false; t.focus(); } return; }
+  const mo = ev.target.closest('[data-dmore]');
+  if (mo){ const dr = mo.closest('.draft'); dr.classList.toggle('open'); mo.textContent = dr.classList.contains('open') ? 'Show less' : 'Show all'; return; }
+  const fa = ev.target.closest('[data-foldall]');
+  if (fa){ fa.closest('.page').querySelectorAll('[data-item]').forEach(x => x.classList.toggle('unfold', fa.dataset.foldall === '0')); paintItems(); return; }
+});
 /* counts: what is open on each page, and in each section */
 function counts(){
+  // a page's badge counts what waits on a decision, and shows a check once nothing does
   $$('[data-c]').forEach(el => { const items = $$('#p-' + el.dataset.c + ' [data-item]');
-    const open = items.filter(x => !decided(x.dataset.item)).length + jeOpen(el.dataset.c).length; el.textContent = open || ''; });
-  $$('[data-cs]').forEach(el => { const n = $$('.sub[data-s="' + el.dataset.cs + '"] [data-c]').reduce((a, x) => a + (Number(x.textContent) || 0), 0);
-    el.textContent = n || ''; });
+    const open = items.filter(x => !decided(x.dataset.item)).length + jeOpen(el.dataset.c).length;
+    el.textContent = open || (items.length ? '\u2713' : ''); el.classList.toggle('ok', !open && items.length > 0); });
+  $$('[data-cs]').forEach(el => { const kids = $$('.sub[data-s="' + el.dataset.cs + '"] [data-c]');
+    const n = kids.reduce((a, x) => a + (Number(x.textContent) || 0), 0), done = kids.some(x => x.classList.contains('ok'));
+    el.textContent = n || (done ? '\u2713' : ''); el.classList.toggle('ok', !n && done); });
+  // the numbers in each page's header that move with the review
+  $$('[data-pgs]').forEach(el => { const [pg, what] = el.dataset.pgs.split(':');
+    const its = pg === '*' ? [] : $$('#p-' + pg + ' [data-item]'), op = its.filter(x => !decided(x.dataset.item));
+    const F = ['fixes', 'inimport', 'nsedit'].indexOf(what) > -1 ? Object.values(fixesOf()) : [];
+    el.textContent = what === 'done' ? (its.length - op.length) + ' of ' + its.length
+      : what === 'open' ? String(op.length)
+      : what === 'openamt' ? money(op.reduce((a, x) => a + (Number(x.dataset.amt) || 0), 0))
+      : what === 'decs' ? String(Object.keys(S.dec).length)
+      : what === 'fins' ? String(Object.keys(S.fin || {}).filter(savedNote).length)
+      : what === 'logs' ? String(Object.keys(S.log).length)
+      : what === 'signs' ? Object.keys(S.sign).length + ' of ' + $$('[data-sname]').length
+      : what === 'fixes' ? String(F.length)
+      : what === 'inimport' ? String(F.filter(f => f.in_import).length)
+      : what === 'nsedit' ? String(F.filter(f => f.path === 'Edited in NetSuite').length) : ''; });
 }
 function signs(){
   $$('[data-sname]').forEach(n => { const r = n.dataset.sname, s = S.sign[r], row = n.closest('.sign');
@@ -1275,7 +1557,7 @@ function checklist(){
     pg.querySelectorAll('[data-item]').forEach(x => { total++; if (!decided(x.dataset.item)){ open++; value += Number(x.dataset.amt) || 0; } });
     /* A page's other comparisons (year on year, year to date) restate its lines; they count once, on the first. */
     pg.querySelectorAll('tr[data-var]').forEach(tr => { if (tr.closest('[data-alt]')) return; const a = Math.abs(Number(tr.dataset.var) || 0); if (a < thr) return;
-      total++; const t = tr.querySelector('textarea[data-note]'); if (!t || !(S.notes[t.dataset.note] || '').trim()){ open++; value += a; } });
+      total++; const t = tr.querySelector('textarea[data-note]'); if (!t || !savedNote(t.dataset.note)){ open++; value += a; } });
     $$('#p-' + pid + ' [data-jerow]').filter(r => jeEdited(r.dataset.jerow)).forEach(r => { total++; });
     jeOpen(pid).forEach(r => { open++; value += jeOf(r.dataset.jerow).lines.reduce((a, l) => a + (Number(l.debit) || 0), 0); });
     if (!total) return;
@@ -1293,6 +1575,7 @@ function marks(){
   $$('.item[data-thr]').forEach(x => { const k = x.dataset.thr, hi = k === 'all' || Number(x.dataset.tamt || x.dataset.amt) >= thrOf(k);
     x.classList.toggle('hi', hi); const g = x.querySelector(':scope > .ih > [data-rev]'); if (g) g.hidden = !hi; });
   $$('[data-thrin]').forEach(t => { if (document.activeElement !== t) t.value = thrOf(t.dataset.thrin).toLocaleString('en-US'); });
+  if (typeof paintThresholds === 'function') paintThresholds();
   const thr = S.thr || DATA.thr;
   $$('tr[data-var]').forEach(tr => { const a = Math.abs(Number(tr.dataset.var) || 0);
     const k = a >= thr ? 'rev' : 'ok';
@@ -1422,6 +1705,9 @@ def coding_corrections():
             sum(1 for it in items if it[1] not in dec))
 
 
+PACK_BTNS = '<span class="r"><button class="pill sm" data-fluxcsv>Commentary, CSV</button> <button class="pill sm solid" data-fluxpack>Export flux pack</button></span>'
+
+
 def flux():
     T = PLR["tables"][0]
     secs = T["sections"]
@@ -1500,7 +1786,7 @@ def flux():
     tiles = [("Total OpEx", short(opex["actual"]), fav(-(opex["actual"] - opex["prior"]), ("&#9660; " if opex["actual"] < opex["prior"] else "&#9650; ") + short(abs(opex["actual"] - opex["prior"]))) + " vs. " + e(PRIOR)),
              ("Net Loss", short(-net["actual"]), fav(-(net["actual"] - net["prior"]), short(abs(net["actual"] - net["prior"])) + (" favorable" if net["actual"] < net["prior"] else " unfavorable")) + " MoM"),
              ("YoY Net Loss", "&ndash;", "No " + e(PY) + " in the GL exports") if NO_PY else
-             ("YoY Net Loss", short(-net["actual"]), fav(-(net["actual"] - net["prior_year"]), short(abs(net["actual"] - net["prior_year"])) + (" favorable" if net["actual"] < net["prior_year"] else " unfavorable")) + " vs. " + e(PY)),
+             ("YoY Net Loss", short(-net["prior_year"]), fav(-(net["actual"] - net["prior_year"]), short(abs(net["actual"] - net["prior_year"])) + (" favorable" if net["actual"] < net["prior_year"] else " unfavorable")) + " vs. " + e(PY)),
              ("Adj Pending", '<span data-pending>' + str(len(ent) + len(revs)) + "</span>", "Review before close")]
     cards = [tile("R&amp;D Spend (" + MON + ")", short(rd[0]), fav(-(rd[0] - rd[1]), short(abs(rd[0] - rd[1]))) + " vs. " + e(PRIOR[:3])),
              tile("G&amp;A Spend (" + MON + ")", short(ga[0]), fav(-(ga[0] - ga[1]), short(abs(ga[0] - ga[1]))) + " vs. " + e(PRIOR[:3])),
@@ -1508,16 +1794,16 @@ def flux():
              tile("Total Headcount", str(sum((pay.get("headcount") or {}).get("by_type", {}).values())),
                   " &middot; ".join(e(str(n) + " " + k) for k, n in ((pay.get("headcount") or {}).get("by_type") or {}).items())),
              tile("Cash &amp; Equiv. (" + MON + " BS)", short(cash_now),
-                  " &middot; ".join(e(r["name"].split(" - ", 1)[-1].replace("Serif - ", "")) + ": " + short(r["values"][PERIOD]) for r in banks)),
+                  " &middot; ".join(e(r["name"].split(" - ", 1)[-1].replace("Serif - ", "")) + ": " + short(r["values"][PERIOD]) for r in banks)) if bs["rows"] else "",
              tile("Flags to Review", '<span data-cm></span>', '<span data-cmn></span>')]
     # The executive summary for the controller: Claude's draft, used and edited by the reviewer.
     sd = txt(RAW_DRAFTS.get("summary"))
-    exec_summary = ('<div class="card"><div class="ch">Executive Summary</div><div class="esum">' + (draft("sum:exec", sd, "exec:summary") if sd else "")
+    exec_summary = ('<div class="card"><div class="ch">Executive Summary%s</div><div class="esum">' % PACK_BTNS + (draft("sum:exec", sd, "exec:summary") if sd else "")
                     + '<textarea class="c" rows="8" data-note="exec:summary" placeholder="Executive summary for the controller"></textarea></div></div>')
-    pages.append(page("ov", hero("P&L Flux Analysis, " + PERIOD, "", tiles) + tie_card([PERIOD, PRIOR]) + '<div class="grid">' + "".join(cards) + "</div>"
+    pages.append(page("ov", hero("P&L Flux Analysis, " + PERIOD, "", tiles) + tie_card([PERIOD, PRIOR]) + exec_summary + '<div class="grid">' + "".join(cards) + "</div>"
                       + '<div class="card"><div class="ch">Net Loss Bridge, ' + e(PRIOR) + ' to ' + e(PERIOD) + '</div>' + wf
                       + '<div class="wflegend"><span><i style="background:var(--color-dark-gray)"></i>Net loss</span><span><i style="background:var(--color-red-text)"></i>Raises the loss</span>'
-                        '<span><i style="background:var(--color-mid-gray)"></i>Lowers the loss</span></div></div>' + exec_summary + CHECKLIST))
+                        '<span><i style="background:var(--color-mid-gray)"></i>Lowers the loss</span></div></div>' + CHECKLIST))
 
     # ----- Actual vs. Actual
     corr, ns_corr, opened, n_booked, n_edited, coding_notes, n_open = coding_corrections() if CODING_REC else ({}, {}, {}, 0, 0, [], 0)
@@ -1858,7 +2144,7 @@ def flux():
         rid = sid("REV", r["account"], r.get("department"))
         f = F.get(r["finding_id"]) or {}
         v = r.get("difference") or 0
-        cards_b.append('<div class="item" data-item="%s" data-amt="%s"><div class="ih"><span class="tag hi">Forecast revision</span><b>%s</b><span class="stp">Pending</span></div><div class="ib"><div class="kv">'
+        cards_b.append('<div class="item" data-item="%s" data-amt="%s"><div class="ih"><span class="tag ink">Forecast revision</span><b>%s</b><span class="stp">Pending</span></div><div class="ib"><div class="kv">'
                        '<div><div class="l">Account</div><div class="x">%s %s%s</div></div><div><div class="l">Variance (ledger vs. forecast)</div><div class="x">%s</div></div>'
                        '<div><div class="l">Impact</div><div class="x">Forecast only, no Journal Entry</div></div></div><div class="why">%s</div>'
                        '<div class="acts"><button class="pill" data-d="%s" data-v="ack" data-label="%s">Acknowledge &amp; Flag</button><button class="pill" data-d="%s" data-v="none" data-label="%s">No Action</button>'
@@ -1972,7 +2258,7 @@ def flux():
         + '<div class="card"><div class="ch">Tie-Outs</div><div class="tw"><table class="ties"><thead><tr><th>Check</th><th class="n2">Amount</th><th class="n2">Against</th><th>Result</th></tr></thead><tbody>'
         + "".join(ties) + "</tbody></table></div>" + tie_note + "</div>" + rp_card
         + '<div class="split"><div class="card"><div class="ch">GAAP Compliance Checklist</div>' + ck + '</div><div><div class="card"><div class="ch">Source Data Validation</div><div class="tw"><table>'
-          '<thead><tr><th>Report</th><th>File</th><th class="n2">Status</th></tr></thead><tbody>' + src + '</tbody></table></div></div><div class="card"><div class="ch">Management Sign-Off</div><div class="pad">'
+          '<thead><tr><th>Report</th><th>File</th><th class="n2">Status</th></tr></thead><tbody>' + src + '</tbody></table></div></div><div class="card"><div class="ch">Management Sign-Off' + PACK_BTNS + '</div><div class="pad">'
         + sign + '</div></div><div class="card"><div class="pad note"><b>AI disclosure.</b> Figures, variances and proposed entries are computed by the flux engine from the exports listed. '
           'Commentary and every decision are the reviewer\'s.</div></div></div></div>'))
 
@@ -1999,7 +2285,103 @@ function refresh(){
   $$('[data-ckdone]').forEach(x => { const v = Object.values(S.ck); x.textContent = v.filter(y => y === 'ok').length + ' reviewed · ' + v.filter(y => y === 'flag').length + ' to follow up'; });
   $$('[data-signs]').forEach(x => x.textContent = Object.keys(S.sign).filter(k => k !== 'prep').length + ' / 2');
 }
-show('ov');
+/* The flux pack: what the close hands on, read-only. Only saved writing goes in; what is
+   still open is listed, so the pack says whether the close is finished. */
+function fluxPack(){
+  const thr = S.thr || DATA.thr, usd = v => (Number(v) || 0).toLocaleString('en-US', {style: 'currency', currency: 'USD'});
+  const when = iso => iso ? new Date(iso).toLocaleString('en-US', {month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'}) : '';
+  const who = uid => uid ? Shared.name(uid) : '';
+  // an element's text with its parts spaced, as it reads on screen
+  const spaced = el => { const x = el.cloneNode(true); x.querySelectorAll('.mk,.tag,button,textarea,.draft,.fin,.fbar,.note,details').forEach(n => n.remove());
+    x.querySelectorAll('*').forEach(n => n.append(' ')); return x.textContent.replace(/\s+/g, ' ').replace(/\s+([,.;:)])/g, '$1').trim(); };
+  const clean = spaced;
+  const para = t => esc(t).split(/\n{2,}/).map(x => '<p>' + x.replace(/\n/g, '<br>') + '</p>').join('');
+  const saved = k => savedNote(k) ? {text: S.notes[k], by: who(S.fin[k].by_uid), at: S.fin[k].at} : null;
+  const rowsOf = sel => { const t = $(sel); return t ? Array.from(t.querySelectorAll(':scope > tbody > tr')) : []; };
+  const pageName = x => { const p = x.closest('.page'), b = p && $('.tb.pg[data-p="' + p.id.slice(2) + '"]'); return b ? b.textContent.replace(/\d+$/, '').trim() : ''; };
+  const open = [];
+  // the executive summary
+  const sum = saved('exec:summary');
+  if (!sum) open.push('The executive summary is not saved.');
+  // the P&L, month over month, with each line's saved commentary
+  const tbl = $('#p-ava [data-pane="mom"] table'), heads = tbl ? Array.from(tbl.querySelectorAll(':scope > thead th')).map(h => h.textContent.trim()) : [];
+  const keep = heads.map((h, i) => [h, i]).filter(([h]) => !/avg|Commentary/i.test(h));
+  let pl = '', missing = 0;
+  rowsOf('#p-ava [data-pane="mom"] table').forEach(tr => {
+    if (tr.classList.contains('jr')) return;
+    if (tr.classList.contains('grp')){ pl += '<tr class="g"><td colspan="' + (keep.length + 1) + '">' + esc(tr.textContent.trim()) + '</td></tr>'; return; }
+    const t = tr.querySelector(':scope > td > textarea[data-note]'), k = t && t.dataset.note, c = k && saved(k);
+    const rev = tr.dataset.var !== undefined && Math.abs(Number(tr.dataset.var)) >= thr;
+    if (rev && !c) missing++;
+    pl += '<tr class="' + (rev ? 'rv' : '') + (tr.classList.contains('tot') ? ' t' : '') + '">' + keep.map(([h, i]) => '<td' + (i ? ' class="n"' : '') + '>' + esc(i ? (tr.cells[i] || {}).textContent || '' : clean(tr.cells[0])) + '</td>').join('')
+      + '<td class="cm">' + (c ? para(c.text) + '<div class="by">' + esc((c.by ? c.by + ', ' : '') + when(c.at)) + '</div>' : rev ? '<span class="op">Needs commentary</span>' : '') + '</td></tr>'; });
+  if (missing) open.push(plural(missing, 'line') + ' at or over ' + money(thr) + ' without saved commentary.');
+  // saved commentary on the other pages
+  const other = $$('.page tr').filter(tr => !tr.closest('#p-ava [data-pane="mom"]') && tr.querySelector(':scope > td > textarea[data-note]')).map(tr => {
+    const k = tr.querySelector(':scope > td > textarea[data-note]').dataset.note, c = saved(k); if (!c) return '';
+    const tab = tr.closest('[data-pane]'), tb = tab && tab.closest('[data-tabbox]') && tab.closest('[data-tabbox]').querySelector('[data-tab="' + tab.dataset.pane + '"]');
+    return '<tr><td>' + esc(pageName(tr) + (tb ? ', ' + tb.textContent.trim() : '')) + '</td><td>' + esc(clean(tr.cells[0])) + '</td><td class="cm">' + para(c.text) + '<div class="by">' + esc((c.by ? c.by + ', ' : '') + when(c.at)) + '</div></td></tr>'; }).filter(Boolean);
+  // adjustments and their decisions
+  const adj = $$('#p-adj [data-item]').map(x => { const id = x.dataset.item, d = S.dec[id], n = S.notes[id] || '', tag = x.querySelector('.ih .tag');
+    if (!decided(id)) open.push('Adjustment not decided: ' + x.querySelector('.ih b').textContent.trim() + '.');
+    return '<tr><td>' + esc(tag ? tag.textContent : '') + '</td><td>' + esc(x.querySelector('.ih b').textContent) + '</td><td class="n">' + usd(x.dataset.amt) + '</td><td>'
+      + (d ? '<b>' + esc(LABEL[d.v] || d.v) + '</b>' : '<span class="op">Pending</span>') + '</td><td>' + esc(n) + (n && !savedNote(id) ? ' <span class="op">(note not saved)</span>' : '')
+      + '</td><td>' + esc(d ? (who(d.by_uid) ? who(d.by_uid) + ', ' : '') + when(d.at) : '') + '</td></tr>'; });
+  const je = [];
+  Object.keys(DATA.je).filter(jeReady).forEach(id => { const j = jeOf(id);
+    j.lines.forEach((l, i) => je.push('<tr><td class="m">' + (i ? '' : esc(j.id)) + '</td><td>' + (i ? '' : esc(j.memo)) + '</td><td class="m">' + esc(l.account) + ' ' + esc(DATA.acct[l.account] || '')
+      + '</td><td>' + esc(l.department || '') + '</td><td class="n">' + (Number(l.debit) ? usd(l.debit) : '') + '</td><td class="n">' + (Number(l.credit) ? usd(l.credit) : '') + '</td></tr>')); });
+  // sign-offs
+  const roles = $$('[data-sname]').map(i => i.dataset.sname);
+  const signs = roles.map(r => { const g = S.sign[r], lb = $('[data-sname="' + r + '"]').closest('.sign').querySelector('b').textContent;
+    if (!g) open.push(lb + ' has not signed.');
+    return '<tr><td>' + esc(lb) + '</td><td>' + (g ? esc(g.name) : '<span class="op">Not signed</span>') + '</td><td>' + esc(g ? g.date : '') + '</td></tr>'; });
+  const tiles = $$('#p-ov .hero .ht > div').map(d => '<div class="k"><div class="l">' + esc(d.children[0].textContent) + '</div><div class="v">' + esc(d.children[1].textContent) + '</div><div class="s">' + esc(d.children[2].textContent) + '</div></div>').join('');
+  const tie = $('#p-ov .tiebar') ? spaced($('#p-ov .tiebar')).replace(/Show the accounts.*/, '').replace(/\s*Details\s*/, ' ').trim() : '';
+  const table = (head, rows, none, cls) => '<table' + (cls ? ' class="' + cls + '"' : '') + '><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>'
+    + (rows.join('') || '<tr><td colspan="' + head.length + '" class="none">' + none + '</td></tr>') + '</tbody></table>';
+  const status = open.length ? 'Draft: ' + plural(open.length, 'item') + ' open' : 'Final';
+  const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>P&amp;L Flux, ' + esc(DATA.period) + '</title><style>'
+    + '@page{margin:14mm}body{font:12.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:#1e1e1c;margin:32px auto;max-width:1180px;padding:0 24px}'
+    + '.co{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b6a63}h1{font-size:24px;font-weight:600;margin:2px 0 6px}h2{font-size:15px;font-weight:600;margin:28px 0 8px;padding-bottom:5px;border-bottom:2px solid #3a4a5e}'
+    + '.meta{color:#6b6a63;font-size:11.5px}.st{display:inline-block;margin-left:10px;font-size:11px;font-weight:600;padding:2px 10px;border-radius:999px;vertical-align:4px;border:1px solid}'
+    + '.st.f{color:#3a4a5e;border-color:#3a4a5e;background:#eef1f5}.st.d{color:#c72e00;border-color:#c72e00}'
+    + '.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0 8px}.k{border:1px solid #d6d6d4;border-radius:6px;padding:9px 12px}.k .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#6b6a63}'
+    + '.k .v{font-size:18px;font-weight:600;margin:2px 0}.k .s{font-size:11px;color:#6b6a63}.tie{color:#3a4a5e;font-size:12px;margin:6px 0 0}'
+    + '.sum{border-left:3px solid #2e2d29;padding:2px 0 2px 14px}.sum p{margin:0 0 9px}.by{font-size:10.5px;color:#6b6a63;margin-top:2px}'
+    + 'table{border-collapse:collapse;width:100%;font-size:11.5px}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:#6b6a63;text-align:left;border-bottom:1.5px solid #2e2d29;padding:5px 7px}'
+    + 'td{border-bottom:1px solid #e3e3e0;padding:5px 7px;vertical-align:top}td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}td.m{font-family:ui-monospace,Menlo,monospace;font-size:11px;white-space:nowrap}'
+    + 'td.cm{width:42%}td.cm p{margin:0 0 4px}tr.g td{background:#f1f1ef;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}tr.t td{font-weight:600;border-top:1.5px solid #2e2d29}'
+    + 'tr.rv td:first-child{box-shadow:inset 3px 0 0 #c72e00;padding-left:10px}.op{color:#c72e00;font-style:italic}.none{color:#6b6a63;font-style:italic}'
+    + 'ul.open{margin:4px 0;padding-left:18px;color:#c72e00}.disc{margin-top:30px;font-size:10.5px;color:#6b6a63;border-top:1px solid #d6d6d4;padding-top:8px}'
+    + 'thead{display:table-header-group}tr{break-inside:avoid}h2{break-after:avoid}</style></head><body>'
+    + '<div class="co">Serif Biomedicines, Inc.</div><h1>P&amp;L Flux, ' + esc(DATA.period) + '<span class="st ' + (open.length ? 'd' : 'f') + '">' + esc(status) + '</span></h1>'
+    + '<div class="meta">Exported ' + esc(when(new Date().toISOString())) + (Shared.on() ? ' by ' + esc(who(Shared.uid())) : '') + ' &middot; run ' + esc(DATA.run) + ' &middot; console ' + esc(DATA.version)
+    + ' &middot; review threshold ' + money(thr) + '</div><div class="kp">' + tiles + '</div>' + (tie ? '<p class="tie">' + esc(tie) + '</p>' : '')
+    + (open.length ? '<h2>Open items</h2><ul class="open">' + open.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' : '')
+    + '<h2>Executive summary</h2>' + (sum ? '<div class="sum">' + para(sum.text) + '<div class="by">Saved ' + esc((sum.by ? 'by ' + sum.by + ', ' : '') + when(sum.at)) + '</div></div>' : '<p class="none">Not saved.</p>')
+    + '<h2>Actual vs. Actual, ' + esc(heads[1] || '') + ' vs. ' + esc(heads[2] || '') + '</h2>' + (tbl ? '<table><thead><tr>' + keep.map(([h, i]) => '<th' + (i ? ' class="n"' : '') + '>' + esc(h) + '</th>').join('') + '<th>Commentary</th></tr></thead><tbody>' + pl + '</tbody></table>' : '')
+    + (other.length ? '<h2>Other commentary</h2>' + table(['Page', 'Line', 'Commentary'], other, '') : '')
+    + '<h2>Adjustments</h2>' + table(['Kind', 'Adjustment', '<span class="n">Amount</span>', 'Decision', 'Note', 'Decided'], adj, 'No adjustments proposed.')
+    + '<h2>Journal Entries for the NetSuite import</h2>' + table(['External ID', 'Memo', 'Account', 'Department', 'Debit', 'Credit'], je, 'None ready.')
+    + '<h2>Sign-off</h2>' + table(['Role', 'Name', 'Date'], signs, 'No sign-off roles.')
+    + '<p class="disc">Figures, variances and proposed entries are computed from the NetSuite and Coupa exports for this run. Commentary and every decision are the reviewer’s; drafts, where used, were accepted or edited by the reviewer before they were saved.</p></body></html>';
+  download('serif-pl-flux-pack-' + DATA.slug + '.html', html, 'text/html');
+  logAdd({id: 'flux-pack', label: 'Flux pack exported', v: status, note: ''}); save();
+}
+/* The saved commentary as a sheet: every line with commentary, on every page. */
+function fluxCSV(){
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const rows = [['Page', 'Line', 'Commentary', 'Saved by', 'Saved at']];
+  $$('.page tr').forEach(tr => { const t = tr.querySelector(':scope > td > textarea[data-note]'); if (!t || !savedNote(t.dataset.note)) return;
+    const x = tr.cells[0].cloneNode(true); x.querySelectorAll('.mk,.tag').forEach(n => n.remove()); x.querySelectorAll('*').forEach(n => n.append(' '));
+    const p = tr.closest('.page'), b = p && $('.tb.pg[data-p="' + p.id.slice(2) + '"]'), f = S.fin[t.dataset.note];
+    rows.push([b ? b.textContent.replace(/\d+$/, '').trim() : '', x.textContent.replace(/\s+/g, ' ').trim(), S.notes[t.dataset.note], f.by_uid ? Shared.name(f.by_uid) : '', f.at]); });
+  if (savedNote('exec:summary')){ const f = S.fin['exec:summary']; rows.splice(1, 0, ['Executive Overview', 'Executive summary', S.notes['exec:summary'], f.by_uid ? Shared.name(f.by_uid) : '', f.at]); }
+  download('serif-pl-flux-commentary-' + DATA.slug + '.csv', rows.map(r => r.map(q).join(',')).join('\r\n'));
+}
+document.addEventListener('click', ev => { if (ev.target.closest('[data-fluxpack]')) fluxPack(); else if (ev.target.closest('[data-fluxcsv]')) fluxCSV(); });
+shapeCards(); shapeNotes(); show('ov');
 """
     pages.append(runlog(PLR, "flux", read=[("Also read", "GL Coding Review run %s and its decision record %s, saved %s" % (
         GLR["manifest"]["run_id"], hashlib.sha256(open(A.coding_record, "rb").read()).hexdigest()[:16], str(CODING_REC.get("saved_at") or "")[:16].replace("T", " ")))]
@@ -2045,6 +2427,13 @@ def coding():
         return ('<details class="lines"><summary>Lines (%d)</summary><div class="tw"><table><thead><tr><th>Date</th><th>Document</th><th>Description</th><th>Account</th><th>Department</th>'
                 '<th>Project / Program</th><th class="n2">Amount</th></tr></thead><tbody>%s</tbody></table></div>%s</details>' % (len(its), rows, ('<p class="note">%d more lines in NetSuite.</p>' % more) if more > 0 else ""))
 
+    def note_fits(vname, dv, doc):
+        """A vendor note that names some of the vendor's documents belongs on those cards
+        only; one that names none is about the vendor and goes on each of its cards."""
+        docs = {i["document"] for r in vrows if r["vendor"] == vname for i in (r.get("detail") or {}).get("items") or [] if i.get("document")}
+        named = {d for d in docs if re.search(r"(?<![\w-])" + re.escape(d) + r"(?![\w-])", txt(dv.get("note")))}
+        return not named or bool(doc and doc["document"] in named)
+
     def acts(iid, label, actions):
         return "".join('<button class="pill" data-d="%s" data-v="%s" data-label="%s">%s</button>' % (iid, v, e(label), lab) for v, lab in actions)
 
@@ -2060,7 +2449,7 @@ def coding():
         if doc:
             nsdoc.setdefault(iid, doc["type"] + " " + doc["document"])
         dv = (RAW_DRAFTS.get("vendors") or {}).get(vendor) or {}
-        if flag and dv.get("recommend") in ("clear", "question", "entry"):
+        if flag and dv.get("recommend") in ("clear", "question", "entry") and note_fits(vendor, dv, doc):
             used_ven.add(vendor)
             v_ = {"clear": "reject", "entry": "approve"}.get(dv["recommend"])
             more = draft("ven:" + iid, txt(dv.get("note")), iid, iid if v_ else None, v_,
@@ -2073,7 +2462,7 @@ def coding():
             hi = over(thr, amount if tamt is None else tamt)
         tag = ('<span class="tag hi" data-rev%s>Review</span>' % ("" if hi else " hidden") if thr else '<span class="tag hi">Review</span>' if hi else "")
         return ('<div class="item%s" data-item="%s" data-amt="%s"%s%s><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span>%s</div><div class="ib"><div class="kv">'
-                '<div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Recommended</div><div class="x">%s</div></div>'
+                '<div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Proposed recode</div><div class="x">%s</div></div>'
                 '<div><div class="l">Document / item</div><div class="x">%s%s</div></div>%s</div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="%s"%s></textarea></div></div></div>'
                 % (" hi" if hi else "", iid, round(amount or 0, 2), " data-flag" if flag else "",
                    (' data-thr="%s"' % thr + (' data-tamt="%s"' % round(tamt, 2) if tamt is not None else "")) if thr else "",
@@ -2175,9 +2564,9 @@ def coding():
     for x in drafted_entries():
         iid = sid("DR", x["memo"], x["debits"])
         je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"]), "reverses": x.get("reverses")}
-        items.append(("dept", iid, "Drafted by Claude", ", ".join(sorted({l["vendor"] for l in x["lines"] if l["vendor"]})) or x["memo"], x["memo"], x["debits"], "", ""))
+        items.append(("dept", iid, "Draft", ", ".join(sorted({l["vendor"] for l in x["lines"] if l["vendor"]})) or x["memo"], x["memo"], x["debits"], "", ""))
         dcards.append(card(iid, x["memo"] or "Drafted Journal Entry", x["debits"], x["debits"] >= thr, "&ndash;", "&ndash;", None,
-                           '<div><div class="l">Type</div><div class="x">Drafted by Claude</div></div>', e(x["support"]), "", DRAFT_ACTS, "", je_editor(iid, je[iid]["lines"]), thr="thr"))
+                           '<div><div class="l">Type</div><div class="x">Draft</div></div>', e(x["support"]), "", DRAFT_ACTS, "", je_editor(iid, je[iid]["lines"]), thr="thr"))
     ents = {x["finding_id"]: x for x in V.get("entries") or []}
     drift = [f for f in GLR["findings"] if f["rule_id"] == "T4.ITEM_ACCOUNT_DRIFT"]
     COVER = ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")
@@ -2307,7 +2696,7 @@ def coding():
     summ = "".join('<tr><td><span class="tag ink">%s</span></td><td>%s</td><td>%s</td><td>%s</td><td class="n2">%s</td><td class="mono">%s</td><td class="mono">%s</td><td><span data-sti="%s">Pending</span></td></tr>'
                    % (i[1], e(i[2]), e(i[3]), e(i[4]), money(i[5], True), e(i[6]), e(i[7]), i[1]) for i in items)
     clean_lines = sum(((r.get("detail") or {}).get("count") or 0) for r in clear)
-    hero_ = hero("GL Coding Review, " + PERIOD, "Serif Biomedicines, Inc. &middot; NetSuite Subsidiary 97", [
+    hero_ = hero("GL Coding Review, " + PERIOD, "", [
         ("Total Period Spend", money(spend), "%d vendors billed" % len(billed)),
         ("Flags Identified", str(len(flagged)), "%s &middot; %.1f%% of period spend" % (money(famt), 100 * famt / spend)
          + (" &middot; plus %s, %s" % (count(len(excepted), "accepted exception"), money(exc_amt)) if excepted else "")),
@@ -2321,8 +2710,15 @@ def coding():
                 + ("".join(flags) or none("No expense lines flagged in " + PERIOD + "."))
                 + '<h4 class="dh">Booked to %s<span class="note">%s &middot; %s</span></h4>' % (accts, count(len(booked_), "line"), money(sum(float(x.split('data-amt="')[1].split('"')[0]) for x in booked_), True))
                 + ("".join(booked_) or none("No bills posted to " + accts.lower() + " accounts in " + PERIOD + ".")))
-    pages.append(page("capex", "<h3>CapEx Flags</h3>" + two_way("Capital", cap_cards, cap_booked, "capex", "Fixed Assets")))
-    pages.append(page("prepaid", "<h3>Prepaid Flags</h3>" + two_way("Prepaid", pre_cards, pre_booked, "prepaid", "Prepaid")))
+    booked_amt = lambda b: sum(float(x.split('data-amt="')[1].split('"')[0]) for x in b)
+    def screen_hero(title, pid, kind, flags, booked_, accts):
+        return hero(title + ", " + PERIOD, "", [
+            ("Flagged", str(len(flags)), money(sum(i[5] for i in items if i[0] == kind), True) + " on expense accounts"),
+            ("Booked to " + accts, str(len(booked_)), money(booked_amt(booked_), True)),
+            ("Decided", live("done", pid), "Items on this page"),
+            ("Open", live("open", pid), live("openamt", pid) + " to decide")])
+    pages.append(page("capex", screen_hero("CapEx Flags", "capex", "capex", cap_cards, cap_booked, "Fixed Assets") + two_way("Capital", cap_cards, cap_booked, "capex", "Fixed Assets")))
+    pages.append(page("prepaid", screen_hero("Prepaid Flags", "prepaid", "prepaid", pre_cards, pre_booked, "Prepaid") + two_way("Prepaid", pre_cards, pre_booked, "prepaid", "Prepaid")))
     exc_html = ""
     issues = ([("Not applied", "the file is malformed: " + exc_run.get("error", ""))] if exc_run.get("status") == "malformed" else []) \
         + [("Rejected, line %s" % r["row"], "%s: %s" % (r["vendor"] or "no vendor", "; ".join(r["problems"]))) for r in exc_run.get("rejected") or []] \
@@ -2338,14 +2734,29 @@ def coding():
                            e(f["title"]), e(f["finding_id"]), e(f["excepted"]["vendor"]), money(f.get("amount_at_risk") or 0, True),
                            e(f["excepted"]["reason"]), e(f["excepted"]["approved_by"] + (", " + f["excepted"]["approved_on"] if f["excepted"].get("approved_on") else "")))
                                for f in excepted)))
-    pages.append(page("dept", '<h3>Dept &amp; Entity Flags <span class="note">%d items &middot; %s total</span></h3>' % (len(dcards), money(sum(i[5] for i in items if i[0] == "dept"), True))
+    pages.append(page("dept", hero("Dept &amp; Entity Flags, ".replace("&amp;", "&") + PERIOD, "", [
+                          ("Flags", str(len(dcards)), money(sum(i[5] for i in items if i[0] == "dept"), True)),
+                          ("Drafted entries", str(sum(1 for i in items if i[0] == "dept" and i[2] == "Draft")), "Journal Entries Claude drafted"),
+                          ("Decided", live("done", "dept"), "Items on this page"),
+                          ("Open", live("open", "dept"), live("openamt", "dept") + " to decide")])
                       + ('<p class="note">%s on an account other than the item\'s usual one, under %s: %s in all, not listed.</p>' % (count(len(small), "Coupa PO line"), money(thr), money(sum(f["amount_at_risk"] for f in small), True)) if small else "")
                       + "".join(dcards) + exc_html))
-    pages.append(page("clear", '<h3>Reviewed &amp; Cleared <span class="note">%d vendors &middot; %s</span></h3><div class="legend">No check flagged these vendors. '
-                      'Confirm each one, or recode it if the coding is wrong. Start with those at $2,500 or more.</div>' % (len(clear), money(sum(r["amount"] for r in clear), True)) + "".join(ccards)))
-    pages.append(page("new", '<h3>New This Period <span class="note">%d vendors &middot; first appearance in the ledger</span></h3><div class="legend">'
-                      '<span class="tag hi">Review</span>$2,500 or more<span class="tag">Routine</span>Under $2,500</div>' % len(news) + "".join(ncards)))
-    pages.append(page("audit", '<h3>Audit Log</h3><div class="card"><div class="tw"><table><thead><tr><th>Timestamp</th><th>Item</th><th>Decision</th><th>By</th><th>Detail</th></tr></thead>'
+    big = lambda rs: [r for r in rs if (r.get("amount") or 0) >= thr]
+    pages.append(page("clear", hero("Reviewed &amp; Cleared, ".replace("&amp;", "&") + PERIOD, "", [
+                          ("Vendors", str(len(clear)), money(sum(r["amount"] for r in clear), True) + ", no check flagged them"),
+                          (money(thr) + " or more", str(len(big(clear))), money(sum(r["amount"] for r in big(clear)), True) + ", start here"),
+                          ("Confirmed", live("done", "clear"), "Confirmed or recoded"),
+                          ("Open", live("open", "clear"), live("openamt", "clear") + " to confirm")])
+                      + '<div class="legend">Confirm each vendor, or recode it if the coding is wrong.</div>' + "".join(ccards)))
+    pages.append(page("new", hero("New This Period, " + PERIOD, "", [
+                          ("New vendors", str(len(news)), money(sum(r["amount"] for r in news), True) + ", first time in the ledger"),
+                          (money(thr) + " or more", str(len(big(news))), money(sum(r["amount"] for r in big(news)), True) + ", marked Review"),
+                          ("Decided", live("done", "new"), "Confirmed or recoded"),
+                          ("Open", live("open", "new"), live("openamt", "new") + " to decide")]) + "".join(ncards)))
+    pages.append(page("audit", hero("Audit Log, " + PERIOD, "", [
+                          ("Decisions", live("decs"), "Recorded on this console"),
+                          ("Notes saved", live("fins"), "Saved as finished"),
+                          ("Log entries", live("logs"), "Every change, in order")]) + '<div class="card"><div class="tw"><table><thead><tr><th>Timestamp</th><th>Item</th><th>Decision</th><th>By</th><th>Detail</th></tr></thead>'
                       '<tbody data-audit></tbody></table></div></div>'))
     srcs = "".join('<tr><td>%s</td><td class="mono" style="text-align:right">%s</td></tr>' % (e(a), e(b)) for a, b in
                    [(", ".join(i.get("roles") or ["input"]).replace("_", " ").title(), i["path"]) for i in GLR["manifest"]["inputs"]]
@@ -2363,18 +2774,25 @@ def coding():
         ("Department and account flags", str(len(dcards))), *([("Accepted exceptions", "%d items, %s" % (len(excepted), money(exc_amt, True)))] if excepted else []), ("Vendors with no flags", str(len(clear))), ("New vendors", str(len(news)))])
     sign = "".join('<div class="sign"><b>%s</b><input class="f" data-sname="%s" placeholder="Name, title"><input class="f" data-sdate="%s" placeholder="Date"><button class="pill" data-signbtn="%s">Sign</button></div>'
                    % (lab, k, k, k) for k, lab in (("prep", "Prepared by"), ("rev", "Reviewed by"), ("appr", "Approved by")))
-    pages.append(page("sox", '<h3>SOX Documentation</h3><div class="card"><div class="ch">Source Citations</div><div class="tw"><table><tbody>' + srcs + "</tbody></table></div></div>"
+    pages.append(page("sox", hero("SOX Documentation, " + PERIOD, "", [
+                          ("Sources", str(len(GLR["manifest"]["inputs"])), "Read as exported"),
+                          ("Ledger tie", ("Pass" if not TIE or TIE["passed"] else "Fail") if TIE else "Not run", "%s accounts" % TIE["accounts"] if TIE else "No Income Statement"),
+                          ("Flagged of GL", "%.1f%%" % (100 * (famt + exc_amt) / gl_6x), money(famt + exc_amt, True)),
+                          ("Sign-offs", live("signs"), "Prepared, reviewed, approved")]) + '<div class="card"><div class="ch">Source Citations</div><div class="tw"><table><tbody>' + srcs + "</tbody></table></div></div>"
                       + '<div class="card"><div class="ch">GL Tie-Out</div><div class="tw"><table><tbody>' + tie_rows + "</tbody></table></div></div>"
                       + '<div class="card"><div class="ch">Policy Application Summary</div><div class="tw"><table><tbody>' + pol_rows + "</tbody></table></div></div>"
                       + '<div class="card"><div class="ch">Management Review &amp; Sign-Off</div><div class="pad">' + sign + "</div></div>"))
-    pages.append(page("export", '<div class="card"><div class="ch">Export to NetSuite<button class="pill r" data-wpsave>Work paper, HTML</button><button class="pill solid" data-export>Export to NetSuite, CSV</button></div>'
-                      '<div class="sumline" data-fixsum></div>'
+    pages.append(page("export", hero("Export, " + PERIOD, "", [
+                          ("Agreed fixes", live("fixes"), "Approved, modified, recoded or edited"),
+                          ("In the import", live("inimport"), "Reclasses ready for the CSV"),
+                          ("Edited in NetSuite", live("nsedit"), "Fixed in NetSuite, not in the CSV")]) + '<div class="card"><div class="ch">Export to NetSuite<button class="pill r" data-wpsave>Work paper, HTML</button><button class="pill solid" data-export>Export to NetSuite, CSV</button></div>'
+                      '<div class="sumline" data-fixsum hidden></div>'
                       '<div class="tw"><table><thead><tr><th>Memo</th><th>Account</th><th>Department</th><th>Project / Program</th><th class="n2">Debit</th><th class="n2">Credit</th><th>Status</th></tr></thead><tbody data-exportrows></tbody></table></div></div>'
                       '<div class="card"><div class="ch">Edited in NetSuite<span class="r note">Fixed on the bill or Journal Entry itself; resolved, and not in the CSV</span></div>'
                       '<div class="tw"><table><thead><tr><th>Ref ID</th><th>Item</th><th>Document</th><th class="n2">Amount</th><th>Note</th><th>Decided</th></tr></thead><tbody data-nsrows></tbody></table></div></div>'))
     sections = [("Overview", [("ov", "Overview")]),
                 ("Review", [("capex", "CapEx Flags"), ("prepaid", "Prepaid Flags"), ("dept", "Dept & Entity")]),
-                ("Transparency", [("clear", "Reviewed & Cleared"), ("new", "New This Period")]),
+                ("Confirm", [("clear", "Reviewed & Cleared"), ("new", "New This Period")]),
                 ("Documentation", [("audit", "Audit Log"), ("sox", "SOX Documentation"), ("export", "Export")])]
     SKIPPED.extend("vendor note for " + k for k in (RAW_DRAFTS.get("vendors") or {}) if k not in used_ven)
     # Reference IDs: numbered by screen within the close, largest first, then by item id, so a
@@ -2448,7 +2866,7 @@ function workPaper(){
   download('serif-' + DATA.kind + '-work-paper-' + DATA.slug + '.html', html, 'text/html');
 }
 document.addEventListener('click', ev => { if (ev.target.closest('[data-wpsave]')) workPaper(); });
-show('ov');
+shapeCards(); shapeNotes(); show('ov');
 """
     pages.append(runlog(GLR, "coding"))
     return shell("Serif GL Coding Review - " + PERIOD, "GL Coding Review", sections, pages, dict(data, docs=nsdoc), js)

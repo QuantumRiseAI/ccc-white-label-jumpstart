@@ -323,7 +323,7 @@ left on it. Run log and Settings are the icons at the right.
   or the ones that differ), and the close checklist: each page, what is open on it
   and what that is worth. A line of the checklist opens its page.
 * **Review**: CapEx Flags, Prepaid Flags, and Dept & Entity.
-* **Transparency**: Reviewed & Cleared, and New This Period.
+* **Confirm**: Reviewed & Cleared, and New This Period.
 * **Documentation**: Audit Log, SOX Documentation, and Export.
 
 ### A Card
@@ -395,8 +395,14 @@ purchase, and coded as planned. A check with nothing to compare against says so 
 the two months before, no Coupa PO, no plan line) rather than passing. Confirm each vendor, or
 recode it if the coding is wrong, starting with those at $2,500 or more.
 
-A draft from Claude sits on its card with **Use this**, which copies the note and sets the
-recommended decision. Only the current month gets an entry.
+A draft from Claude sits on its card with **Accept**, which copies the note and sets the
+recommended decision (marked Recommended on its button), and **Edit**, which copies the note to change.
+A card leads with its facts, the draft and the decision; why it was flagged, the Journal Entry, the
+last three months and the lines open beneath it. A page of more than 12 cards opens folded to one
+line each, with Expand all. A page that applies a threshold shows it beside its title; click its
+value to change it, and Reset returns the default. A note
+is saved with **Save** (or Cmd+Enter) and then reads as finished text, with who saved it and when;
+until then it is marked Not saved. Edit opens it again, and Cancel brings back what was saved. Only the current month gets an entry.
 
 ### Export
 

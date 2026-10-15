@@ -251,7 +251,7 @@ section opens its pages beside its title.
     fixed-asset or prepaid accounts, to confirm or recode to expense;
   * **Dept & Entity**: department and account recodes, each with its proposed Journal Entry,
     and any Journal Entry you drafted.
-* **Transparency**: **Reviewed & Cleared**, the vendors no check flagged, and **New This
+* **Confirm**: **Reviewed & Cleared**, the vendors no check flagged, and **New This
   Period**, the vendors first seen this month. Both are grouped by department, then account;
   each vendor is confirmed, or recoded with a filled-in Journal Entry and a note. A vendor on
   Reviewed & Cleared shows which checks it passed (coded as in the two months before, account
@@ -304,9 +304,12 @@ Capital in Process and asks the Controller which account to use. Never invent on
 
 ## What You Write
 
-Your drafts go into the console, beside the items they belong to, marked "Drafted by Claude"
-with a **Use this** button, on every card of that vendor: its flags and its vendor card. Using
-it copies the note onto the card and sets the recommended decision. Nothing you write counts as reviewed until the reviewer uses it.
+Your drafts go into the console, beside the items they belong to, marked "Draft" with a sparkle
+with **Accept** and **Edit**. A vendor note that names some of the vendor's bills (by document
+number) goes on those bills' cards and the vendor card; one that names none goes on every card of
+that vendor. Name the bill when the note is about one bill. Accept copies the note onto the card and
+sets the recommended decision, which the card marks Recommended; Edit copies the note to change it.
+Nothing you write counts as reviewed until the reviewer accepts or edits it.
 
 After the three scripts run, write `drafts.json` and build the console again with it:
 
@@ -416,7 +419,7 @@ Draft an entry where the coding is wrong and no proposed entry in `views.entries
   the reason gives the in-service date or says it is not known.
 * Check that debits equal credits before you write the entry.
 
-The entry joins Dept & Entity as `SERIF-DRAFT-1` and on, marked "Drafted by Claude". Once the
+The entry joins Dept & Entity as `SERIF-DRAFT-1` and on, marked "Draft" with a sparkle. Once the
 reviewer approves it, it is in the NetSuite CSV on Export.
 
 ### 5. In the Chat

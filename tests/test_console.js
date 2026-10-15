@@ -91,6 +91,26 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     ok(await p.evaluate(id => !jeReady(id), id), k + ': a Modified entry waits for its note');
     await p.fill('[data-note="' + id + '"]', 'Department per budget owner');
     ok(await p.evaluate(id => jeReady(id), id), k + ': with a note the entry is ready');
+    // A note is written, then saved: saved, it reads as finished text; Edit and Cancel bring the saved text back.
+    ok(await p.locator('[data-fbar="' + id + '"] .uns').isVisible(), k + ': a note being written is marked Not saved');
+    await p.click('[data-finsave="' + id + '"]');
+    ok(await p.locator('[data-fin="' + id + '"]').isVisible() && await p.locator('textarea[data-note="' + id + '"]').isHidden()
+       && /Department per budget owner/.test(await p.locator('[data-fin="' + id + '"] .ft').textContent()), k + ': Save shows the note as saved text');
+    await p.reload(); await p.waitForTimeout(400); await p.evaluate(() => show(DATA.kind === 'coding' ? 'capex' : 'adj'));
+    ok(await p.locator('[data-fin="' + id + '"]').isVisible(), k + ': a saved note stays saved after a reload');
+    await p.click('[data-finedit="' + id + '"]'); await p.fill('textarea[data-note="' + id + '"]', 'Changed');
+    ok(/Changed since saved/.test(await p.locator('[data-fbar="' + id + '"] .uns').textContent()), k + ': an edit to a saved note is marked');
+    await p.click('[data-fincancel="' + id + '"]');
+    ok(await p.evaluate(id => S.notes[id] === 'Department per budget owner', id), k + ': Cancel brings the saved note back');
+    if (k === 'pl'){
+      // the flux pack: read-only, saved writing only, and says what is still open
+      await p.evaluate(() => { show('ov'); });
+      await p.fill('textarea[data-note="exec:summary"]', 'August test summary.'); await p.click('[data-finsave="exec:summary"]');
+      const [pk] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('#p-ov [data-fluxpack]')]);
+      const pack = pk ? fs.readFileSync(await pk.path(), 'utf8') : '';
+      ok(/<h2>Executive summary<\/h2><div class="sum"><p>August test summary\./.test(pack) && /Draft: \d+ items? open/.test(pack) && /Needs commentary/.test(pack) && /<h2>Sign-off<\/h2>/.test(pack) && !/<textarea|<button/.test(pack),
+         'pl: the flux pack carries the saved summary, marks lines without commentary, lists what is open, and has no fields');
+    }
     const [dl] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
     let csvText = ''; if (dl){ const f = await dl.path(); csvText = fs.readFileSync(f, 'utf8'); }
     ok(/Finance/.test(csvText) && /Department per budget owner/.test(csvText), k + ': the CSV carries the edit and the note');
@@ -104,6 +124,12 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.evaluate(() => !$$('[data-item^="DR-"] [data-v="netsuite"]').length && $$('#p-clear [data-v="netsuite"]').length > 0 && $$('#p-prepaid [data-v="netsuite"]').length > 0),
          'gl: Edited in NetSuite is offered beside each fix to a transaction, not on an entry Claude drafted');
       await p.evaluate(() => show('dept'));
+      // A page of many cards opens folded: the reviewer opens the card first.
+      ok(await p.locator('[data-item="' + ns.id + '"] [data-v="netsuite"]').isHidden(), 'gl: a long page opens with its cards folded');
+      ok(await p.evaluate(() => $('[data-c="clear"]').classList.contains('soft') && !$('[data-c="dept"]').classList.contains('soft')
+         && /^\d+$/.test($('[data-c="dept"]').textContent) && $('#p-dept .hero [data-pgs="dept:open"]').textContent === $('[data-c="dept"]').textContent),
+         'gl: Dept & Entity counts its open decisions in red and in its header; the confirmation pages count in grey');
+      await p.click('[data-item="' + ns.id + '"] > .ih');
       await p.click('[data-item="' + ns.id + '"] [data-v="netsuite"]');
       ok(await p.evaluate(n => S.dec[n].v === 'netsuite' && decided(n) && !jeLive(n) && /Edited in NetSuite/.test($('[data-item="' + n + '"] .stp').textContent)
          && !$('[data-note="' + n + '"]').hidden, ns.id), 'gl: Edited in NetSuite counts as decided, no note required, the note offered');
@@ -114,6 +140,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(!!csv3 && csv3.includes(await p.evaluate(id => DATA.je[id].id, id)) && !csv3.includes(ns.ext), 'gl: an item edited in NetSuite is absent from the CSV; the reclass is in it');
       ok(/1 item edited in NetSuite, not in the import/.test(await p.evaluate(() => $('#tip').textContent)), 'gl: the export says what was edited in NetSuite and left out');
       await p.evaluate(() => show('export'));
+      ok(await p.textContent('#p-export [data-pgs="*:nsedit"]') === '1', 'gl: the Export header counts the item edited in NetSuite');
       ok(/Edited in NetSuite: 1/.test(await p.textContent('[data-fixsum]')) && (await p.textContent('[data-nsrows]')).includes(ns.doc) && (await p.textContent('[data-nsrows]')).includes(ns.ref),
          'gl: Export counts the paths and lists the item edited in NetSuite with its document and reference ID');
       const [wp] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('[data-wpsave]')]);
@@ -169,6 +196,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     if (k === 'gl'){
       const r = await p.evaluate(() => document.querySelector('#p-clear [data-item]').dataset.item);
       await p.evaluate(() => show('clear'));
+      await p.click('[data-item="' + r + '"] > .ih b');
       await p.click('[data-item="' + r + '"] [data-v="confirm"]');
       ok(await p.locator('[data-item="' + r + '"] > .ib').isHidden(), 'gl: a confirmed vendor card folds to its name');
       await p.click('[data-item="' + r + '"] > .ih b');
@@ -221,7 +249,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       // SERIF-142: a threshold per screen. CapEx and Prepaid have their own, saved like the general one; a Department flag has none
       await p.evaluate(() => show('settings'));
       ok(JSON.stringify(await p.evaluate(() => $$('[data-thrin]').map(t => [t.dataset.thrin, t.value]))) === JSON.stringify([['thr', '2,500'], ['thr_capex', '5,000'], ['thr_prepaid', '25,000']])
-         && /Department flags have no threshold/.test(await p.textContent('#p-settings')), 'gl: Settings has the review, CapEx and Prepaid thresholds ($2,500, $5,000, $25,000); department flags have none');
+         && /Department recodes are always reviewed/.test(await p.textContent("#p-settings")), 'gl: Settings has the review, CapEx and Prepaid thresholds ($2,500, $5,000, $25,000); department flags have none');
       const marked = s => p.evaluate(s => $$(s).filter(x => { const g = x.querySelector(':scope > .ih > [data-rev]'); return x.classList.contains('hi') && g && !g.hidden; }).map(x => x.dataset.item), s);
       const over = (s, t) => p.evaluate(([s, t]) => $$(s).filter(x => Number(x.dataset.tamt || x.dataset.amt) >= t).map(x => x.dataset.item), [s, t]);
       const same = async (s, t) => { const a = await marked(s), b = await over(s, t); return a.length === b.length && a.every((x, i) => x === b[i]); };
@@ -240,6 +268,17 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await same(PF, 5000) && (await marked(PF)).length > (await over(PF, 25000)).length, 'gl: lowering the Prepaid threshold to $5,000 marks more prepaid flags (' + (await marked(PF)).length + ')');
       await p.fill('#thrcapex', '3000'); await p.fill('#thrprepaid', '10000');
       ok(await same(CAP, 3000) && (await marked(CAP)).length === 2 && await same(PRE, 10000), 'gl: changing the CapEx and Prepaid thresholds marks their screens again');
+      ok(await p.evaluate(() => $('#p-capex .thrchips [data-thrv="thr_capex"]').textContent === '$3,000' && /Default \$5,000/.test($('#p-capex [data-thrdef="thr_capex"]').textContent)
+         && $('#p-capex [data-thc="thr_capex"]').classList.contains('chg') && $('#p-prepaid [data-thrv="thr_prepaid"]').textContent === '$10,000'
+         && /Always reviewed/.test($("#p-dept .thrchips").textContent) && !$('#p-export .thrchips')),
+         'gl: each page that applies a threshold shows it by its title, marked when changed; a page with none shows none');
+      // changed where it shows: the value becomes a field, Enter keeps it, Reset goes back to the default
+      await p.evaluate(() => show('capex')); await p.click('#p-capex [data-thedit="thr_capex"]');
+      await p.fill('#p-capex input.thin', '4,000'); await p.press('#p-capex input.thin', 'Enter');
+      ok(await p.evaluate(() => S.thr_capex === 4000 && $('#thrcapex').value === '4,000'), 'gl: a threshold changed by its title is the Settings threshold');
+      await p.click('#p-capex [data-threset="thr_capex"]');
+      ok(await p.evaluate(() => thrOf('thr_capex') === 5000 && $('#p-capex [data-thrdef="thr_capex"]').hidden), 'gl: Reset returns it to the default');
+      await p.evaluate(() => { S.thr_capex = 3000; save(); refresh(); });
       await p.reload(); await p.waitForTimeout(400);
       ok(await p.evaluate(() => S.thr === 1000000 && S.thr_capex === 3000 && S.thr_prepaid === 10000 && $('#thrcapex').value === '3,000') && await same(CAP, 3000),
          'gl: the three thresholds are saved with the review and survive a reload');
@@ -258,7 +297,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       await p.evaluate(() => show('capex'));
       const cx = await p.evaluate(() => $$('#p-capex [data-flag]').map(x => { const pl = x.querySelector('[data-placed]'), nt = x.querySelector('textarea[data-note]');
         return {id: x.dataset.item, text: x.querySelector('.why').textContent, to: DATA.je[x.dataset.item].lines.find(l => Number(l.debit)).account, memo: DATA.je[x.dataset.item].memo,
-                kind: pl ? pl.dataset.placed : '', note: nt && !nt.hidden ? nt.placeholder : '', name: x.querySelector('.ih b').textContent}; }));
+                kind: pl ? pl.dataset.placed : '', note: nt && !nt.hidden ? nt.placeholder : (x.querySelector('[data-fin]:not([hidden])') ? 'saved' : ''), name: x.querySelector('.ih b').textContent}; }));
       ok(cx.length > 0 && cx.every(c => c.kind && (['buildout', 'not_in_service', 'no_account'].includes(c.kind) ? c.to === '1505000' && /Capital in Process/.test(c.memo) : /^15[1-9]\d{4}$/.test(c.to) && /in service: fixed asset/.test(c.memo))),
          'gl: every CapEx card says where it goes, Capital in Process or a fixed asset account, on the card and in its Memo');
       const rt = cx.find(c => c.name === 'Red Thread Spaces LLC') || {}, rp = cx.find(c => c.name === 'Repligen Corporation') || {};
@@ -266,7 +305,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
          'gl: the office desk expansion goes to Capital in Process as build-out work, and asks when the space is in use');
       ok(rp.kind === 'in_service' && rp.to === '1510000' && /policy places it in service at the invoice date/.test(rp.text) && /no in-service date\. Ask when it went into use/.test(rp.text) && /under the \$5,000 capitalization threshold/.test(rp.text),
          'gl: a lab purchase goes to 1510000 Lab Equipment - New, in service at the invoice date, and asks the in-service date');
-      ok(cx.every(c => c.note === 'In-service date, and a note'), 'gl: each CapEx card keeps its note open for the in-service date');
+      ok(cx.every(c => c.note === 'In-service date, and a note' || c.note === 'saved'), 'gl: each CapEx card keeps its note open for the in-service date, or shows it saved');
     }
     if (k === 'pl'){
       // a variance row proposes an entry: the row's account, an offset to fill, the memo from the review; it joins the same CSV

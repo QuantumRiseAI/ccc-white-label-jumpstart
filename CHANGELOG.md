@@ -37,6 +37,58 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## Unreleased: consoles that lead with the decision
+
+- **A grey-blue for actions**: `--color-action` (#3a4a5e) marks the primary action (Save, Accept, the
+  export), AI drafts and their recommendation, and focused fields; red stays for what needs review and
+  dark ink for saved text.
+- **Drafts**: a draft reads full width under a sparkle and "Draft" (was "Drafted by Claude") with its recommendation,
+  **Accept** (the note and the decision) and **Edit** (the note, to change). The empty note box waits
+  behind a draft until Edit. In a table a long draft shows four lines, with Show all; a note box
+  grows to its text.
+- **Cards**: the facts, the draft and the decision first, the recommended decision marked
+  Recommended. Why it was flagged (when there is a draft), the Journal Entry, the last three months
+  and the lines fold into one list beneath. Approving, modifying, recoding or editing in NetSuite
+  opens the Journal Entry. A folded card's header carries Claude's recommendation.
+- **One look for every page**: every page of both consoles opens with the dark header and its own
+  figures, kept current as decisions are made (CapEx and Prepaid: flagged, booked, decided, open;
+  Dept & Entity, Reviewed & Cleared, New This Period, Audit Log, SOX Documentation, Export, Run Log);
+  Settings has a compact one.
+- **Badges**: a nav count is red for decisions due, grey on the confirmation pages (Reviewed & Cleared,
+  New This Period), and a check once a page has nothing open. "Transparency" is now "Confirm".
+- **One status per card**: a single pill (Review while it waits and is marked for review, Pending under
+  the threshold, then the decision) replaces the status text and the Review tag.
+- **The tie, one line**: a tie that passes reads as one line with its details on click; one that fails
+  stays expanded. The YoY Net Loss tile shows last year's figure. The Run Log lists every GL file read.
+- **Dept & Entity thresholds named for what they mark**: "Account recodes $2,500" and "Department
+  recodes, Always reviewed", in place of a review threshold beside "no threshold".
+- **Thresholds by the title**: each page that applies a threshold shows it as a chip beside its title
+  (Review on the flux pages; CapEx, Prepaid and Review on the coding pages, and that department flags
+  have none), with what it marks on hover. The value is changed in place, and a changed value shows its
+  default with Reset; it is the same threshold as in Settings.
+- **The flux pack**: Export flux pack, on the Executive Summary and Management Sign-Off, writes a
+  read-only HTML pack: status (Final, or Draft with its open items), the headline figures and the tie,
+  the saved executive summary, Actual vs. Actual with each line's saved commentary (a line at or over
+  the threshold without it reads Needs commentary), saved commentary from the other pages, the
+  adjustments and their decisions, the Journal Entries ready for the import, and the sign-offs.
+  Commentary, CSV writes every saved commentary with who saved it and when.
+- **Line summaries as drafts**: a line's computed summary (the move, its vendors, "no plan line") is a
+  Draft in the same box as Claude's, with Accept and Edit; where Claude's draft sits on the line it
+  stands in for the summary. Lines with no vendor read "Journals, no vendor", not "(blank)".
+  The GL Coding Review title drops its subsidiary line.
+- **Saved notes**: commentary, the executive summary and every card note are saved with Save (or
+  Cmd+Enter) and then read as finished text, with who saved them and when; until then they are marked
+  Not saved, and an edit to a saved note is marked Changed since saved. Edit opens a saved note again,
+  Cancel brings back what was saved, and Accept on a draft saves it. Saved notes travel in the decision
+  record and the shared review (`fin`), and a line's commentary counts as written once it is saved.
+- **Long pages**: a page of more than 12 cards (Dept & Entity's 172 in Sep 2026) opens folded to one
+  line each, with Expand all and Collapse all; a confirmed card still folds.
+- **Vendor notes on the right cards**: a note that names some of the vendor's bills goes on those
+  bills' cards only; in Sep 2026 that took 29 notes off cards for other bills.
+- **P&L Flux overview**: the executive summary follows the tie, ahead of the cards and the bridge; the
+  cash tile is left out without a Balance Sheet report. The coding card's "Recommended" column is now
+  "Proposed recode", so it no longer reads as Claude's recommendation.
+
 ## Unreleased: a September run as the Projects run it
 
 - **Either Income Statement file**: `tie`, `--income-statement` on `build_pages.py` and the

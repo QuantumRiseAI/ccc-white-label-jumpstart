@@ -33,6 +33,7 @@ const num = s => Number(String(s).replace(/[^0-9.\-]/g, '')) * (/\(/.test(s) ? -
     ok(!!draftId, 'the drafted entry is a card in the coding console, its Memo led by its reference ID');
     const approve = [fac[0], fac[1], syn[0], draftId], reject = syn[1], heldId = syn[2];
     await p.evaluate(() => show('dept'));
+    await p.click('#p-dept [data-foldall="0"]');   // the page opens folded; Expand all opens every card
     for (const id of approve) await p.click('[data-item="' + id + '"] [data-v="approve"]');
     await p.click('[data-item="' + reject + '"] [data-v="reject"]');
     await p.click('[data-item="' + heldId + '"] [data-v="modify"]');          // no note: not decided
@@ -61,7 +62,7 @@ const num = s => Number(String(s).replace(/[^0-9.\-]/g, '')) * (/\(/.test(s) ? -
 
     const open = async f => { const q = await b.newPage(); await q.goto('file://' + f); await q.evaluate(() => show('ava')); return q; };
     const row = (q, a) => q.evaluate(a => { const t = [...document.querySelectorAll('#p-ava [data-pane="mom"] tr[data-var]')].find(x => x.querySelector('.code').textContent === a);
-      return t && {v: Number(t.dataset.var), cells: [...t.cells].map(c => c.innerText.replace(/\s+/g, ' ').trim()), note: (t.querySelector('.cm .note') || {}).innerText || '', cm: t.querySelector('.cm').innerText}; }, a);
+      return t && {v: Number(t.dataset.var), cells: [...t.cells].map(c => c.innerText.replace(/\s+/g, ' ').trim()), note: (t.querySelector('.cm .note') || t.querySelector('.draft.auto .dt') || {}).textContent || '', cm: (t.querySelector('.cm') || t.querySelector('.draft.auto .dt')).textContent}; }, a);   // the line's summary, an Auto Draft
     const q = await open(w.out), f = await row(q, '6607000'), s = await row(q, '6501100');
     // cells: account, actual, prior, reported $ var, corrections, adjusted $ var, adjusted % var, 3-mo, 6-mo, commentary
     ok(f.cells.length === 10 && num(f.cells[3]) < 0 && num(f.cells[4]) > 0, 'Facility Repairs: reported rise, and a correction signed like $ Var (favorable)');

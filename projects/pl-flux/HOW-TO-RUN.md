@@ -343,8 +343,8 @@ left on it. Run log and Settings are the icons at the right.
 * **Executive Overview**: total operating expense, net loss, cash and headcount, the tie to
   NetSuite's Income Statement (every account for the month and the month before, or the ones
   that differ), the cards,
-  the net loss bridge from the prior month (hover a bar for its figures), the executive
-  summary Claude drafts (**Use this**, then edit it in place), and the close
+  the executive summary Claude drafts (**Accept**, or **Edit** to change it), the net loss
+  bridge from the prior month (hover a bar for its figures), and the close
   checklist: each page, what is open on it and what that is worth. A line of the checklist
   opens its page.
 * **Analysis**: Actual vs. Actual (MoM, with a YoY tab), Actual vs. Budget, By Department
@@ -356,7 +356,18 @@ left on it. Run log and Settings are the icons at the right.
 Commentary is the deliverable. A line at or over the threshold is marked Review and needs
 commentary; the close checklist counts it open until it has some. Actual vs. Actual, Actual
 vs. Budget, By Department and Balance Sheet Flux each take commentary on their lines. A draft
-from Claude sits on its line with **Use this**, which copies it into the field.
+from Claude sits on its line with **Accept**, which copies it into the field, and **Edit**, which
+copies it to change; a long draft shows its first lines, with Show all. Written commentary, the
+summary and every note are saved with **Save** (or Cmd+Enter) and then read as finished text, with
+who saved them and when; until then they are marked Not saved. Edit opens a saved note again, and
+Cancel brings back what was saved. A line's commentary counts as written once it is saved. The review threshold shows beside the
+title of each page that applies it; click its value to change it, and Reset returns the default.
+
+**Export flux pack**, on the Executive Summary and Management Sign-Off, saves the close as a read-only
+HTML file to hand on: Final, or Draft with what is still open; the saved executive summary; Actual vs.
+Actual with each line's saved commentary; the adjustments and their decisions; the Journal Entries
+for the import; and the sign-offs. Only saved writing goes in. **Commentary, CSV** saves the
+commentary alone, for Excel.
 
 Actual vs. Actual (MoM) also shows each account's average over the 3 and 6 months before.
 By Department ends with **Credits in Expense Accounts**: every account and department whose
