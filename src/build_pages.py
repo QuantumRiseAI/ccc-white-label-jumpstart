@@ -380,7 +380,7 @@ def service_end(text):
         if 1 <= mo <= 12:
             return (y + 2000 if y < 100 else y, mo)
     mon = r"([A-Za-z]{3,9})\.?(?:\s+\d{1,2},?)?"
-    for m in re.finditer(r"\b%s\s*(\d{4})?\s*[-–]\s*%s\s*(\d{4})\b" % (mon, mon), t):
+    for m in re.finditer(r"(?=\b%s\s*(\d{4})?\s*[-–]\s*%s\s*(\d{4})\b)" % (mon, mon), t):   # overlapping: 'License - May 2026 - Apr 2027'
         if m.group(1).lower() in MONTHS and m.group(3).lower() in MONTHS:
             return (int(m.group(4)), MONTHS[m.group(3).lower()])
     return None
@@ -453,7 +453,10 @@ def review_breakdown(bill, bd, thr_capex, thr_prepaid, period):
             to = leaf.get(name.lower())
             if to and acct and to != acct and re.search(r"\b(%s)\b" % pat, text, re.I):
                 flags.append(("account", "%s cost on %s %s: belongs on %s %s" % (name, acct, acct_name(acct), to, acct_name(to))))
-                reclass[(acct, b["department"], to)] += l["amount"]
+                # an activity booked across departments moves in the shares it was booked
+                same = [x for x in bl if x["account_code"] == acct]; tot = sum(x["amount"] for x in same) or 1
+                for x in same:
+                    reclass[(acct, x["department"], to)] += l["amount"] * x["amount"] / tot
                 break                                                   # one account per item
         items.append(dict(l, serif=acct, flags=flags, future=future, end=end))
     eq = [i for i in items if "equipment" in (groups[i["acct_no"]]["acct_name"] + " " + " ".join(x.get("account_leaf") or "" for x in groups[i["acct_no"]]["booked"] or [])).lower()]
@@ -1058,9 +1061,11 @@ const KEY = 'serif-console::' + DATA.kind + '::' + DATA.run;
 const STORES = ['dec', 'notes', 'fin', 'je', 'jh', 'ck', 'sign', 'log'];
 const refOf = id => (DATA.ref || {})[id] || '';
 let S = {dec: {}, notes: {}, fin: {}, sign: {}, ck: {}, je: {}, jh: {}, log: {}, thr: DATA.thr};
-try { S = Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
-// Notes written before notes were saved have no saved mark: they count as saved, as written.
-Object.keys(S.notes || {}).forEach(k => { if (String(S.notes[k] || '').trim() && !(S.fin || {})[k]) S.fin[k] = {text: String(S.notes[k]), at: '', by_uid: null}; });
+let hadFin = true;
+try { const kept = JSON.parse(localStorage.getItem(KEY) || '{}'); hadFin = 'fin' in kept || !Object.keys(kept.notes || {}).length; S = Object.assign(S, kept); } catch (e) {}
+// Notes written before notes were saved count as saved, once: a review kept from before the
+// saved store existed. A note typed and not saved since stays unsaved.
+if (!hadFin) Object.keys(S.notes || {}).forEach(k => { if (String(S.notes[k] || '').trim() && !S.fin[k]) S.fin[k] = {text: String(S.notes[k]), at: '', by_uid: null}; });
 if (Array.isArray(S.log)){ const o = {}; S.log.forEach((l, i) => { o[String(l.at).replace(/[^0-9]/g, '') + i] = l; }); S.log = o; }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money = v => v == null ? '–' : (v < 0 ? '($' : '$') + Math.abs(Math.round(v)).toLocaleString('en-US') + (v < 0 ? ')' : '');
@@ -1638,10 +1643,11 @@ function download(name, text, type){
   const blob = new Blob([(type ? '' : '\ufeff') + text], {type: type || 'text/csv;charset=utf-8'});
   const go = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0); };
-  if (!(window.claude && typeof window.claude.use === 'function')){ go(); return Promise.resolve(); }
-  return window.claude.use('downloads').then(dl => { if (!dl){ go(); return; }
-    return dl.save({filename: name, data: blob}).catch(e => { const c = (e && e.code) || '';
-      toast(c === 'declined' ? 'Not saved' : c === 'rate_limited' ? 'A save is already waiting for an answer' : 'Files cannot be saved from this page here'); }); }).catch(go);
+  if (!(window.claude && typeof window.claude.use === 'function')){ go(); return Promise.resolve(true); }
+  return window.claude.use('downloads').then(dl => { if (!dl){ go(); return true; }
+    return dl.save({filename: name, data: blob}).then(() => true, e => { const c = (e && e.code) || '';
+      toast(c === 'declined' ? 'Not saved' : c === 'rate_limited' ? 'A save is already waiting for an answer' : 'Files cannot be saved from this page here'); return false; }); })
+    .catch(() => { go(); return true; });
 }
 const csv = rows => rows.map(r => r.map(c => { const s = String(c == null ? '' : c); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\n');
 /* Proposed Journal Entries: filled in from the run, edited in place. An edit
@@ -1726,8 +1732,9 @@ function exportCSV(){
   if (rows.length === 1){ alertBox(said ? said + '.' : 'Approve an entry first: only approved entries go into the import.'); return; }
   if (said) alertBox(said + '.');
   const name = 'serif-' + DATA.kind + '-netsuite-' + DATA.slug + '.csv';
-  download(name, csv(rows)).then(() => download(name.replace(/\.csv$/, '-support.html'), importSupport(name), 'text/html'));
-  logAdd({id: 'netsuite-import', label: 'NetSuite import exported', v: plural(Object.keys(DATA.je).filter(jeReady).length, 'entry'), note: ''}); save();
+  download(name, csv(rows)).then(ok => { if (!ok) return;
+    download(name.replace(/\.csv$/, '-support.html'), importSupport(name), 'text/html');
+    logAdd({id: 'netsuite-import', label: 'NetSuite import exported', v: plural(Object.keys(DATA.je).filter(jeReady).length, 'entry'), note: ''}); save(); });
 }
 /* The import's support, to attach in NetSuite with the CSV: every entry in it, by External ID,
    with why it is booked, who approved it and when, and its lines. */
@@ -2551,7 +2558,7 @@ function fluxPack(){
     pl += '<tr class="' + (rev ? 'rv' : '') + (tr.classList.contains('tot') ? ' t' : '') + '">' + keep.map(([h, i]) => '<td' + (i ? ' class="n"' : '') + '>' + esc(i ? (tr.cells[i] || {}).textContent || '' : clean(tr.cells[0])) + '</td>').join('')
       + '<td class="cm">' + (c ? para(c.text) + '<div class="by">' + esc((c.by ? c.by + ', ' : '') + when(c.at)) + '</div>' : '')
       + (rev && !(k && explained(k)) ? '<span class="op">' + (c ? 'Says what moved, not why: needs commentary' : 'Needs commentary') + '</span>' : '') + '</td></tr>'; });
-  if (missing) open.push(plural(missing, 'line') + ' at or over ' + money(thr) + ' without saved commentary that explains the move.');
+  if (missing) open.push(plural(missing, 'line') + ' at or over ' + money(thr) + (pctThr() ? ' and ' + pctThr() + '%' : '') + ' without saved commentary that explains the move.');
   // saved commentary on the other pages
   const other = $$('.page tr').filter(tr => !tr.closest('#p-ava [data-pane="mom"]') && tr.querySelector(':scope > td > textarea[data-note]')).map(tr => {
     const k = tr.querySelector(':scope > td > textarea[data-note]').dataset.note, c = saved(k); if (!c) return '';
@@ -2885,9 +2892,13 @@ def coding():
         for l in by_period.get(m, []):
             if l["account_code"] in PAIR and norm(l.get("description")):
                 seen[(l.get("vendor_or_name") or "", norm(l["description"]))][l["account_code"]] += abs(l["amount"])
+    # A line another Dept & Entity entry already moves is left to that entry.
+    moved = {(d, l.get("account")) for f in dfind for l in (ents.get(f["finding_id"]) or {}).get("lines", []) for d in (l.get("documents") or [])}
     flips = defaultdict(list)
     for l in by_period.get(PERIOD, []):
         k = (l.get("vendor_or_name") or "", norm(l.get("description")))
+        if (l["document_number"], l["account_code"]) in moved:
+            continue
         if l["account_code"] in PAIR and k[1] and seen.get(k) and l["account_code"] not in seen[k]:
             flips[k].append(l)
     for (vname, _), ls in sorted(flips.items(), key=lambda kv: -sum(abs(l["amount"]) for l in kv[1])):
@@ -2899,8 +2910,9 @@ def coding():
             by_dept[l.get("department") or ""] += l["amount"]
         src = {"project": ls[0].get("project"), "program": ls[0].get("program")}
         je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": ls[0].get("date") or "", "memo": "Recode %s %s from %s to %s, as billed before" % (vname, ls[0]["description"][:40], now, before),
-                   "lines": je_lines([x for d, v in sorted(by_dept.items()) for x in ({"account": before, "department": d, "debit": round(v, 2)},
-                                                                                    {"account": now, "department": d, "credit": round(v, 2), "reverses_line": True})], src)}
+                   "lines": je_lines([x for d, v in sorted(by_dept.items()) if round(v, 2)
+                                      for x in ({"account": before, "department": d, ("debit" if v > 0 else "credit"): round(abs(v), 2)},
+                                                {"account": now, "department": d, ("credit" if v > 0 else "debit"): round(abs(v), 2), "reverses_line": True})], src)}
         doc = {"type": ls[0].get("txn_type") or "Bill", "document": ls[0]["document_number"], "text": ls[0]["description"], "date": ls[0].get("date") or ""}
         prior_amt = seen[(vname, norm(ls[0]["description"]))][before]
         why = ("%s billed %s to %s %s this month, %s across %s. In the six months before, the same item went to %s %s (%s). "

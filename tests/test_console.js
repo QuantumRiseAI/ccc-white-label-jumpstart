@@ -112,6 +112,12 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     ok(await p.evaluate(() => !/\u2713/.test(($('[data-checklist]') || {textContent: ''}).textContent)), k + ': page names in the checklist carry no badge');
     if (k === 'gl') ok(await p.evaluate(() => $$('#p-new .item').filter(x => /Routine/.test((x.querySelector('.ih .tag') || {}).textContent || '')).every(x => !x.querySelector('.stp').classList.contains('rv'))),
        'gl: a Routine item reads Pending, not Review');
+    if (k === 'pl'){
+      const nk = await p.evaluate(() => { const t = $('#p-ava [data-pane="mom"] textarea[data-note]'); S.notes[t.dataset.note] = 'Typed, not saved'; save(); return t.dataset.note; });
+      await p.reload(); await p.waitForTimeout(400);
+      ok(await p.evaluate(k => S.notes[k] === 'Typed, not saved' && !savedNote(k), nk), 'pl: a note typed and not saved stays unsaved after a reload');
+      await p.evaluate(k => { delete S.notes[k]; save(); refresh(); }, nk);
+    }
     if (k === 'pl') ok(await p.evaluate(() => { const n0 = $$('#p-ava [data-pane="mom"] tr[data-var]').filter(overThr).length;
         S.thr_pct = 1000; refresh(); const n1 = $$('#p-ava [data-pane="mom"] tr[data-var]').filter(overThr).length, chip = $('#p-ava [data-thrv="thr"]').textContent;
         delete S.thr_pct; save(); refresh(); return n1 < n0 && /and 1000%/.test(chip) && $$('#p-ava [data-pane="mom"] tr[data-var]').filter(overThr).length === n0; }),
