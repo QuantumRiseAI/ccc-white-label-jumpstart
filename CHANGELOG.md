@@ -50,6 +50,9 @@ serif-pl-flux-aug2026-v1.8.2.html
   Recommended. Why it was flagged (when there is a draft), the Journal Entry, the last three months
   and the lines fold into one list beneath. Approving, modifying, recoding or editing in NetSuite
   opens the Journal Entry. A folded card's header carries Claude's recommendation.
+- **Thresholds on the page**: each page that applies a threshold names it at its top with its value
+  now and what it marks (Review on the flux pages; CapEx, Prepaid and Review on the coding pages, and
+  that department flags have none), marked when it differs from the default, with a link to Settings.
 - **Saved notes**: commentary, the executive summary and every card note are saved with Save (or
   Cmd+Enter) and then read as finished text, with who saved them and when; until then they are marked
   Not saved, and an edit to a saved note is marked Changed since saved. Edit opens a saved note again,

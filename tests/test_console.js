@@ -255,6 +255,9 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await same(PF, 5000) && (await marked(PF)).length > (await over(PF, 25000)).length, 'gl: lowering the Prepaid threshold to $5,000 marks more prepaid flags (' + (await marked(PF)).length + ')');
       await p.fill('#thrcapex', '3000'); await p.fill('#thrprepaid', '10000');
       ok(await same(CAP, 3000) && (await marked(CAP)).length === 2 && await same(PRE, 10000), 'gl: changing the CapEx and Prepaid thresholds marks their screens again');
+      ok(await p.evaluate(() => /CapEx threshold \$3,000:/.test($('#p-capex .thrbar').textContent) && /changed from the default, \$5,000/.test($('#p-capex .thrbar').textContent)
+         && /Prepaid threshold \$10,000:/.test($('#p-prepaid .thrbar').textContent) && /no threshold/.test($('#p-dept .thrbar').textContent) && !$('#p-export .thrbar')),
+         'gl: each page that applies a threshold shows it at its top, marked when changed; a page with none shows none');
       await p.reload(); await p.waitForTimeout(400);
       ok(await p.evaluate(() => S.thr === 1000000 && S.thr_capex === 3000 && S.thr_prepaid === 10000 && $('#thrcapex').value === '3,000') && await same(CAP, 3000),
          'gl: the three thresholds are saved with the review and survive a reload');

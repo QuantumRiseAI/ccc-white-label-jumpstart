@@ -583,6 +583,13 @@ td .draft.open .dt{display:block}
 .ih .dchip{font-size:var(--text--2);color:var(--color-action);background-color:var(--color-action-tint);border:1px solid var(--color-action-tint);border-radius:var(--radius-pill);padding:.1em .6em}
 .foldall{display:flex;gap:var(--spacing-xs);align-items:center;margin:0 0 var(--spacing-xs);font-size:var(--text--1);color:var(--color-fg-secondary)}
 .foldall .lk{margin-left:0;font-size:var(--text--1)}
+.thrbar{display:flex;flex-wrap:wrap;align-items:baseline;gap:.35em var(--spacing-sm);margin:0 0 var(--spacing-sm);padding:.55em .9em;
+  font-size:var(--text--1);color:var(--color-fg-secondary);background-color:var(--color-stark);border-radius:var(--radius-xs);
+  border-left:3px solid var(--color-action)}
+.thrbar b{color:var(--color-fg-primary);font-weight:600}
+.thrbar [data-thrv]{color:var(--color-action);font-variant-numeric:tabular-nums}
+.thrbar .def{color:var(--color-red-text)}
+.thrbar .lk{margin-left:auto;font-size:var(--text--1)}
 .fin{border-left:3px solid var(--color-dark-gray);padding:.2em 0 .2em .8em;margin:.3em 0 .5em}
 .fin .ft{white-space:pre-line;line-height:1.5;color:var(--color-fg-primary)}
 .esum .fin .ft{font-size:var(--text-0);line-height:1.5}
@@ -1289,7 +1296,36 @@ function shapeCards(){
     bar.innerHTML = '<span>' + its.length + ' items, folded to one line each.</span><button class="lk" data-foldall="0">Expand all</button><button class="lk" data-foldall="1">Collapse all</button>';
     its[0].parentNode.insertBefore(bar, its[0]); });
   Object.keys(S.dec || {}).forEach(openJE);
+  shapeThresholds();
 }
+/* thresholds: each page that applies one says so at its top, with its value now */
+const THR_TXT = {
+  thr: DATA.kind === 'coding' ? ['Review threshold', 'account recodes and drafted entries at or over it are marked Review']
+                              : ['Review threshold', 'a line whose change is at or over it is marked Review and needs commentary'],
+  thr_capex: ['CapEx threshold', 'a purchase at or over it is marked Review as a possible capital asset'],
+  thr_prepaid: ['Prepaid threshold', 'a charge at or over it that covers future months is marked Review'],
+  all: ['Department flags', 'no threshold: every one is marked Review, whatever its size']};
+function shapeThresholds(){
+  $$('.page').forEach(pg => { if (pg.id === 'p-settings') return;
+    const keys = [];
+    pg.querySelectorAll('.item[data-thr]').forEach(x => { if (keys.indexOf(x.dataset.thr) < 0) keys.push(x.dataset.thr); });
+    if (pg.querySelector('tr[data-var], [data-cm]') && keys.indexOf('thr') < 0) keys.unshift('thr');
+    if (!keys.length) return;
+    keys.sort((a, b) => (a === 'all') - (b === 'all'));
+    const bar = document.createElement('div'); bar.className = 'thrbar';
+    bar.innerHTML = keys.map(k => '<span class="t"><b>' + THR_TXT[k][0] + (k === 'all' ? '' : ' <span data-thrv="' + k + '"></span>') + ':</b> '
+      + THR_TXT[k][1] + (k === 'all' ? '' : '<span class="def" data-thrdef="' + k + '"></span>') + '</span>').join('')
+      + '<button class="lk" data-goset>Change in Settings</button>';
+    const hero = pg.querySelector(':scope > .hero'), head = pg.querySelector('.dh');
+    if (hero) hero.after(bar); else if (head) head.after(bar); else pg.prepend(bar); });
+}
+function paintThresholds(){
+  $$('[data-thrv]').forEach(x => { x.textContent = money(thrOf(x.dataset.thrv)); });
+  $$('[data-thrdef]').forEach(x => { const k = x.dataset.thrdef, d = Number(DATA[k]) || DATA.thr, v = thrOf(k);
+    x.textContent = v !== d ? ' (changed from the default, ' + money(d) + ')' : ''; });
+  $$('.thrbar').forEach(b => b.classList.toggle('chg', !!b.querySelector('[data-thrdef]:not(:empty)')));
+}
+document.addEventListener('click', ev => { if (ev.target.closest('[data-goset]')) show('settings'); });
 document.addEventListener('click', ev => {
   const ed = ev.target.closest('[data-edit]');
   if (ed){ if (blocked()) return; const d = DATA.drafts[ed.dataset.edit]; S.notes[d.target] = S.notes[d.target] || d.note; EDIT.add(d.target); save(); refresh();
@@ -1438,6 +1474,7 @@ function marks(){
   $$('.item[data-thr]').forEach(x => { const k = x.dataset.thr, hi = k === 'all' || Number(x.dataset.tamt || x.dataset.amt) >= thrOf(k);
     x.classList.toggle('hi', hi); const g = x.querySelector(':scope > .ih > [data-rev]'); if (g) g.hidden = !hi; });
   $$('[data-thrin]').forEach(t => { if (document.activeElement !== t) t.value = thrOf(t.dataset.thrin).toLocaleString('en-US'); });
+  if (typeof paintThresholds === 'function') paintThresholds();
   const thr = S.thr || DATA.thr;
   $$('tr[data-var]').forEach(tr => { const a = Math.abs(Number(tr.dataset.var) || 0);
     const k = a >= thr ? 'rev' : 'ok';
