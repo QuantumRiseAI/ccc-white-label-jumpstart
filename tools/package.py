@@ -23,6 +23,9 @@ SHARED = ["WHEN-DATA-BREAKS.md", "CONNECT-NETSUITE.md", "serif-accounts-and-depa
 TEMPLATES = ["accruals_log.csv", "coupa_dept_code_mapping.csv", "fixed_asset_register.csv",
              "hris_headcount.csv", "open_purchase_commitments.csv", "payroll_register.csv",
              "prepaid_amortization_schedule.csv"]
+# NetSuite's lists, for internal IDs in the import CSV. Serif's data, so they stay out of the repo:
+# read from inputs/reference/ (the OneDrive folder) when it is there, and said when it is not.
+NSREF = ["netsuite_ref_accounts.csv", "netsuite_ref_departments.csv", "netsuite_ref_programs.csv"]
 PROJECTS = {
     "gl-coding-review": {
         "scripts": ["serif_uc1_engine.py"] + SCRIPTS,
@@ -50,6 +53,11 @@ def package(name, spec, dist):
     missing = [f for f in files if not os.path.isfile(f)]
     if missing:
         sys.exit("Missing: " + ", ".join(os.path.relpath(f, ROOT) for f in missing))
+    ref = [os.path.join(ROOT, "inputs", "reference", f) for f in NSREF]
+    if all(os.path.isfile(f) for f in ref):
+        files += ref
+    else:
+        print("%s: NetSuite's lists not in inputs/reference/; add them to the Project by hand" % name)
     for f in files:
         shutil.copy2(f, out)
         os.chmod(os.path.join(out, os.path.basename(f)), 0o644)
