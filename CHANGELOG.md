@@ -39,7 +39,10 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ## Unreleased: consoles that lead with the decision
 
-- **Claude's drafts**: a draft reads full width under "Drafted by Claude" with its recommendation,
+- **A grey-blue for actions**: `--color-action` (#3a4a5e) marks the primary action (Save, Accept, the
+  export), AI drafts and their recommendation, and focused fields; red stays for what needs review and
+  dark ink for saved text.
+- **AI drafts**: a draft reads full width under "AI Draft" (was "Drafted by Claude") with its recommendation,
   **Accept** (the note and the decision) and **Edit** (the note, to change). The empty note box waits
   behind a draft until Edit. In a table a long draft shows four lines, with Show all; a note box
   grows to its text.

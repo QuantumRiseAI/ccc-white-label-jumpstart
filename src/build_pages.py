@@ -320,7 +320,7 @@ def draft(key, note, target, item=None, v=None, label=""):
     the reviewer uses it, which copies it into the note (and the decision)."""
     DRAFTS[key] = {"note": note, "target": target, "item": item, "v": v}
     # Accept takes the draft as written (and its decision); Edit puts it in the note to change.
-    return ('<div class="draft" data-draft="%s"><div class="dhd"><span class="who">Drafted by Claude</span>%s<span class="dacts">'
+    return ('<div class="draft" data-draft="%s"><div class="dhd"><span class="who">AI Draft</span>%s<span class="dacts">'
             '<button class="pill sm solid" data-use="%s">Accept</button><button class="pill sm" data-edit="%s">Edit</button></span></div>'
             '<div class="dt">%s</div><button class="lk more" data-dmore hidden>Show all</button></div>'
             % (e(key), ('<b class="rec">' + e(label) + "</b>") if label else "", e(key), e(key), e(note)))
@@ -338,7 +338,7 @@ def drafted_entries(fids_ok=None):
         if not lines or abs(dr - cr) >= 0.005 or not all(l["account"] for l in lines):
             SKIPPED.append("Journal Entry %d (%s): does not balance or has a line with no account" % (i, txt(x.get("memo"))[:60]))
             continue
-        out.append({"entry_id": "SERIF-DRAFT-%d" % i, "finding_id": "draft-%d" % i, "kind": "Drafted by Claude", "date": txt(x.get("date")),
+        out.append({"entry_id": "SERIF-DRAFT-%d" % i, "finding_id": "draft-%d" % i, "kind": "AI Draft", "date": txt(x.get("date")),
                     "memo": txt(x.get("memo")), "reverses": txt(x.get("reverses")), "support": txt(x.get("reason")), "lines": lines, "debits": dr, "credits": cr})
     return out
 
@@ -493,11 +493,13 @@ tr.crit td:first-child,tr.mat td:first-child{padding-left:1.1em}
 .unf{color:var(--color-red-text)}
 .cm{color:var(--color-fg-primary);line-height:1.45;margin-bottom:.35em}
 textarea.c{width:100%;min-height:2.1em;resize:vertical;border:1px solid var(--color-hairline);border-radius:var(--radius-xs);padding:.35em .5em;font-size:var(--text--1);background:none}
-textarea.c:focus,input.f:focus{outline:2px solid var(--color-vivid);outline-offset:1px}
+:root{--color-action:#3a4a5e;--color-action-hover:#2c3948;--color-action-tint:#eef1f5}
+textarea.c:focus,input.f:focus{outline:2px solid var(--color-action);outline-offset:1px}
 input.f{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);padding:.4em .55em;font-size:var(--text--1);background:none}
 .pill{display:inline-flex;align-items:center;gap:.35em;border:1px solid var(--color-dark-gray);border-radius:var(--radius-pill);padding:.4em 1em;
   background:none;cursor:pointer;font-size:var(--text--1);white-space:nowrap}
-.pill.solid{background-color:var(--color-dark-gray);color:#fff}
+.pill.solid{background-color:var(--color-action);border-color:var(--color-action);color:#fff}
+.pill.solid:hover{background-color:var(--color-action-hover)}
 .pill.on{background-color:var(--color-dark-gray);color:#fff}
 .pill:disabled{opacity:.4;cursor:default}
 .tag{display:inline-block;font-size:var(--text--2);font-weight:600;letter-spacing:.03em;text-transform:uppercase;border-radius:var(--radius-xs);
@@ -551,10 +553,10 @@ tr.jr > td{padding:.4em .8em}
 .jee input.num{text-align:right;font-variant-numeric:tabular-nums;max-width:12ch}
 .jee .jh [data-jebal]{text-transform:none;letter-spacing:0}
 .jee.edited{border-color:var(--color-dark-gray)}
-.draft{border:1px solid var(--color-hairline);border-left:3px solid var(--color-dark-gray);border-radius:var(--radius-xs);background-color:var(--color-stark);
+.draft{border:1px solid var(--color-hairline);border-left:3px solid var(--color-action);border-radius:var(--radius-xs);background-color:var(--color-action-tint);
   padding:.55em .8em .65em;margin:0 0 .7em;font-size:var(--text--1);line-height:1.5}
 .draft .dhd{display:flex;align-items:center;gap:.4em .7em;flex-wrap:wrap;margin-bottom:.35em}
-.draft .who{font-size:var(--text--2);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--color-fg-secondary)}
+.draft .who{font-size:var(--text--2);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--color-action)}
 .draft .rec{font-weight:600}
 .draft .dacts{margin-left:auto;display:flex;gap:.4em}
 .pill.sm{padding:.2em .8em;font-size:var(--text--2)}
@@ -575,10 +577,10 @@ td .draft.open .dt{display:block}
 .xtra > details.fold > .hist,.xtra > details.fold > .jee{margin:0;border:0;border-radius:0}
 .xtra > details.fold > .jee > .jh{display:none}
 .ib > .acts{margin:0 0 .8em}
-.pill.rec{border-width:2px;font-weight:600}
-.pill.rec::after{content:"Recommended";font-size:var(--text--2);font-weight:400;color:var(--color-fg-secondary);margin-left:.2em}
+.pill.rec{border-width:2px;border-color:var(--color-action);font-weight:600}
+.pill.rec::after{content:"Recommended";font-size:var(--text--2);font-weight:400;color:var(--color-action);margin-left:.2em}
 .pill.rec.on::after{color:inherit}
-.ih .dchip{font-size:var(--text--2);color:var(--color-fg-secondary);border:1px solid var(--color-hairline);border-radius:var(--radius-pill);padding:.1em .6em}
+.ih .dchip{font-size:var(--text--2);color:var(--color-action);background-color:var(--color-action-tint);border:1px solid var(--color-action-tint);border-radius:var(--radius-pill);padding:.1em .6em}
 .foldall{display:flex;gap:var(--spacing-xs);align-items:center;margin:0 0 var(--spacing-xs);font-size:var(--text--1);color:var(--color-fg-secondary)}
 .foldall .lk{margin-left:0;font-size:var(--text--1)}
 .fin{border-left:3px solid var(--color-dark-gray);padding:.2em 0 .2em .8em;margin:.3em 0 .5em}
@@ -1277,7 +1279,7 @@ function shapeCards(){
     const ds = ib.querySelectorAll(':scope > details.fold, :scope > details.lines');
     if (ds.length){ const g = document.createElement('div'); g.className = 'xtra'; ds[0].before(g); ds.forEach(d => g.appendChild(d)); }
     const it = ib.parentElement, lab = dr && dr.querySelector('.rec');
-    if (lab){ const c = document.createElement('span'); c.className = 'dchip'; c.textContent = 'Claude: ' + lab.textContent.replace(/[.:].*$/, '');
+    if (lab){ const c = document.createElement('span'); c.className = 'dchip'; c.textContent = 'AI: ' + lab.textContent.replace(/[.:].*$/, '');
       it.querySelector('.ih .stp').before(c); }
   });
   // A page of many cards opens folded to their headers.
@@ -2325,9 +2327,9 @@ def coding():
     for x in drafted_entries():
         iid = sid("DR", x["memo"], x["debits"])
         je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"]), "reverses": x.get("reverses")}
-        items.append(("dept", iid, "Drafted by Claude", ", ".join(sorted({l["vendor"] for l in x["lines"] if l["vendor"]})) or x["memo"], x["memo"], x["debits"], "", ""))
+        items.append(("dept", iid, "AI Draft", ", ".join(sorted({l["vendor"] for l in x["lines"] if l["vendor"]})) or x["memo"], x["memo"], x["debits"], "", ""))
         dcards.append(card(iid, x["memo"] or "Drafted Journal Entry", x["debits"], x["debits"] >= thr, "&ndash;", "&ndash;", None,
-                           '<div><div class="l">Type</div><div class="x">Drafted by Claude</div></div>', e(x["support"]), "", DRAFT_ACTS, "", je_editor(iid, je[iid]["lines"]), thr="thr"))
+                           '<div><div class="l">Type</div><div class="x">AI Draft</div></div>', e(x["support"]), "", DRAFT_ACTS, "", je_editor(iid, je[iid]["lines"]), thr="thr"))
     ents = {x["finding_id"]: x for x in V.get("entries") or []}
     drift = [f for f in GLR["findings"] if f["rule_id"] == "T4.ITEM_ACCOUNT_DRIFT"]
     COVER = ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")
