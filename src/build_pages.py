@@ -315,15 +315,18 @@ def txt(v):
     return str(v).strip() if v is not None else ""
 
 
+SPARK = '<svg class="spk" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7 1.5l1.5 4 4 1.5-4 1.5-1.5 4-1.5-4-4-1.5 4-1.5z"/><path d="M12.5 10l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>'
+
+
 def draft(key, note, target, item=None, v=None, label=""):
     """Claude's draft beside the item it belongs to. It counts for nothing until
     the reviewer uses it, which copies it into the note (and the decision)."""
     DRAFTS[key] = {"note": note, "target": target, "item": item, "v": v}
     # Accept takes the draft as written (and its decision); Edit puts it in the note to change.
-    return ('<div class="draft" data-draft="%s"><div class="dhd"><span class="who">AI Draft</span>%s<span class="dacts">'
+    return ('<div class="draft" data-draft="%s"><div class="dhd"><span class="who">%sDraft</span>%s<span class="dacts">'
             '<button class="pill sm solid" data-use="%s">Accept</button><button class="pill sm" data-edit="%s">Edit</button></span></div>'
             '<div class="dt">%s</div><button class="lk more" data-dmore hidden>Show all</button></div>'
-            % (e(key), ('<b class="rec">' + e(label) + "</b>") if label else "", e(key), e(key), e(note)))
+            % (e(key), SPARK, ('<b class="rec">' + e(label) + "</b>") if label else "", e(key), e(key), e(note)))
 
 
 def drafted_entries(fids_ok=None):
@@ -338,7 +341,7 @@ def drafted_entries(fids_ok=None):
         if not lines or abs(dr - cr) >= 0.005 or not all(l["account"] for l in lines):
             SKIPPED.append("Journal Entry %d (%s): does not balance or has a line with no account" % (i, txt(x.get("memo"))[:60]))
             continue
-        out.append({"entry_id": "SERIF-DRAFT-%d" % i, "finding_id": "draft-%d" % i, "kind": "AI Draft", "date": txt(x.get("date")),
+        out.append({"entry_id": "SERIF-DRAFT-%d" % i, "finding_id": "draft-%d" % i, "kind": "Draft", "date": txt(x.get("date")),
                     "memo": txt(x.get("memo")), "reverses": txt(x.get("reverses")), "support": txt(x.get("reason")), "lines": lines, "debits": dr, "credits": cr})
     return out
 
@@ -583,8 +586,9 @@ td .draft.open .dt{display:block}
 .ih .dchip{font-size:var(--text--2);color:var(--color-action);background-color:var(--color-action-tint);border:1px solid var(--color-action-tint);border-radius:var(--radius-pill);padding:.1em .6em}
 .foldall{display:flex;gap:var(--spacing-xs);align-items:center;margin:0 0 var(--spacing-xs);font-size:var(--text--1);color:var(--color-fg-secondary)}
 .foldall .lk{margin-left:0;font-size:var(--text--1)}
-.draft.auto{border-left-color:var(--color-mid-gray);background-color:var(--color-stark)}
-.draft.auto .who{color:var(--color-fg-secondary)}
+.draft .who{display:inline-flex;align-items:center;gap:.35em}
+.spk{width:1.05em;height:1.05em;flex:none}
+.ih .dchip{display:inline-flex;align-items:center;gap:.3em}
 .thrbar{display:flex;flex-wrap:wrap;align-items:baseline;gap:.35em var(--spacing-sm);margin:0 0 var(--spacing-sm);padding:.55em .9em;
   font-size:var(--text--1);color:var(--color-fg-secondary);background-color:var(--color-stark);border-radius:var(--radius-xs);
   border-left:3px solid var(--color-action)}
@@ -1157,7 +1161,7 @@ document.addEventListener('click', ev => {
   const u = ev.target.closest('[data-use]');
   if (u){ if (blocked()) return; const d = DATA.drafts[u.dataset.use]; S.notes[d.target] = d.note; finalize(d.target);
     if (d.item && d.v) S.dec[d.item] = {v: d.v, at: new Date().toISOString(), by_uid: Shared.uid()};
-    logAdd({id: d.item || d.target, label: u.dataset.use.startsWith('auto:') ? 'Auto draft used' : 'AI draft used', v: d.v || 'used', note: d.note}); save(); refresh(); return; }
+    logAdd({id: d.item || d.target, label: 'Draft used', v: d.v || 'used', note: d.note}); save(); refresh(); return; }
   if (ev.target.closest('[data-recsave]')){ saveRecord(); return; }
   if (ev.target.closest('[data-recload]')){ if (!blocked()) $('#recfile').click(); return; }
   if (ev.target.closest('[data-carry]')){ if (!blocked()) carryRun(); return; }
@@ -1238,6 +1242,7 @@ function openJE(id){ const d = S.dec[id]; if (!d || ['approve', 'modify', 'recod
   if (el.dataset.autofold === '1') el.classList.add('unfold'); }
 /* notes: written, then saved. A saved note reads as finished text, with who saved it and
    when; Edit opens it again, and until it is saved again it is marked Not saved. */
+const SPARK = '<svg class="spk" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7 1.5l1.5 4 4 1.5-4 1.5-1.5 4-1.5-4-4-1.5 4-1.5z"/><path d="M12.5 10l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>';
 const EDIT = new Set();
 const savedNote = k => { const f = S.fin[k], n = String(S.notes[k] || ''); return !!f && !!n.trim() && f.text === n; };
 function finalize(k){ S.fin[k] = {text: String(S.notes[k] || ''), at: new Date().toISOString(), by_uid: Shared.uid()}; EDIT.delete(k); }
@@ -1250,7 +1255,7 @@ function shapeNotes(){
     const note = cm.innerText.replace(/\s+\n/g, '\n').trim(); if (!note) return;
     const key = 'auto:' + t.dataset.note; DATA.drafts = DATA.drafts || {}; DATA.drafts[key] = {note: note, target: t.dataset.note};
     const d = document.createElement('div'); d.className = 'draft auto'; d.dataset.draft = key;
-    d.innerHTML = '<div class="dhd"><span class="who">Auto Draft</span><span class="dacts"><button class="pill sm solid" data-use="' + esc(key) + '">Accept</button>'
+    d.innerHTML = '<div class="dhd"><span class="who">' + SPARK + 'Draft</span><span class="dacts"><button class="pill sm solid" data-use="' + esc(key) + '">Accept</button>'
       + '<button class="pill sm" data-edit="' + esc(key) + '">Edit</button></span></div><div class="dt"></div><button class="lk more" data-dmore hidden>Show all</button>';
     d.querySelector('.dt').textContent = note; cm.replaceWith(d); });
   $$('textarea.c[data-note]').forEach(t => { const k = t.dataset.note, at = t.closest('.acts') || t;
@@ -1299,7 +1304,7 @@ function shapeCards(){
     const ds = ib.querySelectorAll(':scope > details.fold, :scope > details.lines');
     if (ds.length){ const g = document.createElement('div'); g.className = 'xtra'; ds[0].before(g); ds.forEach(d => g.appendChild(d)); }
     const it = ib.parentElement, lab = dr && dr.querySelector('.rec');
-    if (lab){ const c = document.createElement('span'); c.className = 'dchip'; c.textContent = 'AI: ' + lab.textContent.replace(/[.:].*$/, '');
+    if (lab){ const c = document.createElement('span'); c.className = 'dchip'; c.innerHTML = SPARK + esc(lab.textContent.replace(/[.:].*$/, ''));
       it.querySelector('.ih .stp').before(c); }
   });
   // A page of many cards opens folded to their headers.
@@ -2377,9 +2382,9 @@ def coding():
     for x in drafted_entries():
         iid = sid("DR", x["memo"], x["debits"])
         je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"]), "reverses": x.get("reverses")}
-        items.append(("dept", iid, "AI Draft", ", ".join(sorted({l["vendor"] for l in x["lines"] if l["vendor"]})) or x["memo"], x["memo"], x["debits"], "", ""))
+        items.append(("dept", iid, "Draft", ", ".join(sorted({l["vendor"] for l in x["lines"] if l["vendor"]})) or x["memo"], x["memo"], x["debits"], "", ""))
         dcards.append(card(iid, x["memo"] or "Drafted Journal Entry", x["debits"], x["debits"] >= thr, "&ndash;", "&ndash;", None,
-                           '<div><div class="l">Type</div><div class="x">AI Draft</div></div>', e(x["support"]), "", DRAFT_ACTS, "", je_editor(iid, je[iid]["lines"]), thr="thr"))
+                           '<div><div class="l">Type</div><div class="x">Draft</div></div>', e(x["support"]), "", DRAFT_ACTS, "", je_editor(iid, je[iid]["lines"]), thr="thr"))
     ents = {x["finding_id"]: x for x in V.get("entries") or []}
     drift = [f for f in GLR["findings"] if f["rule_id"] == "T4.ITEM_ACCOUNT_DRIFT"]
     COVER = ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")

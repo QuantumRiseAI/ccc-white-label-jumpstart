@@ -304,7 +304,7 @@ Capital in Process and asks the Controller which account to use. Never invent on
 
 ## What You Write
 
-Your drafts go into the console, beside the items they belong to, marked "AI Draft"
+Your drafts go into the console, beside the items they belong to, marked "Draft" with a sparkle
 with **Accept** and **Edit**. A vendor note that names some of the vendor's bills (by document
 number) goes on those bills' cards and the vendor card; one that names none goes on every card of
 that vendor. Name the bill when the note is about one bill. Accept copies the note onto the card and
@@ -419,7 +419,7 @@ Draft an entry where the coding is wrong and no proposed entry in `views.entries
   the reason gives the in-service date or says it is not known.
 * Check that debits equal credits before you write the entry.
 
-The entry joins Dept & Entity as `SERIF-DRAFT-1` and on, marked "AI Draft". Once the
+The entry joins Dept & Entity as `SERIF-DRAFT-1` and on, marked "Draft" with a sparkle. Once the
 reviewer approves it, it is in the NetSuite CSV on Export.
 
 ### 5. In the Chat

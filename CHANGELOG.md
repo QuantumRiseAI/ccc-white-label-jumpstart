@@ -42,7 +42,7 @@ serif-pl-flux-aug2026-v1.8.2.html
 - **A grey-blue for actions**: `--color-action` (#3a4a5e) marks the primary action (Save, Accept, the
   export), AI drafts and their recommendation, and focused fields; red stays for what needs review and
   dark ink for saved text.
-- **AI drafts**: a draft reads full width under "AI Draft" (was "Drafted by Claude") with its recommendation,
+- **Drafts**: a draft reads full width under a sparkle and "Draft" (was "Drafted by Claude") with its recommendation,
   **Accept** (the note and the decision) and **Edit** (the note, to change). The empty note box waits
   behind a draft until Edit. In a table a long draft shows four lines, with Show all; a note box
   grows to its text.
@@ -53,9 +53,9 @@ serif-pl-flux-aug2026-v1.8.2.html
 - **Thresholds on the page**: each page that applies a threshold names it at its top with its value
   now and what it marks (Review on the flux pages; CapEx, Prepaid and Review on the coding pages, and
   that department flags have none), marked when it differs from the default, with a link to Settings.
-- **Auto Drafts**: a line's computed summary (the move, its vendors, "no plan line") is an Auto Draft in
-  the same box as an AI draft, grey rather than blue, with Accept and Edit; where an AI draft sits on
-  the line it stands in for the summary. Lines with no vendor read "Journals, no vendor", not "(blank)".
+- **Line summaries as drafts**: a line's computed summary (the move, its vendors, "no plan line") is a
+  Draft in the same box as Claude's, with Accept and Edit; where Claude's draft sits on the line it
+  stands in for the summary. Lines with no vendor read "Journals, no vendor", not "(blank)".
   The GL Coding Review title drops its subsidiary line.
 - **Saved notes**: commentary, the executive summary and every card note are saved with Save (or
   Cmd+Enter) and then read as finished text, with who saved them and when; until then they are marked

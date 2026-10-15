@@ -306,7 +306,7 @@ threshold. A line needs commentary when its move reaches it.
 
 ## What You Write
 
-Your drafts go into the console, beside the items they belong to, marked "AI Draft"
+Your drafts go into the console, beside the items they belong to, marked "Draft" with a sparkle
 with **Accept** and **Edit**. Drafted commentary sits on the account's line on Actual vs. Actual
 (MoM); a drafted note on an adjustment carries your recommendation. Accept copies it into the
 commentary or the note, and sets the recommended decision; Edit copies it to change. Nothing you
@@ -450,7 +450,7 @@ covers it.
 * Memo, per the Data Entry Policy: `Specific description | Mon'YY`.
 * Patterns and accounts are in [`PL_FLUX_SKILL.md`](PL_FLUX_SKILL.md).
 
-The entry joins Adjustments, Section A, as `SERIF-DRAFT-1` and on, marked "AI Draft".
+The entry joins Adjustments, Section A, as `SERIF-DRAFT-1` and on, marked "Draft" with a sparkle.
 Once the reviewer approves it, it is in the NetSuite CSV.
 
 The reviewer can also propose an entry from a variance. **Propose entry** on a row of Actual vs.
