@@ -2833,7 +2833,8 @@ def coding():
 
     # Dept & Entity: department and account recodes, from the coding findings and their entries
     dcards = []
-    for x in drafted_entries():
+    drafted = drafted_entries()
+    for x in drafted:
         iid = sid("DR", x["memo"], x["debits"])
         je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"]), "reverses": x.get("reverses")}
         items.append(("dept", iid, "Draft", ", ".join(sorted({l["vendor"] for l in x["lines"] if l["vendor"]})) or x["memo"], x["memo"], x["debits"], "", ""))
@@ -3022,10 +3023,13 @@ def coding():
         if t.get("account_code"):
             carded.add((vn, t["account_code"], t.get("department") or ""))
     carded |= same_item_codings
+    # Pass-through bills are reviewed on Pass-Through Bills, and an entry Claude drafted moves its own lines.
+    carded |= {(b["vendor"], l["account_code"], l.get("department") or "") for b in PT_BILLS for l in b["lines"]}
+    carded |= {(l.get("vendor") or "", l["account"], l.get("department") or "") for x in drafted for l in x["lines"] if l.get("credit")}
     vc_cards = []
     vc = []
     for r in vrows:
-        fls = [f for f in r.get("flags") or [] if f.get("id") in VC_FLAGS]
+        fls = sorted((f for f in r.get("flags") or [] if f.get("id") in VC_FLAGS), key=lambda f: f["id"] != "changed")
         if not fls or any(f.get("id") == "new" for f in r["flags"]):
             continue
         cods = {(c["account"], c.get("department") or ""): c for c in r.get("by_coding") or [] if round(c.get("current") or 0, 2)}
@@ -3054,13 +3058,22 @@ def coding():
         ch = next((f.get("before") for f in fls if f["id"] == "changed" and f.get("before")), None)
         usual = (ch["account"], ch.get("department") or "") if ch else None
         for k, why_id in keys.items():
-            to = (plan_to if why_id == "plan" else (usual or before)) or usual or before or plan_to or k
+            # A coding the vendor used in earlier months is its usual one: the plan may be what is
+            # wrong, so the entry leaves it. The plan is the target only for a coding never used.
+            used = hist(cods[k]) > 0.005
+            to = (usual or before or plan_to) if why_id == "changed" else (k if used else plan_to or k)
             v = round(cods[k]["current"], 2)
+            if to == k:
+                continue
             pp = {(i.get("project") or "", i.get("program") or "") for i in its if i["account"] == k[0] and (i.get("department") or "") == k[1]}
             src = dict(zip(("project", "program"), next(iter(pp)))) if len(pp) == 1 else {}
             lines += [dict(src, account=to[0], department=to[1] or "Non-Specific", **{("debit" if v > 0 else "credit"): abs(v)}),
                       dict(src, account=k[0], department=k[1] or "Non-Specific", reverses_line=True, **{("credit" if v > 0 else "debit"): abs(v)})]
         amt = round(sum(abs(cods[k]["current"]) for k in keys), 2)
+        if not lines:
+            # Nothing to move without the reviewer: the entry stays as booked until edited.
+            lines = [x for k in keys for x in ({"account": k[0], "department": k[1] or "Non-Specific", "debit": abs(cods[k]["current"])},
+                                               {"account": k[0], "department": k[1] or "Non-Specific", "credit": abs(cods[k]["current"]), "reverses_line": True})]
         on = [i for i in its if (i["account"], i.get("department") or "") in keys]
         top = max(on, key=lambda i: abs(i.get("amount") or 0), default=None)
         doc = {"type": top.get("type") or "Bill", "document": str(top["document"]), "text": top.get("text") or "", "date": top.get("date") or ""} if top else None

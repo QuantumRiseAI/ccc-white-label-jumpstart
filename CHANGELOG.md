@@ -44,7 +44,8 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
 - **Coding changed or off plan**, on Dept & Entity in the GL Coding Review: a vendor card, CODING-NN,
   for each vendor flagged Coding changed or Coded off plan, to confirm or recode. The card covers
   the flagged codings no other card already moves (a new vendor stays on New This Period), and its
-  Journal Entry moves them back to the vendor's usual coding or to the plan. These flags had no
+  Journal Entry moves a changed coding back to the vendor's usual one, and an off-plan coding it
+  never used to the plan; pass-through bills and drafted entries keep their own cards. These flags had no
   card on any page: in Sep 2026, 13 vendors and $295,491.93 of
   flagged spend (Aldevron $180,261.56, UMass Chan, Jubilant, Beacon Hill, Fisher's facility-repairs
   coding) were nowhere in the console, and drafts for them were left out. A vendor card names each

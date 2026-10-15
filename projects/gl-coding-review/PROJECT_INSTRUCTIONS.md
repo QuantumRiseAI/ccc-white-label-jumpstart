@@ -290,9 +290,10 @@ section opens its pages beside its title.
   Last on Dept & Entity, **Coding changed or off plan**: a vendor card for each vendor whose
   account or department this month is one it did not use in the months before (Coding changed),
   or whose coding differs from the plan (Coded off plan). The card covers only those codings,
-  less any another card already moves (CapEx, Prepaid, a Dept & Entity entry, Same item); a vendor
-  new this month stays on New This Period. Its Journal Entry moves the codings back to the one
-  the vendor used before, or to the planned one. The reviewer confirms the coding, or recodes,
+  less any another card already moves (CapEx, Prepaid, a Dept & Entity entry, Same item, a
+  pass-through bill, a drafted entry); a vendor new this month stays on New This Period. Its
+  Journal Entry moves a changed coding back to the one the vendor used before, and an off-plan
+  coding the vendor never used to the planned one; a coding it has used before is left as booked. The reviewer confirms the coding, or recodes,
   editing the entry if the lines belong elsewhere, with a note. Draft notes for these vendors as
   for any flagged vendor; a note that names a bill goes on the card for that bill.
   Each page shows its threshold beside its title; a long page opens folded to one line per card.

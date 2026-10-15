@@ -271,7 +271,13 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
         const capped = await p.evaluate(() => [...document.querySelectorAll('[data-item^="C-"], [data-item^="P-"]')].map(x => x.querySelector('.ih b').textContent));
         ok(got.every(g => Math.abs(g.dr - g.cr) < 0.01 && Math.abs(Math.max(g.dr, g.cr) - Math.abs(g.amt)) < 0.01),
           'gl: each such card\'s entry balances and moves the card\'s amount');
-        ok(got.length && got.every(g => g.moves), 'gl: the entry moves the flagged codings to the vendor\'s usual or planned coding (' + got.filter(g => g.moves).length + ')'); }
+        const tgt = await p.evaluate(() => [...document.querySelectorAll('#p-dept [data-item^="VC-"]')].map(x => ({v: x.querySelector('.ih b').textContent,
+          to: DATA.je[x.dataset.item].lines.filter(l => l.debit).map(l => l.account + '|' + l.department), from: DATA.je[x.dataset.item].lines.filter(l => l.credit).map(l => l.account + '|' + l.department)})));
+        const allowed = v => { const r = rows.find(x => x.vendor === v), ch = (r.flags.find(f => f.id === 'changed') || {}).before;
+          return new Set([...(ch ? [ch.account + '|' + (ch.department || 'Non-Specific')] : []), ...(r.planned || []).map(q => q.account + '|' + (q.department || 'Non-Specific')),
+            ...(r.by_coding || []).filter(c => Math.abs(c.prior || 0) + Math.abs(c.prior2 || 0) > 0.005).map(c => c.account + '|' + (c.department || 'Non-Specific'))]); };
+        ok(got.some(g => g.moves) && tgt.every(t => t.to.every(c => t.from.includes(c) || allowed(t.v).has(c))),
+          'gl: each entry moves the flagged codings to the vendor\'s usual coding or the plan, or leaves them for the reviewer (' + got.filter(g => g.moves).length + ' of ' + got.length + ' move)');}
       ok(Object.values(refs.reduce((m, r) => { const [s, n] = r.ref.split('-'); (m[s] = m[s] || [])[Number(n) - 1] = r; return m; }, {}))
         .every(xs => Array.from(xs).every((r, i) => r && (!i || xs[i - 1].amt >= r.amt))), 'gl: within a screen, numbered from 01 with no gaps, largest amount first');
       ok(await p.evaluate(() => Object.keys(DATA.je).every(id => refOf(id) && DATA.je[id].memo.startsWith(refOf(id) + ' | ') && / \| Aug'26$/.test(DATA.je[id].memo)
