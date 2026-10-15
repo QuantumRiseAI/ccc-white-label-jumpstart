@@ -287,6 +287,11 @@ section opens its pages beside its title.
   6410000 Lab Supplies/Consumables or 6415000 Lab Non-Capital Equipment that went only to the
   other in the six months before. It reads the ledger, so it runs when the Coupa report has no
   Account column. Either side may be wrong: the card offers the recode back or Coding Stands.
+  Last on Dept & Entity, **Coding changed or off plan**: a vendor card for each vendor whose
+  account or department this month is one it did not use in the months before (Coding changed),
+  or whose coding differs from the plan (Coded off plan). The reviewer confirms the coding or
+  recodes it with a filled-in Journal Entry and a note. Draft notes for these vendors as for any
+  flagged vendor.
   Each page shows its threshold beside its title; a long page opens folded to one line per card.
   The reviewer accepts or edits a draft and saves each note; only saved notes read as finished.
 * **Confirm**: **Reviewed & Cleared**, the vendors no check flagged, and **New This
@@ -304,7 +309,7 @@ section opens its pages beside its title.
   earlier run's decisions**.
 
 Every flag and vendor card starts with its reference ID, numbered by screen within the close
-(CAPEX-01, FA-01, PREPAID-01, PPD-01, DEPT-01, DRAFT-01, PASS-01, CLEAR-01, NEW-01), and the Memo of its
+(CAPEX-01, FA-01, PREPAID-01, PPD-01, DEPT-01, DRAFT-01, CODING-01, PASS-01, CLEAR-01, NEW-01), and the Memo of its
 Journal Entry starts with the same ID, so the entry in NetSuite ties back to the card. Use the ID
 when you name a card to the reviewer. Each card shows its document with NetSuite and Coupa links, the vendor's last
 three months by account and department with the line descriptions, and its lines, each with its
@@ -330,6 +335,9 @@ threshold is marked Review. The booked lines on CapEx and Prepaid take their pag
 and Prepaid list every flag from $2,500, so a lower threshold shows more; one under its
 threshold says it stays expense. Do not recommend booking a prepaid under $25,000 or
 capitalizing a purchase under $5,000 unless it is part of something larger that is over.
+A bill that a Journal Entry in the month already moves off its account (a journal line on that
+account, for the bill's amount the other way, whose memo names the bill's document number, as
+Serif's close entries do) is not flagged on CapEx or Prepaid: it is already booked.
 
 Each CapEx card says whether the purchase goes to **`1505000` Capital in Process** (build-out
 work, or an asset bought but not yet in service) or to its fixed asset account (an asset in
@@ -543,7 +551,7 @@ keyed by item id:
 
 Item ids start `C-` and `P-` for CapEx and Prepaid flags, `CB-` and `PB-` for bills booked to
 fixed-asset and prepaid accounts, `D-` for Dept & Entity, `DR-` for your drafted entries, and
-`R-` and `N-` for Reviewed & Cleared and New This Period, and `PT-` for Pass-Through Bills. Notes are the reviewer's own words.
+`VC-` for Coding changed or off plan, `R-` and `N-` for Reviewed & Cleared and New This Period, and `PT-` for Pass-Through Bills. Notes are the reviewer's own words.
 
 ## Requests
 

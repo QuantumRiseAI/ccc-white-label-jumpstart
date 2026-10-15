@@ -94,6 +94,26 @@ ok(V.capitalize_memo("Red Thread", rt["correction"]["placement"]).endswith("unti
    and V.capitalize_memo("Repligen", rp["correction"]["placement"]) == "Capitalize Repligen purchase as a fixed asset",
    "the flux entry's memo says Capital in Process or fixed asset; an asset in service keeps the memo it had")
 
+print("a bill a Journal Entry in the month already moves")
+def jline(account, amount, text, dept="General R&D"):
+    return {"period": "Aug 2026", "date": "2026-08-31", "txn_type": "Journal", "document_number": "JE1", "vendor_or_name": "",
+            "account_code": account, "department": dept, "amount": amount, "description": text, "memo": "Capitalize Freezers Posted to Expense"}
+frz = bill("VWR International LLC", "6415000", 17_729.41, "UPRIGHT FREEZER 729L", doc="8822578887")
+ok(len(F.capex_findings([frz], LEAVES, "Aug 2026", [0])) == 1, "a freezer on Lab Non-Capital Equipment is flagged")
+ok(not F.capex_findings([frz, jline("6415000", -17_729.41, "Capitalize freezer VWR International LLC bill 8822578887 moved from 6415000")], LEAVES, "Aug 2026", [0]),
+   "a freezer a month-end Journal Entry already capitalizes, naming the bill, is not flagged again")
+ok(len(F.capex_findings([frz, jline("6415000", -17_729.41, "Capitalize freezer bill 88225788870")], LEAVES, "Aug 2026", [0])) == 1
+   and len(F.capex_findings([frz, jline("6415000", -10_000, "Capitalize freezer bill 8822578887")], LEAVES, "Aug 2026", [0])) == 1
+   and len(F.capex_findings([frz, jline("6410000", -17_729.41, "Capitalize freezer bill 8822578887")], LEAVES, "Aug 2026", [0])) == 1,
+   "a journal naming another document, moving another amount or on another account does not clear the bill")
+two = [bill("Fisher Scientific", "6415000", 6_000, "Centrifuge", doc="9001"), bill("Fisher Scientific", "6415000", 4_000, "Rotor", doc="9001")]
+ok(not F.capex_findings(two + [jline("6415000", -10_000, "Reclass bill 9001 to CIP")], LEAVES, "Aug 2026", [0]),
+   "a journal moving a document's whole total on the account clears every line of it")
+sub = bill("Acme Insurance", "6891000", 30_000, "Annual policy renewal", doc="INS-77")
+ok(len(F.prepaid_findings([sub], {}, LEAVES, "Aug 2026", [0])) == 1
+   and not F.prepaid_findings([sub, jline("6891000", -30_000, "To record prepaid insurance INS-77")], {}, LEAVES, "Aug 2026", [0]),
+   "the prepaid screen skips a bill a journal already moves to prepaid")
+
 if FAILED:
     print("%d failed" % len(FAILED))
     sys.exit(1)
