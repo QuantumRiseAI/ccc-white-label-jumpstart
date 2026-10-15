@@ -50,9 +50,16 @@ serif-pl-flux-aug2026-v1.8.2.html
   Recommended. Why it was flagged (when there is a draft), the Journal Entry, the last three months
   and the lines fold into one list beneath. Approving, modifying, recoding or editing in NetSuite
   opens the Journal Entry. A folded card's header carries Claude's recommendation.
-- **Thresholds on the page**: each page that applies a threshold names it at its top with its value
-  now and what it marks (Review on the flux pages; CapEx, Prepaid and Review on the coding pages, and
-  that department flags have none), marked when it differs from the default, with a link to Settings.
+- **Thresholds by the title**: each page that applies a threshold shows it as a chip beside its title
+  (Review on the flux pages; CapEx, Prepaid and Review on the coding pages, and that department flags
+  have none), with what it marks on hover. The value is changed in place, and a changed value shows its
+  default with Reset; it is the same threshold as in Settings.
+- **The flux pack**: Export flux pack, on the Executive Summary and Management Sign-Off, writes a
+  read-only HTML pack: status (Final, or Draft with its open items), the headline figures and the tie,
+  the saved executive summary, Actual vs. Actual with each line's saved commentary (a line at or over
+  the threshold without it reads Needs commentary), saved commentary from the other pages, the
+  adjustments and their decisions, the Journal Entries ready for the import, and the sign-offs.
+  Commentary, CSV writes every saved commentary with who saved it and when.
 - **Line summaries as drafts**: a line's computed summary (the move, its vendors, "no plan line") is a
   Draft in the same box as Claude's, with Accept and Edit; where Claude's draft sits on the line it
   stands in for the summary. Lines with no vendor read "Journals, no vendor", not "(blank)".

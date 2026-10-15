@@ -589,13 +589,28 @@ td .draft.open .dt{display:block}
 .draft .who{display:inline-flex;align-items:center;gap:.35em}
 .spk{width:1.05em;height:1.05em;flex:none}
 .ih .dchip{display:inline-flex;align-items:center;gap:.3em}
-.thrbar{display:flex;flex-wrap:wrap;align-items:baseline;gap:.35em var(--spacing-sm);margin:0 0 var(--spacing-sm);padding:.55em .9em;
-  font-size:var(--text--1);color:var(--color-fg-secondary);background-color:var(--color-stark);border-radius:var(--radius-xs);
-  border-left:3px solid var(--color-action)}
-.thrbar b{color:var(--color-fg-primary);font-weight:600}
-.thrbar [data-thrv]{color:var(--color-action);font-variant-numeric:tabular-nums}
-.thrbar .def{color:var(--color-red-text)}
-.thrbar .lk{margin-left:auto;font-size:var(--text--1)}
+.thrchips{display:flex;flex-wrap:wrap;gap:.4em;margin-left:auto;align-items:center;font-size:var(--text--2);font-weight:400;letter-spacing:0}
+.thc{display:inline-flex;align-items:center;gap:.5em;border:1px solid var(--color-hairline);background-color:var(--color-stark);border-radius:var(--radius-pill);padding:.2em .35em .2em .8em;white-space:nowrap}
+.thc .tl{color:var(--color-fg-secondary);text-transform:uppercase;letter-spacing:.04em}
+.thc .tv{display:inline-flex;align-items:center;gap:.35em;border:0;border-radius:var(--radius-pill);background-color:var(--color-action-tint);color:var(--color-action);
+  font-weight:600;font-size:var(--text--1);font-variant-numeric:tabular-nums;padding:.15em .6em;cursor:pointer}
+.thc .tv:hover{background-color:var(--color-action);color:#fff}
+.thc .tv svg{width:.85em;height:.85em}
+.thc .tv0{color:var(--color-fg-secondary);padding:.15em .6em .15em 0}
+.thc input.thin{width:8ch;font:inherit;font-size:var(--text--1);font-weight:600;color:var(--color-action);border:1px solid var(--color-action);border-radius:var(--radius-pill);padding:.1em .6em;text-align:right}
+.thc .def{color:var(--color-red-text);padding-right:.4em}
+.thc .def .lk{margin-left:.3em;font-size:var(--text--2);color:var(--color-red-text)}
+.thc.chg{border-color:var(--color-red-text)}
+.hhead{display:flex;align-items:center;flex-wrap:wrap;gap:var(--spacing-xs);margin-bottom:var(--spacing-xs)}
+.hhead h1{margin:0}
+.hhead.plain{margin:var(--spacing-sm) 0 0}
+.hhead.plain h3{margin:0}
+.hero .thc{background-color:rgba(255,255,255,.07);border-color:rgba(255,255,255,.14)}
+.hero .thc .tl{color:var(--color-warm-gray)}
+.hero .thc .tv{background-color:rgba(255,255,255,.12);color:#fff}
+.hero .thc .tv:hover{background-color:#fff;color:var(--color-dark-gray)}
+.hero .thc.chg{border-color:#ff8a66} .hero .thc .def,.hero .thc .def .lk{color:#ff8a66}
+
 .fin{border-left:3px solid var(--color-dark-gray);padding:.2em 0 .2em .8em;margin:.3em 0 .5em}
 .fin .ft{white-space:pre-line;line-height:1.5;color:var(--color-fg-primary)}
 .esum .fin .ft{font-size:var(--text-0);line-height:1.5}
@@ -1323,6 +1338,7 @@ const THR_TXT = {
   thr_capex: ['CapEx threshold', 'a purchase at or over it is marked Review as a possible capital asset'],
   thr_prepaid: ['Prepaid threshold', 'a charge at or over it that covers future months is marked Review'],
   all: ['Department flags', 'no threshold: every one is marked Review, whatever its size']};
+const PENCIL = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg>';
 function shapeThresholds(){
   $$('.page').forEach(pg => { if (pg.id === 'p-settings') return;
     const keys = [];
@@ -1330,20 +1346,39 @@ function shapeThresholds(){
     if (pg.querySelector('tr[data-var], [data-cm]') && keys.indexOf('thr') < 0) keys.unshift('thr');
     if (!keys.length) return;
     keys.sort((a, b) => (a === 'all') - (b === 'all'));
-    const bar = document.createElement('div'); bar.className = 'thrbar';
-    bar.innerHTML = keys.map(k => '<span class="t"><b>' + THR_TXT[k][0] + (k === 'all' ? '' : ' <span data-thrv="' + k + '"></span>') + ':</b> '
-      + THR_TXT[k][1] + (k === 'all' ? '' : '<span class="def" data-thrdef="' + k + '"></span>') + '</span>').join('')
-      + '<button class="lk" data-goset>Change in Settings</button>';
-    const hero = pg.querySelector(':scope > .hero'), head = pg.querySelector('.dh');
-    if (hero) hero.after(bar); else if (head) head.after(bar); else pg.prepend(bar); });
+    const box = document.createElement('div'); box.className = 'thrchips';
+    box.innerHTML = keys.map(k => k === 'all'
+      ? '<span class="thc none" data-tip="' + esc(THR_TXT[k][1]) + '"><span class="tl">' + THR_TXT[k][0] + '</span><span class="tv0">No threshold</span></span>'
+      : '<span class="thc" data-thc="' + k + '" data-tip="' + esc(THR_TXT[k][1].replace(/^./, c => c.toUpperCase())) + '."><span class="tl">' + THR_TXT[k][0] + '</span>'
+        + '<button class="tv" data-thedit="' + k + '" aria-label="Change the ' + THR_TXT[k][0] + '"><span data-thrv="' + k + '"></span>' + PENCIL + '</button>'
+        + '<span class="def" data-thrdef="' + k + '" hidden></span></span>').join('');
+    // beside the page's title: in the hero, or on the title line of a page without one
+    const hero = pg.querySelector(':scope > .hero'), t = hero ? hero.querySelector('h1') : pg.querySelector(':scope > h3');
+    if (t){ const row = document.createElement('div'); row.className = hero ? 'hhead' : 'hhead plain'; t.before(row); row.append(t, box); }
+    else pg.prepend(box); });
 }
 function paintThresholds(){
   $$('[data-thrv]').forEach(x => { x.textContent = money(thrOf(x.dataset.thrv)); });
   $$('[data-thrdef]').forEach(x => { const k = x.dataset.thrdef, d = Number(DATA[k]) || DATA.thr, v = thrOf(k);
-    x.textContent = v !== d ? ' (changed from the default, ' + money(d) + ')' : ''; });
-  $$('.thrbar').forEach(b => b.classList.toggle('chg', !!b.querySelector('[data-thrdef]:not(:empty)')));
+    x.hidden = v === d; x.innerHTML = v === d ? '' : 'Default ' + money(d) + ' <button class="lk" data-threset="' + k + '">Reset</button>';
+    x.closest('.thc').classList.toggle('chg', v !== d); });
 }
-document.addEventListener('click', ev => { if (ev.target.closest('[data-goset]')) show('settings'); });
+// A threshold is changed where it shows: its value becomes a field; Enter or leaving it keeps
+// the new value, Escape leaves it as it was.
+document.addEventListener('click', ev => {
+  const ed = ev.target.closest('[data-thedit]');
+  if (ed){ if (blocked()) return; const k = ed.dataset.thedit, inp = document.createElement('input');
+    inp.className = 'thin'; inp.inputMode = 'numeric'; inp.value = thrOf(k).toLocaleString('en-US'); inp.setAttribute('aria-label', ed.getAttribute('aria-label'));
+    let fin = false;
+    const done = keep => { if (fin) return; fin = true; const v = Number(String(inp.value).replace(/[^0-9.]/g, ''));
+      inp.replaceWith(ed); if (keep && isFinite(v) && v > 0 && v !== thrOf(k)){ S[k] = v; logAdd({id: k, label: THR_TXT[k][0], v: money(v), note: ''}); save(); refresh(); } };
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(true); else if (e.key === 'Escape') done(false); });
+    inp.addEventListener('blur', () => done(true));
+    ed.replaceWith(inp); inp.focus(); inp.select(); return; }
+  const rs = ev.target.closest('[data-threset]');
+  if (rs){ if (blocked()) return; const k = rs.dataset.threset; if (k === 'thr') S.thr = DATA.thr; else delete S[k];
+    logAdd({id: k, label: THR_TXT[k][0], v: 'default', note: ''}); save(); refresh(); }
+});
 document.addEventListener('click', ev => {
   const ed = ev.target.closest('[data-edit]');
   if (ed){ if (blocked()) return; const d = DATA.drafts[ed.dataset.edit]; S.notes[d.target] = S.notes[d.target] || d.note; EDIT.add(d.target); save(); refresh();
@@ -1622,6 +1657,9 @@ def coding_corrections():
             sum(1 for it in items if it[1] not in dec))
 
 
+PACK_BTNS = '<span class="r"><button class="pill sm" data-fluxcsv>Commentary, CSV</button> <button class="pill sm solid" data-fluxpack>Export flux pack</button></span>'
+
+
 def flux():
     T = PLR["tables"][0]
     secs = T["sections"]
@@ -1712,7 +1750,7 @@ def flux():
              tile("Flags to Review", '<span data-cm></span>', '<span data-cmn></span>')]
     # The executive summary for the controller: Claude's draft, used and edited by the reviewer.
     sd = txt(RAW_DRAFTS.get("summary"))
-    exec_summary = ('<div class="card"><div class="ch">Executive Summary</div><div class="esum">' + (draft("sum:exec", sd, "exec:summary") if sd else "")
+    exec_summary = ('<div class="card"><div class="ch">Executive Summary%s</div><div class="esum">' % PACK_BTNS + (draft("sum:exec", sd, "exec:summary") if sd else "")
                     + '<textarea class="c" rows="8" data-note="exec:summary" placeholder="Executive summary for the controller"></textarea></div></div>')
     pages.append(page("ov", hero("P&L Flux Analysis, " + PERIOD, "", tiles) + tie_card([PERIOD, PRIOR]) + exec_summary + '<div class="grid">' + "".join(cards) + "</div>"
                       + '<div class="card"><div class="ch">Net Loss Bridge, ' + e(PRIOR) + ' to ' + e(PERIOD) + '</div>' + wf
@@ -2172,7 +2210,7 @@ def flux():
         + '<div class="card"><div class="ch">Tie-Outs</div><div class="tw"><table class="ties"><thead><tr><th>Check</th><th class="n2">Amount</th><th class="n2">Against</th><th>Result</th></tr></thead><tbody>'
         + "".join(ties) + "</tbody></table></div>" + tie_note + "</div>" + rp_card
         + '<div class="split"><div class="card"><div class="ch">GAAP Compliance Checklist</div>' + ck + '</div><div><div class="card"><div class="ch">Source Data Validation</div><div class="tw"><table>'
-          '<thead><tr><th>Report</th><th>File</th><th class="n2">Status</th></tr></thead><tbody>' + src + '</tbody></table></div></div><div class="card"><div class="ch">Management Sign-Off</div><div class="pad">'
+          '<thead><tr><th>Report</th><th>File</th><th class="n2">Status</th></tr></thead><tbody>' + src + '</tbody></table></div></div><div class="card"><div class="ch">Management Sign-Off' + PACK_BTNS + '</div><div class="pad">'
         + sign + '</div></div><div class="card"><div class="pad note"><b>AI disclosure.</b> Figures, variances and proposed entries are computed by the flux engine from the exports listed. '
           'Commentary and every decision are the reviewer\'s.</div></div></div></div>'))
 
@@ -2199,6 +2237,102 @@ function refresh(){
   $$('[data-ckdone]').forEach(x => { const v = Object.values(S.ck); x.textContent = v.filter(y => y === 'ok').length + ' reviewed · ' + v.filter(y => y === 'flag').length + ' to follow up'; });
   $$('[data-signs]').forEach(x => x.textContent = Object.keys(S.sign).filter(k => k !== 'prep').length + ' / 2');
 }
+/* The flux pack: what the close hands on, read-only. Only saved writing goes in; what is
+   still open is listed, so the pack says whether the close is finished. */
+function fluxPack(){
+  const thr = S.thr || DATA.thr, usd = v => (Number(v) || 0).toLocaleString('en-US', {style: 'currency', currency: 'USD'});
+  const when = iso => iso ? new Date(iso).toLocaleString('en-US', {month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'}) : '';
+  const who = uid => uid ? Shared.name(uid) : '';
+  // an element's text with its parts spaced, as it reads on screen
+  const spaced = el => { const x = el.cloneNode(true); x.querySelectorAll('.mk,.tag,button,textarea,.draft,.fin,.fbar,.note,details').forEach(n => n.remove());
+    x.querySelectorAll('*').forEach(n => n.append(' ')); return x.textContent.replace(/\s+/g, ' ').replace(/\s+([,.;:)])/g, '$1').trim(); };
+  const clean = spaced;
+  const para = t => esc(t).split(/\n{2,}/).map(x => '<p>' + x.replace(/\n/g, '<br>') + '</p>').join('');
+  const saved = k => savedNote(k) ? {text: S.notes[k], by: who(S.fin[k].by_uid), at: S.fin[k].at} : null;
+  const rowsOf = sel => { const t = $(sel); return t ? Array.from(t.querySelectorAll(':scope > tbody > tr')) : []; };
+  const pageName = x => { const p = x.closest('.page'), b = p && $('.tb.pg[data-p="' + p.id.slice(2) + '"]'); return b ? b.textContent.replace(/\d+$/, '').trim() : ''; };
+  const open = [];
+  // the executive summary
+  const sum = saved('exec:summary');
+  if (!sum) open.push('The executive summary is not saved.');
+  // the P&L, month over month, with each line's saved commentary
+  const tbl = $('#p-ava [data-pane="mom"] table'), heads = tbl ? Array.from(tbl.querySelectorAll(':scope > thead th')).map(h => h.textContent.trim()) : [];
+  const keep = heads.map((h, i) => [h, i]).filter(([h]) => !/avg|Commentary/i.test(h));
+  let pl = '', missing = 0;
+  rowsOf('#p-ava [data-pane="mom"] table').forEach(tr => {
+    if (tr.classList.contains('jr')) return;
+    if (tr.classList.contains('grp')){ pl += '<tr class="g"><td colspan="' + (keep.length + 1) + '">' + esc(tr.textContent.trim()) + '</td></tr>'; return; }
+    const t = tr.querySelector(':scope > td > textarea[data-note]'), k = t && t.dataset.note, c = k && saved(k);
+    const rev = tr.dataset.var !== undefined && Math.abs(Number(tr.dataset.var)) >= thr;
+    if (rev && !c) missing++;
+    pl += '<tr class="' + (rev ? 'rv' : '') + (tr.classList.contains('tot') ? ' t' : '') + '">' + keep.map(([h, i]) => '<td' + (i ? ' class="n"' : '') + '>' + esc(i ? (tr.cells[i] || {}).textContent || '' : clean(tr.cells[0])) + '</td>').join('')
+      + '<td class="cm">' + (c ? para(c.text) + '<div class="by">' + esc((c.by ? c.by + ', ' : '') + when(c.at)) + '</div>' : rev ? '<span class="op">Needs commentary</span>' : '') + '</td></tr>'; });
+  if (missing) open.push(plural(missing, 'line') + ' at or over ' + money(thr) + ' without saved commentary.');
+  // saved commentary on the other pages
+  const other = $$('.page tr').filter(tr => !tr.closest('#p-ava [data-pane="mom"]') && tr.querySelector(':scope > td > textarea[data-note]')).map(tr => {
+    const k = tr.querySelector(':scope > td > textarea[data-note]').dataset.note, c = saved(k); if (!c) return '';
+    const tab = tr.closest('[data-pane]'), tb = tab && tab.closest('[data-tabbox]') && tab.closest('[data-tabbox]').querySelector('[data-tab="' + tab.dataset.pane + '"]');
+    return '<tr><td>' + esc(pageName(tr) + (tb ? ', ' + tb.textContent.trim() : '')) + '</td><td>' + esc(clean(tr.cells[0])) + '</td><td class="cm">' + para(c.text) + '<div class="by">' + esc((c.by ? c.by + ', ' : '') + when(c.at)) + '</div></td></tr>'; }).filter(Boolean);
+  // adjustments and their decisions
+  const adj = $$('#p-adj [data-item]').map(x => { const id = x.dataset.item, d = S.dec[id], n = S.notes[id] || '', tag = x.querySelector('.ih .tag');
+    if (!decided(id)) open.push('Adjustment not decided: ' + x.querySelector('.ih b').textContent.trim() + '.');
+    return '<tr><td>' + esc(tag ? tag.textContent : '') + '</td><td>' + esc(x.querySelector('.ih b').textContent) + '</td><td class="n">' + usd(x.dataset.amt) + '</td><td>'
+      + (d ? '<b>' + esc(LABEL[d.v] || d.v) + '</b>' : '<span class="op">Pending</span>') + '</td><td>' + esc(n) + (n && !savedNote(id) ? ' <span class="op">(note not saved)</span>' : '')
+      + '</td><td>' + esc(d ? (who(d.by_uid) ? who(d.by_uid) + ', ' : '') + when(d.at) : '') + '</td></tr>'; });
+  const je = [];
+  Object.keys(DATA.je).filter(jeReady).forEach(id => { const j = jeOf(id);
+    j.lines.forEach((l, i) => je.push('<tr><td class="m">' + (i ? '' : esc(j.id)) + '</td><td>' + (i ? '' : esc(j.memo)) + '</td><td class="m">' + esc(l.account) + ' ' + esc(DATA.acct[l.account] || '')
+      + '</td><td>' + esc(l.department || '') + '</td><td class="n">' + (Number(l.debit) ? usd(l.debit) : '') + '</td><td class="n">' + (Number(l.credit) ? usd(l.credit) : '') + '</td></tr>')); });
+  // sign-offs
+  const roles = $$('[data-sname]').map(i => i.dataset.sname);
+  const signs = roles.map(r => { const g = S.sign[r], lb = $('[data-sname="' + r + '"]').closest('.sign').querySelector('b').textContent;
+    if (!g) open.push(lb + ' has not signed.');
+    return '<tr><td>' + esc(lb) + '</td><td>' + (g ? esc(g.name) : '<span class="op">Not signed</span>') + '</td><td>' + esc(g ? g.date : '') + '</td></tr>'; });
+  const tiles = $$('#p-ov .hero .ht > div').map(d => '<div class="k"><div class="l">' + esc(d.children[0].textContent) + '</div><div class="v">' + esc(d.children[1].textContent) + '</div><div class="s">' + esc(d.children[2].textContent) + '</div></div>').join('');
+  const tie = $('#p-ov .tiebar') ? spaced($('#p-ov .tiebar')).replace(/Show the accounts.*/, '').trim() : '';
+  const table = (head, rows, none, cls) => '<table' + (cls ? ' class="' + cls + '"' : '') + '><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>'
+    + (rows.join('') || '<tr><td colspan="' + head.length + '" class="none">' + none + '</td></tr>') + '</tbody></table>';
+  const status = open.length ? 'Draft: ' + plural(open.length, 'item') + ' open' : 'Final';
+  const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>P&amp;L Flux, ' + esc(DATA.period) + '</title><style>'
+    + '@page{margin:14mm}body{font:12.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:#1e1e1c;margin:32px auto;max-width:1180px;padding:0 24px}'
+    + '.co{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b6a63}h1{font-size:24px;font-weight:600;margin:2px 0 6px}h2{font-size:15px;font-weight:600;margin:28px 0 8px;padding-bottom:5px;border-bottom:2px solid #3a4a5e}'
+    + '.meta{color:#6b6a63;font-size:11.5px}.st{display:inline-block;margin-left:10px;font-size:11px;font-weight:600;padding:2px 10px;border-radius:999px;vertical-align:4px;border:1px solid}'
+    + '.st.f{color:#3a4a5e;border-color:#3a4a5e;background:#eef1f5}.st.d{color:#c72e00;border-color:#c72e00}'
+    + '.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0 8px}.k{border:1px solid #d6d6d4;border-radius:6px;padding:9px 12px}.k .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#6b6a63}'
+    + '.k .v{font-size:18px;font-weight:600;margin:2px 0}.k .s{font-size:11px;color:#6b6a63}.tie{color:#3a4a5e;font-size:12px;margin:6px 0 0}'
+    + '.sum{border-left:3px solid #2e2d29;padding:2px 0 2px 14px}.sum p{margin:0 0 9px}.by{font-size:10.5px;color:#6b6a63;margin-top:2px}'
+    + 'table{border-collapse:collapse;width:100%;font-size:11.5px}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:#6b6a63;text-align:left;border-bottom:1.5px solid #2e2d29;padding:5px 7px}'
+    + 'td{border-bottom:1px solid #e3e3e0;padding:5px 7px;vertical-align:top}td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}td.m{font-family:ui-monospace,Menlo,monospace;font-size:11px;white-space:nowrap}'
+    + 'td.cm{width:42%}td.cm p{margin:0 0 4px}tr.g td{background:#f1f1ef;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}tr.t td{font-weight:600;border-top:1.5px solid #2e2d29}'
+    + 'tr.rv td:first-child{box-shadow:inset 3px 0 0 #c72e00;padding-left:10px}.op{color:#c72e00;font-style:italic}.none{color:#6b6a63;font-style:italic}'
+    + 'ul.open{margin:4px 0;padding-left:18px;color:#c72e00}.disc{margin-top:30px;font-size:10.5px;color:#6b6a63;border-top:1px solid #d6d6d4;padding-top:8px}'
+    + 'thead{display:table-header-group}tr{break-inside:avoid}h2{break-after:avoid}</style></head><body>'
+    + '<div class="co">Serif Biomedicines, Inc.</div><h1>P&amp;L Flux, ' + esc(DATA.period) + '<span class="st ' + (open.length ? 'd' : 'f') + '">' + esc(status) + '</span></h1>'
+    + '<div class="meta">Exported ' + esc(when(new Date().toISOString())) + (Shared.on() ? ' by ' + esc(who(Shared.uid())) : '') + ' &middot; run ' + esc(DATA.run) + ' &middot; console ' + esc(DATA.version)
+    + ' &middot; review threshold ' + money(thr) + '</div><div class="kp">' + tiles + '</div>' + (tie ? '<p class="tie">' + esc(tie) + '</p>' : '')
+    + (open.length ? '<h2>Open items</h2><ul class="open">' + open.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' : '')
+    + '<h2>Executive summary</h2>' + (sum ? '<div class="sum">' + para(sum.text) + '<div class="by">Saved ' + esc((sum.by ? 'by ' + sum.by + ', ' : '') + when(sum.at)) + '</div></div>' : '<p class="none">Not saved.</p>')
+    + '<h2>Actual vs. Actual, ' + esc(heads[1] || '') + ' vs. ' + esc(heads[2] || '') + '</h2>' + (tbl ? '<table><thead><tr>' + keep.map(([h, i]) => '<th' + (i ? ' class="n"' : '') + '>' + esc(h) + '</th>').join('') + '<th>Commentary</th></tr></thead><tbody>' + pl + '</tbody></table>' : '')
+    + (other.length ? '<h2>Other commentary</h2>' + table(['Page', 'Line', 'Commentary'], other, '') : '')
+    + '<h2>Adjustments</h2>' + table(['Kind', 'Adjustment', '<span class="n">Amount</span>', 'Decision', 'Note', 'Decided'], adj, 'No adjustments proposed.')
+    + '<h2>Journal Entries for the NetSuite import</h2>' + table(['External ID', 'Memo', 'Account', 'Department', 'Debit', 'Credit'], je, 'None ready.')
+    + '<h2>Sign-off</h2>' + table(['Role', 'Name', 'Date'], signs, 'No sign-off roles.')
+    + '<p class="disc">Figures, variances and proposed entries are computed from the NetSuite and Coupa exports for this run. Commentary and every decision are the reviewer’s; drafts, where used, were accepted or edited by the reviewer before they were saved.</p></body></html>';
+  download('serif-pl-flux-pack-' + DATA.slug + '.html', html, 'text/html');
+  logAdd({id: 'flux-pack', label: 'Flux pack exported', v: status, note: ''}); save();
+}
+/* The saved commentary as a sheet: every line with commentary, on every page. */
+function fluxCSV(){
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const rows = [['Page', 'Line', 'Commentary', 'Saved by', 'Saved at']];
+  $$('.page tr').forEach(tr => { const t = tr.querySelector(':scope > td > textarea[data-note]'); if (!t || !savedNote(t.dataset.note)) return;
+    const x = tr.cells[0].cloneNode(true); x.querySelectorAll('.mk,.tag').forEach(n => n.remove()); x.querySelectorAll('*').forEach(n => n.append(' '));
+    const p = tr.closest('.page'), b = p && $('.tb.pg[data-p="' + p.id.slice(2) + '"]'), f = S.fin[t.dataset.note];
+    rows.push([b ? b.textContent.replace(/\d+$/, '').trim() : '', x.textContent.replace(/\s+/g, ' ').trim(), S.notes[t.dataset.note], f.by_uid ? Shared.name(f.by_uid) : '', f.at]); });
+  if (savedNote('exec:summary')){ const f = S.fin['exec:summary']; rows.splice(1, 0, ['Executive Overview', 'Executive summary', S.notes['exec:summary'], f.by_uid ? Shared.name(f.by_uid) : '', f.at]); }
+  download('serif-pl-flux-commentary-' + DATA.slug + '.csv', rows.map(r => r.map(q).join(',')).join('\r\n'));
+}
+document.addEventListener('click', ev => { if (ev.target.closest('[data-fluxpack]')) fluxPack(); else if (ev.target.closest('[data-fluxcsv]')) fluxCSV(); });
 shapeCards(); shapeNotes(); show('ov');
 """
     pages.append(runlog(PLR, "flux", read=[("Also read", "GL Coding Review run %s and its decision record %s, saved %s" % (

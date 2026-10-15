@@ -360,8 +360,14 @@ from Claude sits on its line with **Accept**, which copies it into the field, an
 copies it to change; a long draft shows its first lines, with Show all. Written commentary, the
 summary and every note are saved with **Save** (or Cmd+Enter) and then read as finished text, with
 who saved them and when; until then they are marked Not saved. Edit opens a saved note again, and
-Cancel brings back what was saved. A line's commentary counts as written once it is saved. A page that applies the review threshold
-names it at its top, with its value, and says when it differs from the default.
+Cancel brings back what was saved. A line's commentary counts as written once it is saved. The review threshold shows beside the
+title of each page that applies it; click its value to change it, and Reset returns the default.
+
+**Export flux pack**, on the Executive Summary and Management Sign-Off, saves the close as a read-only
+HTML file to hand on: Final, or Draft with what is still open; the saved executive summary; Actual vs.
+Actual with each line's saved commentary; the adjustments and their decisions; the Journal Entries
+for the import; and the sign-offs. Only saved writing goes in. **Commentary, CSV** saves the
+commentary alone, for Excel.
 
 Actual vs. Actual (MoM) also shows each account's average over the 3 and 6 months before.
 By Department ends with **Credits in Expense Accounts**: every account and department whose

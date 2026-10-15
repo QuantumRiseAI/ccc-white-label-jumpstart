@@ -399,8 +399,8 @@ A draft from Claude sits on its card with **Accept**, which copies the note and 
 recommended decision (marked Recommended on its button), and **Edit**, which copies the note to change.
 A card leads with its facts, the draft and the decision; why it was flagged, the Journal Entry, the
 last three months and the lines open beneath it. A page of more than 12 cards opens folded to one
-line each, with Expand all. A page that applies a threshold names it at its top, with its value
-and what it marks, and says when it differs from the default. A note
+line each, with Expand all. A page that applies a threshold shows it beside its title; click its
+value to change it, and Reset returns the default. A note
 is saved with **Save** (or Cmd+Enter) and then reads as finished text, with who saved it and when;
 until then it is marked Not saved. Edit opens it again, and Cancel brings back what was saved. Only the current month gets an entry.
 

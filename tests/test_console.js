@@ -102,6 +102,15 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     ok(/Changed since saved/.test(await p.locator('[data-fbar="' + id + '"] .uns').textContent()), k + ': an edit to a saved note is marked');
     await p.click('[data-fincancel="' + id + '"]');
     ok(await p.evaluate(id => S.notes[id] === 'Department per budget owner', id), k + ': Cancel brings the saved note back');
+    if (k === 'pl'){
+      // the flux pack: read-only, saved writing only, and says what is still open
+      await p.evaluate(() => { show('ov'); });
+      await p.fill('textarea[data-note="exec:summary"]', 'August test summary.'); await p.click('[data-finsave="exec:summary"]');
+      const [pk] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('#p-ov [data-fluxpack]')]);
+      const pack = pk ? fs.readFileSync(await pk.path(), 'utf8') : '';
+      ok(/<h2>Executive summary<\/h2><div class="sum"><p>August test summary\./.test(pack) && /Draft: \d+ items? open/.test(pack) && /Needs commentary/.test(pack) && /<h2>Sign-off<\/h2>/.test(pack) && !/<textarea|<button/.test(pack),
+         'pl: the flux pack carries the saved summary, marks lines without commentary, lists what is open, and has no fields');
+    }
     const [dl] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
     let csvText = ''; if (dl){ const f = await dl.path(); csvText = fs.readFileSync(f, 'utf8'); }
     ok(/Finance/.test(csvText) && /Department per budget owner/.test(csvText), k + ': the CSV carries the edit and the note');
@@ -255,9 +264,17 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await same(PF, 5000) && (await marked(PF)).length > (await over(PF, 25000)).length, 'gl: lowering the Prepaid threshold to $5,000 marks more prepaid flags (' + (await marked(PF)).length + ')');
       await p.fill('#thrcapex', '3000'); await p.fill('#thrprepaid', '10000');
       ok(await same(CAP, 3000) && (await marked(CAP)).length === 2 && await same(PRE, 10000), 'gl: changing the CapEx and Prepaid thresholds marks their screens again');
-      ok(await p.evaluate(() => /CapEx threshold \$3,000:/.test($('#p-capex .thrbar').textContent) && /changed from the default, \$5,000/.test($('#p-capex .thrbar').textContent)
-         && /Prepaid threshold \$10,000:/.test($('#p-prepaid .thrbar').textContent) && /no threshold/.test($('#p-dept .thrbar').textContent) && !$('#p-export .thrbar')),
-         'gl: each page that applies a threshold shows it at its top, marked when changed; a page with none shows none');
+      ok(await p.evaluate(() => $('#p-capex .thrchips [data-thrv="thr_capex"]').textContent === '$3,000' && /Default \$5,000/.test($('#p-capex [data-thrdef="thr_capex"]').textContent)
+         && $('#p-capex [data-thc="thr_capex"]').classList.contains('chg') && $('#p-prepaid [data-thrv="thr_prepaid"]').textContent === '$10,000'
+         && /No threshold/.test($('#p-dept .thrchips').textContent) && !$('#p-export .thrchips')),
+         'gl: each page that applies a threshold shows it by its title, marked when changed; a page with none shows none');
+      // changed where it shows: the value becomes a field, Enter keeps it, Reset goes back to the default
+      await p.evaluate(() => show('capex')); await p.click('#p-capex [data-thedit="thr_capex"]');
+      await p.fill('#p-capex input.thin', '4,000'); await p.press('#p-capex input.thin', 'Enter');
+      ok(await p.evaluate(() => S.thr_capex === 4000 && $('#thrcapex').value === '4,000'), 'gl: a threshold changed by its title is the Settings threshold');
+      await p.click('#p-capex [data-threset="thr_capex"]');
+      ok(await p.evaluate(() => thrOf('thr_capex') === 5000 && $('#p-capex [data-thrdef="thr_capex"]').hidden), 'gl: Reset returns it to the default');
+      await p.evaluate(() => { S.thr_capex = 3000; save(); refresh(); });
       await p.reload(); await p.waitForTimeout(400);
       ok(await p.evaluate(() => S.thr === 1000000 && S.thr_capex === 3000 && S.thr_prepaid === 10000 && $('#thrcapex').value === '3,000') && await same(CAP, 3000),
          'gl: the three thresholds are saved with the review and survive a reload');
