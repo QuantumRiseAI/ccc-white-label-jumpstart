@@ -158,12 +158,15 @@ MONTHLY_EXPORTS = [
 
 def exports_card(m, views):
     flux = "uc2" in str(m.get("ruleset_version", ""))
-    got = {}
+    got, many = {}, {}
     for item in m.get("inputs", []):
         roles = item.get("roles") or (["netsuite_gl"] if str(item.get("path", "")).startswith("netsuite_gl")
                                       else ["coupa"] if str(item.get("path", "")).startswith("coupa") else [])
         for r in roles:
             got.setdefault(r, item)
+            # every file a role was read from: a GL can come in more than one
+            if item.get("path") not in [x.get("path") for x in many.get(r, [])]:
+                many.setdefault(r, []).append(item)
     for item in views.get("inputs", []):
         role = {"forecast_workbook": "plan"}.get(item.get("role"), item.get("role"))
         got.setdefault(role, item)
@@ -173,7 +176,7 @@ def exports_card(m, views):
             continue
         item = got.get(role)
         rows.append("<tr><td>" + esc(label) + "</td><td>"
-                    + ('<span class="mono">' + esc(os.path.basename(str(item.get("path")))) + "</span>"
+                    + ("<br>".join('<span class="mono">' + esc(os.path.basename(str(x.get("path")))) + "</span>" for x in (many.get(role) or [item]))
                        if item else '<span class="expmiss">Not supplied</span>')
                     + "</td><td>" + esc(feeds) + "</td></tr>")
     return ('<div class="card"><h3>Exports this month</h3>'

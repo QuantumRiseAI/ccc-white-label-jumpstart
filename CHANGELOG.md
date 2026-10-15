@@ -50,6 +50,18 @@ serif-pl-flux-aug2026-v1.8.2.html
   Recommended. Why it was flagged (when there is a draft), the Journal Entry, the last three months
   and the lines fold into one list beneath. Approving, modifying, recoding or editing in NetSuite
   opens the Journal Entry. A folded card's header carries Claude's recommendation.
+- **One look for every page**: every page of both consoles opens with the dark header and its own
+  figures, kept current as decisions are made (CapEx and Prepaid: flagged, booked, decided, open;
+  Dept & Entity, Reviewed & Cleared, New This Period, Audit Log, SOX Documentation, Export, Run Log);
+  Settings has a compact one.
+- **Badges**: a nav count is red for decisions due, grey on the confirmation pages (Reviewed & Cleared,
+  New This Period), and a check once a page has nothing open. "Transparency" is now "Confirm".
+- **One status per card**: a single pill (Review while it waits and is marked for review, Pending under
+  the threshold, then the decision) replaces the status text and the Review tag.
+- **The tie, one line**: a tie that passes reads as one line with its details on click; one that fails
+  stays expanded. The YoY Net Loss tile shows last year's figure. The Run Log lists every GL file read.
+- **Dept & Entity thresholds named for what they mark**: "Account recodes $2,500" and "Department
+  recodes, Always reviewed", in place of a review threshold beside "no threshold".
 - **Thresholds by the title**: each page that applies a threshold shows it as a chip beside its title
   (Review on the flux pages; CapEx, Prepaid and Review on the coding pages, and that department flags
   have none), with what it marks on hover. The value is changed in place, and a changed value shows its

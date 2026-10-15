@@ -429,6 +429,16 @@ a.xl{font-size:var(--text--2);color:var(--color-fg-secondary);text-decoration:un
 .sub.shut{max-width:0;opacity:0;pointer-events:none}
 .n{font-size:var(--text--2);background-color:var(--color-red-text);color:#fff;border-radius:var(--radius-pill);padding:.05em .5em;font-variant-numeric:tabular-nums}
 .n:empty{display:none}
+.n.soft{background-color:var(--color-mid-gray)}
+.n.ok,.tb.cur .n.ok{background:none;color:var(--color-warm-gray);padding:0 .2em}
+.tb.cur .n.soft{background-color:var(--color-mid-gray)}
+.tieline{background-color:var(--color-stark);border-radius:var(--radius-sm);margin-bottom:var(--spacing-sm);font-size:var(--text--1)}
+.tieline > summary{display:flex;align-items:baseline;gap:.6em;padding:.65em var(--spacing-sm-md);cursor:pointer;list-style:none}
+.tieline > summary::-webkit-details-marker{display:none}
+.tieline .ok{color:var(--color-action);font-weight:700}
+.tieline .more{margin-left:auto;color:var(--color-fg-secondary);text-decoration:underline;font-size:var(--text--2)}
+.tieline[open] .more{visibility:hidden}
+.tieline > .note{padding:0 var(--spacing-sm-md) .7em calc(var(--spacing-sm-md) + 1.3em)}
 .tb.cur .n{background-color:var(--color-red-text)}
 .icons{display:flex;gap:var(--spacing-3xs);margin-left:auto;flex:none}
 .icons .tb{padding:0 .55em}
@@ -440,6 +450,8 @@ a.xl{font-size:var(--text--2);color:var(--color-fg-secondary);text-decoration:un
 main{max-width:96rem;margin:0 auto;padding:var(--spacing-md) var(--spacing-md-lg) var(--spacing-xl)}
 .page[hidden]{display:none}
 .hero{background-color:var(--color-bg-inverse);color:var(--color-fg-inverse);border-radius:var(--radius-sm);padding:var(--spacing-sm-md);margin-bottom:var(--spacing-sm)}
+.hero.slim{padding-block:var(--spacing-xs)}
+.hero.slim h1{margin:0}
 .hero h1{font-size:var(--text-2);font-weight:500;color:#fff;margin:0 0 .2em;letter-spacing:-0.01em}
 .hero .sub2{color:var(--color-warm-gray);font-size:var(--text--1);margin:0 0 var(--spacing-xs)}
 .hero .ht{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:var(--spacing-xs)}
@@ -510,9 +522,12 @@ input.f{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);pa
   padding:.15em .5em;border:1px solid var(--color-hairline);color:var(--color-fg-secondary);white-space:nowrap}
 .tag.hi{border-color:var(--color-red-text);color:var(--color-red-text)}
 .tag.ink{background-color:var(--color-dark-gray);border-color:var(--color-dark-gray);color:#fff}
-.stp{margin-left:auto;font-size:var(--text--2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--color-fg-secondary)}
-.stp.done{color:var(--color-dark-gray)}
-.stp.rej{color:var(--color-red-text)}
+.stp{margin-left:auto;font-size:var(--text--2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--color-fg-secondary);
+  border:1px solid var(--color-hairline);border-radius:var(--radius-pill);padding:.15em .7em;white-space:nowrap}
+.stp.rv{border-color:var(--color-red-text);color:var(--color-red-text)}
+.item > .ih > .tag:not(.ink){display:none}
+.stp.done{background-color:var(--color-dark-gray);border-color:var(--color-dark-gray);color:#fff}
+.stp.rej{border-color:var(--color-dark-gray);color:var(--color-dark-gray)}
 .item{background-color:var(--color-stark);border-radius:var(--radius-sm);margin-bottom:var(--spacing-xs);border-left:3px solid var(--color-warm-gray)}
 .item.hi{border-left-color:var(--color-red-text)}
 .item.done{border-left-color:var(--color-dark-gray)}
@@ -750,7 +765,10 @@ def runlog(run, kind, also=None, read=()):
     rec.extend(read)
     out.append('<div class="card"><h3>Build record</h3><div class="tw"><table><tbody>'
                + "".join('<tr><td>%s</td><td class="mono">%s</td></tr>' % (e(a), e(b)) for a, b in rec) + "</tbody></table></div></div>")
-    return page("runlog", "<h3>Run Log</h3>" + "".join(out))
+    return page("runlog", hero("Run Log", "", [("Inputs read", str(len(files)), "Files the engine and schedules read"),
+                                               ("Checks run", str(len(m.get("rules_run") or [])), "%d not run" % len(m.get("rules_not_run") or [])),
+                                               ("Run", '<span class="mono">%s</span>' % e(m.get("run_id") or ""), e(str(m.get("generated_at") or "")[:16].replace("T", " ")) + " UTC"),
+                                               ("Engine", e(m.get("engine_version") or ""), "Console " + VERSION)]) + "".join(out))
 
 
 def gap_card():
@@ -769,6 +787,11 @@ def gap_card():
             % (len(GAPS), "" if len(GAPS) == 1 else "s", "has" if len(GAPS) == 1 else "have", e(PERIOD), rows))
 
 
+def live(what, pid="*"):
+    """A header number the page keeps current: an item count, value or tally as decisions are made."""
+    return '<span data-pgs="%s:%s"></span>' % (pid, what)
+
+
 def tie_card(months):
     """The Income Statement tie, at the top of a console's first page, and any month-end gap."""
     return tie_card_only(months) + gap_card()
@@ -781,8 +804,9 @@ def tie_card_only(months):
     bad = [f for f in TIE["failed"] if f["month"] in months]
     tot = " &middot; ".join("%s net: ledger %s, Income Statement %s" % (e(m), money(TIE["totals"][m]["ledger"], True), money(TIE["totals"][m]["report"], True)) for m in months)
     if not bad:
-        return ('<div class="card tiebar" data-tie="pass"><div class="pad"><b>Ties to NetSuite&rsquo;s Income Statement</b><span>%s, %d accounts, every account ties</span>'
-                '<span class="note">%s &middot; %s</span></div></div>' % (e(" and ".join(months)), TIE["accounts"], tot, e(TIE["report"])))
+        return ('<details class="tieline tiebar" data-tie="pass"><summary><span class="ok" aria-hidden="true">&#10003;</span><b>Ties to NetSuite&rsquo;s Income Statement</b>'
+                '<span>%s &middot; %d accounts</span><span class="more">Details</span></summary><div class="note">%s &middot; %s</div></details>'
+                % (e(" and ".join(months)), TIE["accounts"], tot, e(TIE["report"])))
     bad.sort(key=lambda f: -abs(f["difference"]))
     rows = "".join('<tr><td>%s</td><td><span class="code">%s</span>%s</td><td class="n2">%s</td><td class="n2">%s</td><td class="n2 unf">%s</td></tr>'
                    % (e(f["month"]), e(f["code"]), e(f["name"]), money(f["ledger"], True), money(f["report"], True), money(f["difference"], True)) for f in bad)
@@ -809,8 +833,8 @@ def tie_row(months):
 
 
 def hero(title, sub, tiles):
-    return ('<div class="hero"><h1>' + e(title) + "</h1>" + ('<p class="sub2">' + sub + "</p>" if sub else "")
-            + '<div class="ht">' + "".join('<div><div class="k">%s</div><div class="v">%s</div><div class="s">%s</div></div>' % t for t in tiles) + "</div></div>")
+    return ('<div class="hero%s"><h1>' % ("" if tiles else " slim") + e(title) + "</h1>" + ('<p class="sub2">' + sub + "</p>" if sub else "")
+            + ('<div class="ht">' + "".join('<div><div class="k">%s</div><div class="v">%s</div><div class="s">%s</div></div>' % t for t in tiles) + "</div>" if tiles else "") + "</div>")
 
 
 CHECKLIST = ('<div class="card"><div class="ch">Close checklist</div><div class="tw"><table class="cl"><thead><tr><th>Page</th><th>Status</th>'
@@ -827,14 +851,17 @@ def page(pid, inner):
 
 def shell(title, product, sections, pages, data, js):
     nav = []
+    # A badge is red for decisions due; a page of routine confirmations counts in grey.
+    soft = {"clear", "new"} if data.get("kind") == "coding" else set()
+    sc = lambda pid: "n soft" if pid in soft else "n"
     for si, (stitle, items) in enumerate(sections):
         if len(items) == 1:
             pid, label = items[0][:2]
-            nav.append('<div class="tg"><button class="tb pg" data-p="%s">%s<span class="n" data-c="%s"></span></button></div>' % (pid, e(label), pid))
+            nav.append('<div class="tg"><button class="tb pg" data-p="%s">%s<span class="%s" data-c="%s"></span></button></div>' % (pid, e(label), sc(pid), pid))
         else:
-            sub = "".join('<button class="tb pg" data-p="%s">%s<span class="n" data-c="%s"></span></button>' % (pid, e(label), pid) for pid, label in items)
-            nav.append('<div class="tg" data-s="%d"><button class="tb sec" data-s="%d" aria-expanded="false" aria-controls="sub%d">%s<span class="n" data-cs="%d"></span></button>'
-                       '<div class="sub shut" data-s="%d" id="sub%d" role="group" aria-label="%s">%s</div></div>' % (si, si, si, e(stitle), si, si, si, e(stitle), sub))
+            sub = "".join('<button class="tb pg" data-p="%s">%s<span class="%s" data-c="%s"></span></button>' % (pid, e(label), sc(pid), pid) for pid, label in items)
+            nav.append('<div class="tg" data-s="%d"><button class="tb sec" data-s="%d" aria-expanded="false" aria-controls="sub%d">%s<span class="%s" data-cs="%d"></span></button>'
+                       '<div class="sub shut" data-s="%d" id="sub%d" role="group" aria-label="%s">%s</div></div>' % (si, si, si, e(stitle), "n soft" if all(i[0] in soft for i in items) else "n", si, si, si, e(stitle), sub))
     return ("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
             "<title>" + e(title) + "</title><style>" + CSS + "</style></head><body>"
             '<header class="top"><div class="brand">' + DS.LOGO + "<b>" + e(product) + "</b><span>" + e(PERIOD) + "</span></div>"
@@ -843,14 +870,14 @@ def shell(title, product, sections, pages, data, js):
             + SETTINGS_SVG + '</button></div></header><div id="sharedbar" hidden></div><div id="tip"></div><div id="toast" role="status" hidden></div>'
             '<div id="ask" hidden><div class="askbox" role="dialog" aria-modal="true"><h3></h3><div class="askbody"></div><div class="acts">'
             '<button class="pill solid" data-askok>OK</button><button class="pill" data-askno>Cancel</button></div></div></div><main>' + "".join(pages)
-            + page("settings", '<div class="card"><h3>Settings</h3>' + "".join(
+            + page("settings", hero("Settings", "", []) + '<div class="card"><h3>Thresholds</h3>' + "".join(
                        '<div class="pad setcard"><label for="%s"%s>%s</label><span>$</span><input class="f" id="%s" data-thrin="%s" inputmode="numeric" style="width:9ch">%s</div>'
                        % (i, ' style="min-width:9.5rem"' if n else "", lab, i, k, n)
                        for i, k, lab, n in ((("thr", "thr", "Review threshold", ""),) if data.get("kind") != "coding" else (
-                           ("thr", "thr", "Review threshold", '<span class="note">Dept &amp; Entity account recodes, and drafted entries</span>'),
+                           ("thr", "thr", "Account recode threshold", '<span class="note">Dept &amp; Entity account recodes, and drafted entries</span>'),
                            ("thrcapex", "thr_capex", "CapEx threshold", '<span class="note">CapEx Flags</span>'),
                            ("thrprepaid", "thr_prepaid", "Prepaid threshold", '<span class="note">Prepaid Flags</span>'))))
-                   + ('<div class="pad setcard"><span class="note">Department flags have no threshold: each is marked Review, whatever its size.</span></div>'
+                   + ('<div class="pad setcard"><span class="note">Department recodes are always reviewed, whatever their size.</span></div>'
                       if data.get("kind") == "coding" else "") + "</div>"
                    '<div class="card"><h3>Decision record</h3><div class="pad acts"><button class="pill" data-recsave>Save decision record</button>'
                    '<button class="pill" data-recload>Load decision record</button><input type="file" id="recfile" accept=".json,application/json" hidden>'
@@ -1225,9 +1252,11 @@ function paintItems(){
     el.classList.toggle('folded', fold && !el.classList.contains('unfold'));
     el.classList.toggle('foldable', fold);
     el.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('rec', REC[id] === b.dataset.v));
+    // one status: Review while it waits and is marked for review, Pending while it waits under it, then the decision
+    const rv = el.classList.contains('hi') || Array.from(el.querySelectorAll(':scope > .ih > .tag:not(.ink):not(.plain)')).some(t => !t.hidden && t.textContent.trim());
     const st = el.querySelector('.stp'); if (st){ st.textContent = d ? (LABEL[d.v] || d.v) + ((['modify','recode'].indexOf(d.v) > -1 && !(S.notes[id]||'').trim()) ? ', add a note' : '')
-      + (d.by_uid ? ' · ' + Shared.name(d.by_uid) : '') : 'Pending';
-      st.className = 'stp' + (d ? (d.v === 'reject' || d.v === 'none' ? ' rej' : ' done') : ''); }
+      + (d.by_uid ? ' · ' + Shared.name(d.by_uid) : '') : rv ? 'Review' : 'Pending';
+      st.className = 'stp' + (d ? (d.v === 'reject' || d.v === 'none' ? ' rej' : ' done') : rv ? ' rv' : ''); }
     el.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('on', !!d && d.v === b.dataset.v));
     const nt = el.querySelector('textarea[data-note]'); if (nt){ nt.hidden = nt.dataset.ask === undefined && !(d && ['modify','recode','netsuite','reject','none'].indexOf(d.v) > -1) && !(S.notes[id]||'').trim();
       if (document.activeElement !== nt) nt.value = S.notes[id] || ''; } });
@@ -1334,11 +1363,11 @@ function shapeCards(){
 }
 /* thresholds: each page that applies one says so at its top, with its value now */
 const THR_TXT = {
-  thr: DATA.kind === 'coding' ? ['Review threshold', 'Recodes of {v} or more are flagged for review.']
+  thr: DATA.kind === 'coding' ? ['Account recodes', 'Account recodes and drafted entries of {v} or more are flagged for review.']
                               : ['Review threshold', 'Lines that moved {v} or more need commentary.'],
   thr_capex: ['CapEx threshold', 'Purchases of {v} or more are flagged as possible capital assets.'],
   thr_prepaid: ['Prepaid threshold', 'Charges of {v} or more that cover future months are flagged as possible prepaids.'],
-  all: ['Department flags', 'Every department flag is reviewed, whatever its size.']};
+  all: ['Department recodes', 'A department recode is reviewed whatever its size.']};
 const PENCIL = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg>';
 function shapeThresholds(){
   $$('.page').forEach(pg => { if (pg.id === 'p-settings') return;
@@ -1349,7 +1378,7 @@ function shapeThresholds(){
     keys.sort((a, b) => (a === 'all') - (b === 'all'));
     const box = document.createElement('div'); box.className = 'thrchips';
     box.innerHTML = keys.map(k => k === 'all'
-      ? '<span class="thc none" data-tipsm data-tip="' + esc(THR_TXT[k][1]) + '"><span class="tl">' + THR_TXT[k][0] + '</span><span class="tv0">No threshold</span></span>'
+      ? '<span class="thc none" data-tipsm data-tip="' + esc(THR_TXT[k][1]) + '"><span class="tl">' + THR_TXT[k][0] + '</span><span class="tv0">Always reviewed</span></span>'
       : '<span class="thc" data-thc="' + k + '" data-tipsm data-tip=""><span class="tl">' + THR_TXT[k][0] + '</span>'
         + '<button class="tv" data-thedit="' + k + '" aria-label="Change the ' + THR_TXT[k][0] + '"><span data-thrv="' + k + '"></span>' + PENCIL + '</button>'
         + '<span class="def" data-thrdef="' + k + '" hidden></span></span>').join('');
@@ -1392,10 +1421,27 @@ document.addEventListener('click', ev => {
 });
 /* counts: what is open on each page, and in each section */
 function counts(){
+  // a page's badge counts what waits on a decision, and shows a check once nothing does
   $$('[data-c]').forEach(el => { const items = $$('#p-' + el.dataset.c + ' [data-item]');
-    const open = items.filter(x => !decided(x.dataset.item)).length + jeOpen(el.dataset.c).length; el.textContent = open || ''; });
-  $$('[data-cs]').forEach(el => { const n = $$('.sub[data-s="' + el.dataset.cs + '"] [data-c]').reduce((a, x) => a + (Number(x.textContent) || 0), 0);
-    el.textContent = n || ''; });
+    const open = items.filter(x => !decided(x.dataset.item)).length + jeOpen(el.dataset.c).length;
+    el.textContent = open || (items.length ? '\u2713' : ''); el.classList.toggle('ok', !open && items.length > 0); });
+  $$('[data-cs]').forEach(el => { const kids = $$('.sub[data-s="' + el.dataset.cs + '"] [data-c]');
+    const n = kids.reduce((a, x) => a + (Number(x.textContent) || 0), 0), done = kids.some(x => x.classList.contains('ok'));
+    el.textContent = n || (done ? '\u2713' : ''); el.classList.toggle('ok', !n && done); });
+  // the numbers in each page's header that move with the review
+  $$('[data-pgs]').forEach(el => { const [pg, what] = el.dataset.pgs.split(':');
+    const its = pg === '*' ? [] : $$('#p-' + pg + ' [data-item]'), op = its.filter(x => !decided(x.dataset.item));
+    const F = ['fixes', 'inimport', 'nsedit'].indexOf(what) > -1 ? Object.values(fixesOf()) : [];
+    el.textContent = what === 'done' ? (its.length - op.length) + ' of ' + its.length
+      : what === 'open' ? String(op.length)
+      : what === 'openamt' ? money(op.reduce((a, x) => a + (Number(x.dataset.amt) || 0), 0))
+      : what === 'decs' ? String(Object.keys(S.dec).length)
+      : what === 'fins' ? String(Object.keys(S.fin || {}).filter(savedNote).length)
+      : what === 'logs' ? String(Object.keys(S.log).length)
+      : what === 'signs' ? Object.keys(S.sign).length + ' of ' + $$('[data-sname]').length
+      : what === 'fixes' ? String(F.length)
+      : what === 'inimport' ? String(F.filter(f => f.in_import).length)
+      : what === 'nsedit' ? String(F.filter(f => f.path === 'Edited in NetSuite').length) : ''; });
 }
 function signs(){
   $$('[data-sname]').forEach(n => { const r = n.dataset.sname, s = S.sign[r], row = n.closest('.sign');
@@ -1740,7 +1786,7 @@ def flux():
     tiles = [("Total OpEx", short(opex["actual"]), fav(-(opex["actual"] - opex["prior"]), ("&#9660; " if opex["actual"] < opex["prior"] else "&#9650; ") + short(abs(opex["actual"] - opex["prior"]))) + " vs. " + e(PRIOR)),
              ("Net Loss", short(-net["actual"]), fav(-(net["actual"] - net["prior"]), short(abs(net["actual"] - net["prior"])) + (" favorable" if net["actual"] < net["prior"] else " unfavorable")) + " MoM"),
              ("YoY Net Loss", "&ndash;", "No " + e(PY) + " in the GL exports") if NO_PY else
-             ("YoY Net Loss", short(-net["actual"]), fav(-(net["actual"] - net["prior_year"]), short(abs(net["actual"] - net["prior_year"])) + (" favorable" if net["actual"] < net["prior_year"] else " unfavorable")) + " vs. " + e(PY)),
+             ("YoY Net Loss", short(-net["prior_year"]), fav(-(net["actual"] - net["prior_year"]), short(abs(net["actual"] - net["prior_year"])) + (" favorable" if net["actual"] < net["prior_year"] else " unfavorable")) + " vs. " + e(PY)),
              ("Adj Pending", '<span data-pending>' + str(len(ent) + len(revs)) + "</span>", "Review before close")]
     cards = [tile("R&amp;D Spend (" + MON + ")", short(rd[0]), fav(-(rd[0] - rd[1]), short(abs(rd[0] - rd[1]))) + " vs. " + e(PRIOR[:3])),
              tile("G&amp;A Spend (" + MON + ")", short(ga[0]), fav(-(ga[0] - ga[1]), short(abs(ga[0] - ga[1]))) + " vs. " + e(PRIOR[:3])),
@@ -2098,7 +2144,7 @@ def flux():
         rid = sid("REV", r["account"], r.get("department"))
         f = F.get(r["finding_id"]) or {}
         v = r.get("difference") or 0
-        cards_b.append('<div class="item" data-item="%s" data-amt="%s"><div class="ih"><span class="tag hi">Forecast revision</span><b>%s</b><span class="stp">Pending</span></div><div class="ib"><div class="kv">'
+        cards_b.append('<div class="item" data-item="%s" data-amt="%s"><div class="ih"><span class="tag ink">Forecast revision</span><b>%s</b><span class="stp">Pending</span></div><div class="ib"><div class="kv">'
                        '<div><div class="l">Account</div><div class="x">%s %s%s</div></div><div><div class="l">Variance (ledger vs. forecast)</div><div class="x">%s</div></div>'
                        '<div><div class="l">Impact</div><div class="x">Forecast only, no Journal Entry</div></div></div><div class="why">%s</div>'
                        '<div class="acts"><button class="pill" data-d="%s" data-v="ack" data-label="%s">Acknowledge &amp; Flag</button><button class="pill" data-d="%s" data-v="none" data-label="%s">No Action</button>'
@@ -2291,7 +2337,7 @@ function fluxPack(){
     if (!g) open.push(lb + ' has not signed.');
     return '<tr><td>' + esc(lb) + '</td><td>' + (g ? esc(g.name) : '<span class="op">Not signed</span>') + '</td><td>' + esc(g ? g.date : '') + '</td></tr>'; });
   const tiles = $$('#p-ov .hero .ht > div').map(d => '<div class="k"><div class="l">' + esc(d.children[0].textContent) + '</div><div class="v">' + esc(d.children[1].textContent) + '</div><div class="s">' + esc(d.children[2].textContent) + '</div></div>').join('');
-  const tie = $('#p-ov .tiebar') ? spaced($('#p-ov .tiebar')).replace(/Show the accounts.*/, '').trim() : '';
+  const tie = $('#p-ov .tiebar') ? spaced($('#p-ov .tiebar')).replace(/Show the accounts.*/, '').replace(/\s*Details\s*/, ' ').trim() : '';
   const table = (head, rows, none, cls) => '<table' + (cls ? ' class="' + cls + '"' : '') + '><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>'
     + (rows.join('') || '<tr><td colspan="' + head.length + '" class="none">' + none + '</td></tr>') + '</tbody></table>';
   const status = open.length ? 'Draft: ' + plural(open.length, 'item') + ' open' : 'Final';
@@ -2664,8 +2710,15 @@ def coding():
                 + ("".join(flags) or none("No expense lines flagged in " + PERIOD + "."))
                 + '<h4 class="dh">Booked to %s<span class="note">%s &middot; %s</span></h4>' % (accts, count(len(booked_), "line"), money(sum(float(x.split('data-amt="')[1].split('"')[0]) for x in booked_), True))
                 + ("".join(booked_) or none("No bills posted to " + accts.lower() + " accounts in " + PERIOD + ".")))
-    pages.append(page("capex", "<h3>CapEx Flags</h3>" + two_way("Capital", cap_cards, cap_booked, "capex", "Fixed Assets")))
-    pages.append(page("prepaid", "<h3>Prepaid Flags</h3>" + two_way("Prepaid", pre_cards, pre_booked, "prepaid", "Prepaid")))
+    booked_amt = lambda b: sum(float(x.split('data-amt="')[1].split('"')[0]) for x in b)
+    def screen_hero(title, pid, kind, flags, booked_, accts):
+        return hero(title + ", " + PERIOD, "", [
+            ("Flagged", str(len(flags)), money(sum(i[5] for i in items if i[0] == kind), True) + " on expense accounts"),
+            ("Booked to " + accts, str(len(booked_)), money(booked_amt(booked_), True)),
+            ("Decided", live("done", pid), "Items on this page"),
+            ("Open", live("open", pid), live("openamt", pid) + " to decide")])
+    pages.append(page("capex", screen_hero("CapEx Flags", "capex", "capex", cap_cards, cap_booked, "Fixed Assets") + two_way("Capital", cap_cards, cap_booked, "capex", "Fixed Assets")))
+    pages.append(page("prepaid", screen_hero("Prepaid Flags", "prepaid", "prepaid", pre_cards, pre_booked, "Prepaid") + two_way("Prepaid", pre_cards, pre_booked, "prepaid", "Prepaid")))
     exc_html = ""
     issues = ([("Not applied", "the file is malformed: " + exc_run.get("error", ""))] if exc_run.get("status") == "malformed" else []) \
         + [("Rejected, line %s" % r["row"], "%s: %s" % (r["vendor"] or "no vendor", "; ".join(r["problems"]))) for r in exc_run.get("rejected") or []] \
@@ -2681,14 +2734,29 @@ def coding():
                            e(f["title"]), e(f["finding_id"]), e(f["excepted"]["vendor"]), money(f.get("amount_at_risk") or 0, True),
                            e(f["excepted"]["reason"]), e(f["excepted"]["approved_by"] + (", " + f["excepted"]["approved_on"] if f["excepted"].get("approved_on") else "")))
                                for f in excepted)))
-    pages.append(page("dept", '<h3>Dept &amp; Entity Flags <span class="note">%d items &middot; %s total</span></h3>' % (len(dcards), money(sum(i[5] for i in items if i[0] == "dept"), True))
+    pages.append(page("dept", hero("Dept &amp; Entity Flags, ".replace("&amp;", "&") + PERIOD, "", [
+                          ("Flags", str(len(dcards)), money(sum(i[5] for i in items if i[0] == "dept"), True)),
+                          ("Drafted entries", str(sum(1 for i in items if i[0] == "dept" and i[2] == "Draft")), "Journal Entries Claude drafted"),
+                          ("Decided", live("done", "dept"), "Items on this page"),
+                          ("Open", live("open", "dept"), live("openamt", "dept") + " to decide")])
                       + ('<p class="note">%s on an account other than the item\'s usual one, under %s: %s in all, not listed.</p>' % (count(len(small), "Coupa PO line"), money(thr), money(sum(f["amount_at_risk"] for f in small), True)) if small else "")
                       + "".join(dcards) + exc_html))
-    pages.append(page("clear", '<h3>Reviewed &amp; Cleared <span class="note">%d vendors &middot; %s</span></h3><div class="legend">No check flagged these vendors. '
-                      'Confirm each one, or recode it if the coding is wrong. Start with those at $2,500 or more.</div>' % (len(clear), money(sum(r["amount"] for r in clear), True)) + "".join(ccards)))
-    pages.append(page("new", '<h3>New This Period <span class="note">%d vendors &middot; first appearance in the ledger</span></h3><div class="legend">'
-                      '<span class="tag hi">Review</span>$2,500 or more<span class="tag">Routine</span>Under $2,500</div>' % len(news) + "".join(ncards)))
-    pages.append(page("audit", '<h3>Audit Log</h3><div class="card"><div class="tw"><table><thead><tr><th>Timestamp</th><th>Item</th><th>Decision</th><th>By</th><th>Detail</th></tr></thead>'
+    big = lambda rs: [r for r in rs if (r.get("amount") or 0) >= thr]
+    pages.append(page("clear", hero("Reviewed &amp; Cleared, ".replace("&amp;", "&") + PERIOD, "", [
+                          ("Vendors", str(len(clear)), money(sum(r["amount"] for r in clear), True) + ", no check flagged them"),
+                          (money(thr) + " or more", str(len(big(clear))), money(sum(r["amount"] for r in big(clear)), True) + ", start here"),
+                          ("Confirmed", live("done", "clear"), "Confirmed or recoded"),
+                          ("Open", live("open", "clear"), live("openamt", "clear") + " to confirm")])
+                      + '<div class="legend">Confirm each vendor, or recode it if the coding is wrong.</div>' + "".join(ccards)))
+    pages.append(page("new", hero("New This Period, " + PERIOD, "", [
+                          ("New vendors", str(len(news)), money(sum(r["amount"] for r in news), True) + ", first time in the ledger"),
+                          (money(thr) + " or more", str(len(big(news))), money(sum(r["amount"] for r in big(news)), True) + ", marked Review"),
+                          ("Decided", live("done", "new"), "Confirmed or recoded"),
+                          ("Open", live("open", "new"), live("openamt", "new") + " to decide")]) + "".join(ncards)))
+    pages.append(page("audit", hero("Audit Log, " + PERIOD, "", [
+                          ("Decisions", live("decs"), "Recorded on this console"),
+                          ("Notes saved", live("fins"), "Saved as finished"),
+                          ("Log entries", live("logs"), "Every change, in order")]) + '<div class="card"><div class="tw"><table><thead><tr><th>Timestamp</th><th>Item</th><th>Decision</th><th>By</th><th>Detail</th></tr></thead>'
                       '<tbody data-audit></tbody></table></div></div>'))
     srcs = "".join('<tr><td>%s</td><td class="mono" style="text-align:right">%s</td></tr>' % (e(a), e(b)) for a, b in
                    [(", ".join(i.get("roles") or ["input"]).replace("_", " ").title(), i["path"]) for i in GLR["manifest"]["inputs"]]
@@ -2706,18 +2774,25 @@ def coding():
         ("Department and account flags", str(len(dcards))), *([("Accepted exceptions", "%d items, %s" % (len(excepted), money(exc_amt, True)))] if excepted else []), ("Vendors with no flags", str(len(clear))), ("New vendors", str(len(news)))])
     sign = "".join('<div class="sign"><b>%s</b><input class="f" data-sname="%s" placeholder="Name, title"><input class="f" data-sdate="%s" placeholder="Date"><button class="pill" data-signbtn="%s">Sign</button></div>'
                    % (lab, k, k, k) for k, lab in (("prep", "Prepared by"), ("rev", "Reviewed by"), ("appr", "Approved by")))
-    pages.append(page("sox", '<h3>SOX Documentation</h3><div class="card"><div class="ch">Source Citations</div><div class="tw"><table><tbody>' + srcs + "</tbody></table></div></div>"
+    pages.append(page("sox", hero("SOX Documentation, " + PERIOD, "", [
+                          ("Sources", str(len(GLR["manifest"]["inputs"])), "Read as exported"),
+                          ("Ledger tie", ("Pass" if not TIE or TIE["passed"] else "Fail") if TIE else "Not run", "%s accounts" % TIE["accounts"] if TIE else "No Income Statement"),
+                          ("Flagged of GL", "%.1f%%" % (100 * (famt + exc_amt) / gl_6x), money(famt + exc_amt, True)),
+                          ("Sign-offs", live("signs"), "Prepared, reviewed, approved")]) + '<div class="card"><div class="ch">Source Citations</div><div class="tw"><table><tbody>' + srcs + "</tbody></table></div></div>"
                       + '<div class="card"><div class="ch">GL Tie-Out</div><div class="tw"><table><tbody>' + tie_rows + "</tbody></table></div></div>"
                       + '<div class="card"><div class="ch">Policy Application Summary</div><div class="tw"><table><tbody>' + pol_rows + "</tbody></table></div></div>"
                       + '<div class="card"><div class="ch">Management Review &amp; Sign-Off</div><div class="pad">' + sign + "</div></div>"))
-    pages.append(page("export", '<div class="card"><div class="ch">Export to NetSuite<button class="pill r" data-wpsave>Work paper, HTML</button><button class="pill solid" data-export>Export to NetSuite, CSV</button></div>'
-                      '<div class="sumline" data-fixsum></div>'
+    pages.append(page("export", hero("Export, " + PERIOD, "", [
+                          ("Agreed fixes", live("fixes"), "Approved, modified, recoded or edited"),
+                          ("In the import", live("inimport"), "Reclasses ready for the CSV"),
+                          ("Edited in NetSuite", live("nsedit"), "Fixed in NetSuite, not in the CSV")]) + '<div class="card"><div class="ch">Export to NetSuite<button class="pill r" data-wpsave>Work paper, HTML</button><button class="pill solid" data-export>Export to NetSuite, CSV</button></div>'
+                      '<div class="sumline" data-fixsum hidden></div>'
                       '<div class="tw"><table><thead><tr><th>Memo</th><th>Account</th><th>Department</th><th>Project / Program</th><th class="n2">Debit</th><th class="n2">Credit</th><th>Status</th></tr></thead><tbody data-exportrows></tbody></table></div></div>'
                       '<div class="card"><div class="ch">Edited in NetSuite<span class="r note">Fixed on the bill or Journal Entry itself; resolved, and not in the CSV</span></div>'
                       '<div class="tw"><table><thead><tr><th>Ref ID</th><th>Item</th><th>Document</th><th class="n2">Amount</th><th>Note</th><th>Decided</th></tr></thead><tbody data-nsrows></tbody></table></div></div>'))
     sections = [("Overview", [("ov", "Overview")]),
                 ("Review", [("capex", "CapEx Flags"), ("prepaid", "Prepaid Flags"), ("dept", "Dept & Entity")]),
-                ("Transparency", [("clear", "Reviewed & Cleared"), ("new", "New This Period")]),
+                ("Confirm", [("clear", "Reviewed & Cleared"), ("new", "New This Period")]),
                 ("Documentation", [("audit", "Audit Log"), ("sox", "SOX Documentation"), ("export", "Export")])]
     SKIPPED.extend("vendor note for " + k for k in (RAW_DRAFTS.get("vendors") or {}) if k not in used_ven)
     # Reference IDs: numbered by screen within the close, largest first, then by item id, so a

@@ -126,6 +126,9 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       await p.evaluate(() => show('dept'));
       // A page of many cards opens folded: the reviewer opens the card first.
       ok(await p.locator('[data-item="' + ns.id + '"] [data-v="netsuite"]').isHidden(), 'gl: a long page opens with its cards folded');
+      ok(await p.evaluate(() => $('[data-c="clear"]').classList.contains('soft') && !$('[data-c="dept"]').classList.contains('soft')
+         && /^\d+$/.test($('[data-c="dept"]').textContent) && $('#p-dept .hero [data-pgs="dept:open"]').textContent === $('[data-c="dept"]').textContent),
+         'gl: Dept & Entity counts its open decisions in red and in its header; the confirmation pages count in grey');
       await p.click('[data-item="' + ns.id + '"] > .ih');
       await p.click('[data-item="' + ns.id + '"] [data-v="netsuite"]');
       ok(await p.evaluate(n => S.dec[n].v === 'netsuite' && decided(n) && !jeLive(n) && /Edited in NetSuite/.test($('[data-item="' + n + '"] .stp').textContent)
@@ -137,6 +140,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(!!csv3 && csv3.includes(await p.evaluate(id => DATA.je[id].id, id)) && !csv3.includes(ns.ext), 'gl: an item edited in NetSuite is absent from the CSV; the reclass is in it');
       ok(/1 item edited in NetSuite, not in the import/.test(await p.evaluate(() => $('#tip').textContent)), 'gl: the export says what was edited in NetSuite and left out');
       await p.evaluate(() => show('export'));
+      ok(await p.textContent('#p-export [data-pgs="*:nsedit"]') === '1', 'gl: the Export header counts the item edited in NetSuite');
       ok(/Edited in NetSuite: 1/.test(await p.textContent('[data-fixsum]')) && (await p.textContent('[data-nsrows]')).includes(ns.doc) && (await p.textContent('[data-nsrows]')).includes(ns.ref),
          'gl: Export counts the paths and lists the item edited in NetSuite with its document and reference ID');
       const [wp] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('[data-wpsave]')]);
@@ -245,7 +249,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       // SERIF-142: a threshold per screen. CapEx and Prepaid have their own, saved like the general one; a Department flag has none
       await p.evaluate(() => show('settings'));
       ok(JSON.stringify(await p.evaluate(() => $$('[data-thrin]').map(t => [t.dataset.thrin, t.value]))) === JSON.stringify([['thr', '2,500'], ['thr_capex', '5,000'], ['thr_prepaid', '25,000']])
-         && /Department flags have no threshold/.test(await p.textContent('#p-settings')), 'gl: Settings has the review, CapEx and Prepaid thresholds ($2,500, $5,000, $25,000); department flags have none');
+         && /Department recodes are always reviewed/.test(await p.textContent("#p-settings")), 'gl: Settings has the review, CapEx and Prepaid thresholds ($2,500, $5,000, $25,000); department flags have none');
       const marked = s => p.evaluate(s => $$(s).filter(x => { const g = x.querySelector(':scope > .ih > [data-rev]'); return x.classList.contains('hi') && g && !g.hidden; }).map(x => x.dataset.item), s);
       const over = (s, t) => p.evaluate(([s, t]) => $$(s).filter(x => Number(x.dataset.tamt || x.dataset.amt) >= t).map(x => x.dataset.item), [s, t]);
       const same = async (s, t) => { const a = await marked(s), b = await over(s, t); return a.length === b.length && a.every((x, i) => x === b[i]); };
@@ -266,7 +270,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await same(CAP, 3000) && (await marked(CAP)).length === 2 && await same(PRE, 10000), 'gl: changing the CapEx and Prepaid thresholds marks their screens again');
       ok(await p.evaluate(() => $('#p-capex .thrchips [data-thrv="thr_capex"]').textContent === '$3,000' && /Default \$5,000/.test($('#p-capex [data-thrdef="thr_capex"]').textContent)
          && $('#p-capex [data-thc="thr_capex"]').classList.contains('chg') && $('#p-prepaid [data-thrv="thr_prepaid"]').textContent === '$10,000'
-         && /No threshold/.test($('#p-dept .thrchips').textContent) && !$('#p-export .thrchips')),
+         && /Always reviewed/.test($("#p-dept .thrchips").textContent) && !$('#p-export .thrchips')),
          'gl: each page that applies a threshold shows it by its title, marked when changed; a page with none shows none');
       // changed where it shows: the value becomes a field, Enter keeps it, Reset goes back to the default
       await p.evaluate(() => show('capex')); await p.click('#p-capex [data-thedit="thr_capex"]');

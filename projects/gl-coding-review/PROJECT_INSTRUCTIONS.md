@@ -251,7 +251,7 @@ section opens its pages beside its title.
     fixed-asset or prepaid accounts, to confirm or recode to expense;
   * **Dept & Entity**: department and account recodes, each with its proposed Journal Entry,
     and any Journal Entry you drafted.
-* **Transparency**: **Reviewed & Cleared**, the vendors no check flagged, and **New This
+* **Confirm**: **Reviewed & Cleared**, the vendors no check flagged, and **New This
   Period**, the vendors first seen this month. Both are grouped by department, then account;
   each vendor is confirmed, or recoded with a filled-in Journal Entry and a note. A vendor on
   Reviewed & Cleared shows which checks it passed (coded as in the two months before, account

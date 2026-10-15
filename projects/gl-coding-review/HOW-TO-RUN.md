@@ -323,7 +323,7 @@ left on it. Run log and Settings are the icons at the right.
   or the ones that differ), and the close checklist: each page, what is open on it
   and what that is worth. A line of the checklist opens its page.
 * **Review**: CapEx Flags, Prepaid Flags, and Dept & Entity.
-* **Transparency**: Reviewed & Cleared, and New This Period.
+* **Confirm**: Reviewed & Cleared, and New This Period.
 * **Documentation**: Audit Log, SOX Documentation, and Export.
 
 ### A Card
