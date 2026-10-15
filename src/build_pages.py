@@ -191,7 +191,7 @@ dept_acct_vendor = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))
 for i, lines in enumerate((gl_now, gl_prior)):
     for l in lines:
         if PNL(l["account_code"]):
-            dept_acct_vendor[(l["department"] or "Non-Specific", l["account_code"])][(l.get("vendor_or_name") or "").strip() or "(blank)"][i] += l["amount"]
+            dept_acct_vendor[(l["department"] or "Non-Specific", l["account_code"])][(l.get("vendor_or_name") or "").strip() or "Journals, no vendor"][i] += l["amount"]
 ytd = sum(l["amount"] for p, ls in by_period.items() if p.endswith(PERIOD[-4:]) and SS.period_key(p) <= SS.period_key(PERIOD)
           for l in ls if l["account_code"][:1] in "67")
 gl_6x = sum(l["amount"] for l in gl_now if l["account_code"][:1] == "6")
@@ -583,6 +583,8 @@ td .draft.open .dt{display:block}
 .ih .dchip{font-size:var(--text--2);color:var(--color-action);background-color:var(--color-action-tint);border:1px solid var(--color-action-tint);border-radius:var(--radius-pill);padding:.1em .6em}
 .foldall{display:flex;gap:var(--spacing-xs);align-items:center;margin:0 0 var(--spacing-xs);font-size:var(--text--1);color:var(--color-fg-secondary)}
 .foldall .lk{margin-left:0;font-size:var(--text--1)}
+.draft.auto{border-left-color:var(--color-mid-gray);background-color:var(--color-stark)}
+.draft.auto .who{color:var(--color-fg-secondary)}
 .thrbar{display:flex;flex-wrap:wrap;align-items:baseline;gap:.35em var(--spacing-sm);margin:0 0 var(--spacing-sm);padding:.55em .9em;
   font-size:var(--text--1);color:var(--color-fg-secondary);background-color:var(--color-stark);border-radius:var(--radius-xs);
   border-left:3px solid var(--color-action)}
@@ -1155,7 +1157,7 @@ document.addEventListener('click', ev => {
   const u = ev.target.closest('[data-use]');
   if (u){ if (blocked()) return; const d = DATA.drafts[u.dataset.use]; S.notes[d.target] = d.note; finalize(d.target);
     if (d.item && d.v) S.dec[d.item] = {v: d.v, at: new Date().toISOString(), by_uid: Shared.uid()};
-    logAdd({id: d.item || d.target, label: 'Claude draft used', v: d.v || 'used', note: d.note}); save(); refresh(); return; }
+    logAdd({id: d.item || d.target, label: u.dataset.use.startsWith('auto:') ? 'Auto draft used' : 'AI draft used', v: d.v || 'used', note: d.note}); save(); refresh(); return; }
   if (ev.target.closest('[data-recsave]')){ saveRecord(); return; }
   if (ev.target.closest('[data-recload]')){ if (!blocked()) $('#recfile').click(); return; }
   if (ev.target.closest('[data-carry]')){ if (!blocked()) carryRun(); return; }
@@ -1240,6 +1242,17 @@ const EDIT = new Set();
 const savedNote = k => { const f = S.fin[k], n = String(S.notes[k] || ''); return !!f && !!n.trim() && f.text === n; };
 function finalize(k){ S.fin[k] = {text: String(S.notes[k] || ''), at: new Date().toISOString(), by_uid: Shared.uid()}; EDIT.delete(k); }
 function shapeNotes(){
+  // A line's computed summary is a draft like any other: Accept or Edit it, or write your own.
+  // Where an AI draft sits on the line, it stands in for the summary.
+  $$('td > .cm').forEach(cm => { const td = cm.parentElement, t = td.querySelector(':scope > textarea.c[data-note]');
+    if (!t || td.closest('[data-item]')) return;
+    if (td.querySelector('.draft')){ cm.hidden = true; return; }
+    const note = cm.innerText.replace(/\s+\n/g, '\n').trim(); if (!note) return;
+    const key = 'auto:' + t.dataset.note; DATA.drafts = DATA.drafts || {}; DATA.drafts[key] = {note: note, target: t.dataset.note};
+    const d = document.createElement('div'); d.className = 'draft auto'; d.dataset.draft = key;
+    d.innerHTML = '<div class="dhd"><span class="who">Auto Draft</span><span class="dacts"><button class="pill sm solid" data-use="' + esc(key) + '">Accept</button>'
+      + '<button class="pill sm" data-edit="' + esc(key) + '">Edit</button></span></div><div class="dt"></div><button class="lk more" data-dmore hidden>Show all</button>';
+    d.querySelector('.dt').textContent = note; cm.replaceWith(d); });
   $$('textarea.c[data-note]').forEach(t => { const k = t.dataset.note, at = t.closest('.acts') || t;
     const fin = document.createElement('div'); fin.className = 'fin'; fin.dataset.fin = k; fin.hidden = true;
     fin.innerHTML = '<div class="ft"></div><div class="fm"><span class="by"></span><button class="lk" data-finedit="' + esc(k) + '">Edit</button></div>';
