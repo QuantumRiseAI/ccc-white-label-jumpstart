@@ -70,6 +70,47 @@ with tempfile.TemporaryDirectory() as d:
     ok([b_["document"] for b_ in bills] == ["INV1", "INV3"] and bills[0]["amount"] == 150.0,
        "Flagship Labs LLC and TPC bills, expense lines only; the FSP charges, other Flagship entities and journals are not pass-through")
 
+# The review itself, on cases the code review found: its functions, taken from build_pages.py.
+import ast, calendar  # noqa: E401
+from collections import defaultdict
+src = open(os.path.join(B, "src", "build_pages.py"), encoding="utf-8").read()
+want = {"MONTHS", "T_AND_E", "service_end", "one_month", "_match_groups", "review_breakdown"}
+ns = {"re": re, "calendar": calendar, "defaultdict": defaultdict, "money": lambda v, c=False: "$%s" % format(abs(v), ",.2f"),
+      "ACC": {"6201000": "General Consulting", "6816000": "Office Non-Cap Software", "6603000": "Parking", "6704000": "Travel"}}
+ns["acct_name"] = lambda c: ns["ACC"].get(c, "")
+tree = ast.parse(src)
+for node in tree.body:
+    names = {node.name} if isinstance(node, ast.FunctionDef) else {t.id for t in getattr(node, "targets", []) if isinstance(t, ast.Name)}
+    month_table = ast.unparse(node).startswith(("MONTHS[", "MONTHS.update("))
+    if (names & want) or month_table:
+        exec(compile(ast.Module([node], []), "build_pages", "exec"), ns)
+se, rb = ns["service_end"], ns["review_breakdown"]
+print("Reading a service period")
+ok(se("Subscription - May 2026 - Apr 2027") == (2027, 4) and se("July 15, 2026 - June 30, 2027") == (2027, 6) and se("7/15/26-6/1/27") == (2027, 6)
+   and se("11/1/2026 - 10/31/2027") == (2027, 10) and se("Aug 2026") is None, "a memo's service period is read in its common shapes")
+ok(not ns["one_month"]("Subscription - May 2026 - Apr 2027") and ns["one_month"]("Help desk Aug 2026"), "a range is not a month's charge; a single month is")
+BL = lambda acct, leaf, amt, dept="General G&A": {"account_code": acct, "account_leaf": leaf, "department": dept, "amount": amt, "project": "", "program": ""}
+IT = lambda no, name, hm, amt: {"acct_no": no, "acct_name": name, "header_memo": hm, "memo": "", "amount": amt, "date": "", "vendor": "", "department": "", "document": ""}
+print("Reading a breakdown against its bill")
+bill = {"amount": 1000.0, "lines": [BL("6816000", "Office Non-Cap Software", 500.0), BL("6201000", "General Consulting", 500.0)]}
+bd = {"total": 1000.0, "stated_total": 1000.0, "lines": [IT("6555", "Software Costs", "Notion renewal", 500.0), IT("6100", "Consultants", "Bay State IT - Parking", 500.0)]}
+r = rb(bill, bd, 5000.0, 25000.0, "Sep 2026")
+ok({i["header_memo"]: i["serif"] for i in r["items"]} == {"Notion renewal": "6816000", "Bay State IT - Parking": "6201000"} and r["ties"],
+   "two activities of the same amount map by account, not by order")
+bill = {"amount": 500.0, "lines": [BL("6201000", "General Consulting", 500.0)]}
+r = rb(bill, {"total": 500.0, "stated_total": 500.0, "lines": [IT("6100", "Consultants", "Hotel parking", 500.0)]}, 5000.0, 25000.0, "Sep 2026")
+ok(sum(l.get("debit") or 0 for l in r["reclass"]) == 500.0 and len(r["reclass"]) == 2, "an item that reads as two kinds of T&E is reclassed once")
+bill = {"amount": 460.0, "lines": [BL("6201000", "General Consulting", 460.0)]}
+r = rb(bill, {"total": 460.0, "stated_total": 460.0, "lines": [IT("6100", "Consultants", "Kyndryl", 500.0), IT("6100", "Consultants", "Parking refund", -40.0)]}, 5000.0, 25000.0, "Sep 2026")
+ok(all((l.get("debit") or 0) >= 0 and (l.get("credit") or 0) >= 0 for l in r["reclass"]) and {(l["account"], l.get("credit")) for l in r["reclass"]} >= {("6603000", 40.0)},
+   "a refund's reclass runs the other way, with no negative amounts")
+bill = {"amount": 500.0, "lines": [BL("6201000", "General Consulting", 300.0), BL("6201000", "General Consulting", 200.0, "General R&D")]}
+r = rb(bill, {"total": 500.0, "stated_total": 500.0, "lines": [IT("6100", "Consultants", "Kyndryl", 500.0)]}, 5000.0, 25000.0, "Sep 2026")
+ok(r["ties"] and r["items"][0]["serif"] == "6201000", "an activity booked across departments still maps and ties")
+r = rb({"amount": 500.0, "lines": [BL("6201000", "General Consulting", 500.0)]}, {"total": 500.0, "stated_total": 400.0, "lines": [IT("6100", "Consultants", "Kyndryl", 500.0)]},
+       5000.0, 25000.0, "Sep 2026")
+ok(not r["ties"] and "Total row" in r["why"], "a breakdown whose items do not add to its own Total row says so")
+
 # The console, on the Aug exports, with a breakdown made up for one of its bills.
 I = os.path.join(B, "inputs", "aug2026")
 RUN = os.path.join(B, "out", "aug2026", "gl-coding-review", "run.json")

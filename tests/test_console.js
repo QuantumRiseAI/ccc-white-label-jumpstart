@@ -109,7 +109,21 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     await p.evaluate(() => show('sox')); await p.waitForTimeout(300); await p.click('#tosign'); await p.waitForTimeout(900);
     ok(offOv && await p.evaluate(() => $('#signoff').getBoundingClientRect().top < innerHeight && /Sign Off · \d of 3/.test($('#tosign').textContent)),
        k + ': the Sign Off button shows on SOX only, scrolls to the sign-off card and counts the signatures');
+    ok(await p.evaluate(() => !/\u2713/.test(($('[data-checklist]') || {textContent: ''}).textContent)), k + ': page names in the checklist carry no badge');
+    if (k === 'gl') ok(await p.evaluate(() => $$('#p-new .item').filter(x => /Routine/.test((x.querySelector('.ih .tag') || {}).textContent || '')).every(x => !x.querySelector('.stp').classList.contains('rv'))),
+       'gl: a Routine item reads Pending, not Review');
+    if (k === 'pl') ok(await p.evaluate(() => { const n0 = $$('#p-ava [data-pane="mom"] tr[data-var]').filter(overThr).length;
+        S.thr_pct = 1000; refresh(); const n1 = $$('#p-ava [data-pane="mom"] tr[data-var]').filter(overThr).length, chip = $('#p-ava [data-thrv="thr"]').textContent;
+        delete S.thr_pct; save(); refresh(); return n1 < n0 && /and 1000%/.test(chip) && $$('#p-ava [data-pane="mom"] tr[data-var]').filter(overThr).length === n0; }),
+      'pl: an optional percent narrows the lines needing commentary, shows on the chip, and clears');
+    if (k === 'gl') ok(await p.evaluate(() => $$('#p-dept .item').filter(x => /Same item, two accounts/.test(x.textContent)).every(x => DATA.je[x.dataset.item] && x.querySelector('[data-v="reject"]').textContent === 'Coding Stands')),
+      'gl: a same item on two accounts is a card with the recode and Coding Stands');
     if (k === 'pl'){
+      ok(await p.evaluate(() => $$('.draft.auto a.xl').length > 0 && !$$('.draft.auto').some(d => /NetSuiteCoupa|\dNetSuite/.test(DATA.drafts[d.dataset.draft].note))),
+         'pl: a line summary drafted from the ledger keeps its NetSuite and Coupa links, and its text reads cleanly');
+      ok(await p.evaluate(() => { const d = $$('#p-ava [data-pane="mom"] tr[data-var]').map(tr => tr.querySelector('.draft.auto')).find(Boolean); if (!d) return true;
+          const k = DATA.drafts[d.dataset.draft].target; d.querySelector('[data-use]').click(); const r = savedNote(k) && !explained(k); delete S.notes[k]; delete S.fin[k]; save(); refresh(); return r; }),
+         'pl: an accepted line summary is saved but does not count as commentary that explains the move');
       // the flux pack: read-only, saved writing only, and says what is still open
       await p.evaluate(() => { show('ov'); });
       await p.fill('textarea[data-note="exec:summary"]', 'August test summary.'); await p.click('[data-finsave="exec:summary"]');
@@ -118,9 +132,15 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(/<h2>Executive summary<\/h2><div class="sum"><p>August test summary\./.test(pack) && /Draft: \d+ items? open/.test(pack) && /Needs commentary/.test(pack) && /<h2>Sign-off<\/h2>/.test(pack) && !/<textarea|<button/.test(pack),
          'pl: the flux pack carries the saved summary, marks lines without commentary, lists what is open, and has no fields');
     }
-    const [dl] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
+    const got = []; const onDl = d => got.push(d); p.on('download', onDl);
+    await p.evaluate(() => exportCSV()); for (let i = 0; i < 20 && got.length < 2; i++) await p.waitForTimeout(150); p.off('download', onDl);
+    const dl = got.find(d => /\.csv$/.test(d.suggestedFilename())), sup = got.find(d => /-support\.html$/.test(d.suggestedFilename()));
     let csvText = ''; if (dl){ const f = await dl.path(); csvText = fs.readFileSync(f, 'utf8'); }
     ok(/Finance/.test(csvText) && /Department per budget owner/.test(csvText), k + ': the CSV carries the edit and the note');
+    const supText = sup ? fs.readFileSync(await sup.path(), 'utf8') : '';
+    const ext = await p.evaluate(id => DATA.je[id].id, id);
+    ok(!!sup && supText.includes('>' + ext + '<') && /Department per budget owner/.test(supText) && /matched to the CSV by External ID/.test(supText) && !/<textarea|<button/.test(supText),
+       k + ': the export writes the support file with it, each entry by External ID with its reason and note');
     let ns = null;
     if (k === 'gl'){
       // Edited in NetSuite: the fix was made on the bill itself. Decided, out of the CSV, in the record and the work paper

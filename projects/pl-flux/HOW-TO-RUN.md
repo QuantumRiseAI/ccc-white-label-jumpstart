@@ -30,9 +30,10 @@ and the difference, and exits 2. A failed tie stops the close there: export the 
 Income Statement again. Then:
 
 ```sh
+# Leave out --forecast when the month has no cut of its own (see Each Month).
 python3 serif_uc2_flux.py --period "Sep 2026" \
   --gl       netsuite_gl_* \
-  --coupa    coupa_po_lines_2026.csv \
+  --coupa    coupa_po_lines_*.csv \
   --forecast serif_rolling_forecast_2026-09.xlsx \
   --plan     serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
   --pending  . \
@@ -53,8 +54,8 @@ python3 serif_uc2_flux.py --period "Sep 2026" \
 python3 serif_views.py out/sep2026/run.json \
   --gl     netsuite_gl_* \
   --plan   serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
-  --coupa  coupa_po_lines_2026.csv \
-  --roster ukg_full_roster_hrbp_<date>.csv \
+  --coupa  coupa_po_lines_*.csv \
+  --roster ukg_full_roster_*.csv \
   --balance-sheet netsuite_balance_sheet_*.xls \
   --keep-names
 ```
@@ -165,9 +166,9 @@ decision record each time you ask for a rerun, a summary or an email.
 | `Draft the commentary.` | Commentary for the accounts named, or every account still needing it, built into the console |
 | `Redraft the executive summary.` | Rewrites the executive summary on the Executive Overview from the commentary you have explained |
 | `Draft the follow-up email.` | One email per department from the questions in your notes, such as accrual confirmations, for you to send |
-| `Build the NetSuite import.` | Puts every entry you want on Journal Entries, then checks the **NetSuite import, CSV** you export. A person imports it. |
+| `Build the NetSuite import.` | Puts every entry you want on Adjustments, then checks the **Export to NetSuite, CSV** you export, with its support file. A person imports it. |
 | `Draft the forecast revisions.` | The changes to the rolling forecast a finding calls for, with who approves them |
-| `Summarize the session.` | The hand-off: runs, decisions, commentary, what is left, checks not run, the work paper |
+| `Summarize the session.` | The hand-off: runs, decisions, commentary, what is left, checks not run, the flux pack |
 | `List the follow-ups.` | A checklist of everything waiting on someone, from your decision record, with an ID, owner, due date and status for each |
 | `Check the posted entries.` | Compares what posted in NetSuite with the import you approved: Matches, Differences found or Not found, entry by entry |
 | `What is the support for Journal Entry 1234?` | Finds the item, the decision, the note and who approved it, in the decision records you attach, or says there is none |
@@ -197,9 +198,9 @@ imports.
 
 * Today the connector pulls the month's link IDs (below), and Claude can look up a document
   as NetSuite holds it now, for example to see that an accrual is posted.
-* The month's GL still comes from the saved search export. Once the scripts read the
-  connector's results, Claude pulls the month itself and the uploads stop. Until then,
-  attach the exports.
+* The month's GL and Income Statement can come from the connector: Claude runs
+  `netsuite_gl_detail.sql` and `netsuite_income_statement.sql` and the scripts read the saved
+  results, in place of uploading those two exports.
 * Coupa has no connector yet. When it has one, it is read-only too.
 
 To connect the NetSuite connector and set its tool permissions, see [`CONNECT-NETSUITE.md`](CONNECT-NETSUITE.md).
@@ -363,7 +364,7 @@ who saved them and when; until then they are marked Not saved. Edit opens a save
 Cancel brings back what was saved. A line's commentary counts as written once it is saved. The review threshold shows beside the
 title of each page that applies it; click its value to change it, and Reset returns the default.
 
-**Export flux pack**, on the Executive Summary and Management Sign-Off, saves the close as a read-only
+**Export flux pack**, on the Executive Summary and the **Sign-Off & Export** card at the foot of SOX & GAAP, saves the close as a read-only
 HTML file to hand on: Final, or Draft with what is still open; the saved executive summary; Actual vs.
 Actual with each line's saved commentary; the adjustments and their decisions; the Journal Entries
 for the import; and the sign-offs. Only saved writing goes in. **Commentary, CSV** saves the
@@ -400,9 +401,8 @@ not the ledger's. Payroll tax on the bonus needs the payroll register.
   times its usual month and at or over the threshold. It may be a missed accrual coming back,
   so the commentary says whether last month needed one.
 
-**Download NetSuite JE CSV** holds every entry approved, or modified with a note, as edited:
-External ID, Date, Account, Department, Project, Program, Debit, Credit and Memo, with the note in
-the memo. An entry out of balance or unchanged is left out.
+**Export to NetSuite, CSV** holds every entry approved, or modified with a note, as edited: External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs.
+An entry out of balance or unchanged is left out. The same export saves the support file beside it (`...-support.html`): every entry in the import, by External ID, with its reason, the decision and who made it, the note and its lines, to attach in NetSuite with the import.
 
 ### SOX & GAAP
 

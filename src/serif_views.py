@@ -1971,7 +1971,9 @@ def build_views(run, args):
         # rather than stopping the run.
         try:
             extra_views["balance_sheet"] = balance_sheet(args.balance_sheet, period, inputs)
-        except SystemExit:
+        except SystemExit as stop:
+            if "no column for" not in str(stop):
+                raise                      # a report that cannot be read says why
             dark.append({"id": "balance_sheet", "title": "Balance sheet",
                          "needs": f"the NetSuite Balance Sheet report through {period} "
                                   f"({os.path.basename(args.balance_sheet)} ends before it)"})
@@ -2018,6 +2020,10 @@ def main(argv=None):
     ap.add_argument("--dept-codes", dest="dept_codes",
                     help="Serif's confirmed Coupa department code mapping, coupa_dept_code_mapping.csv")
     args = ap.parse_args(argv)
+    # An optional report given as a pattern the shell found no file for
+    # (netsuite_balance_sheet_*.xls) was not supplied: its view says so.
+    if args.balance_sheet and "*" in args.balance_sheet and not os.path.exists(args.balance_sheet):
+        args.balance_sheet = None
 
     for path in [args.run_json] + (args.gl or []) + [p for p in (args.plan, args.coupa, args.roster,
                                                                   args.dept_codes, args.balance_sheet) if p]:
