@@ -246,7 +246,8 @@ def _gl_line(values, cols):
         "internal_id": (values[cols["internal_id"]].strip()
                         if cols["internal_id"] is not None and cols["internal_id"] < len(values)
                         else ""),
-        "coupa_url": next((v.strip() for v in values if v.strip().startswith(COUPA_INVOICE)), ""),
+        # A connector field can hold the link and then a note ('<link> | ...'): keep the link.
+        "coupa_url": next((v.strip().split()[0] for v in values if v.strip().startswith(COUPA_INVOICE)), ""),
         # 'FL087030260-1' is PO FL087030260, line 1; 'No PO' is none.
         "coupa_po": po,
     }
@@ -1124,6 +1125,7 @@ def read_income_statement_query(path, months) -> list[dict]:
 def income_statement_totals(path, month) -> dict:
     """The Income Statement's totals for one month, by the names NetSuite's report gives
     them, from either the .xls report or the connector's query result."""
+    path = pick_income_statement(path, [month])
     if not is_income_statement_query(path):
         return {r["name"].strip(): r["values"] for r in read_balance_sheet(path, [month])}
     total = defaultdict(float)
@@ -1138,11 +1140,32 @@ def income_statement_totals(path, month) -> dict:
     return {k: {month: round(v, 2)} for k, v in total.items()}
 
 
+def pick_income_statement(paths, months) -> str:
+    """The first of the Income Statement files that holds every month asked for: NetSuite's
+    .xls report or the connector's result for netsuite_income_statement.sql. Stops, saying
+    why, when none does."""
+    if isinstance(paths, str):
+        return paths
+    why = []
+    for path in paths:
+        try:
+            if is_income_statement_query(path):
+                read_income_statement_query(path, months)
+            else:
+                read_balance_sheet(path, months)
+            return path
+        except SystemExit as stop:
+            why.append(str(stop))
+    raise SystemExit(" ".join(why) or "No Income Statement file was given.")
+
+
 def income_statement_tie(by_period, path, months) -> dict:
     """-> {report, months, accounts, passed, failed: [{month, code, name, ledger, report,
     difference}], totals: {month: {ledger, report}}}. An account in either the ledger or
     the report that differs by a cent or more fails. The report is NetSuite's .xls or the
-    connector's result for netsuite_income_statement.sql."""
+    connector's result for netsuite_income_statement.sql; given several, the first that
+    holds every month is used."""
+    path = pick_income_statement(path, months)
     sign, names, report = 1, {}, defaultdict(float)
     query_names = {}
     if is_income_statement_query(path):
@@ -1335,7 +1358,9 @@ def main(argv=None):
     t = sub.add_parser("tie", help="tie the close month (and with --prior, the month before)")
     t.add_argument("--period", required=True, help='the close month, eg "Sep 2026"')
     t.add_argument("--gl", nargs="+", required=True, help="the NetSuite Custom General Ledger export(s)")
-    t.add_argument("--income-statement", required=True, help="the NetSuite Income Statement by month report")
+    t.add_argument("--income-statement", required=True, nargs="+", action="extend",
+                   help="the NetSuite Income Statement by month report or the connector's result; "
+                        "given several, the first that holds every month tied is used")
     t.add_argument("--prior", action="store_true", help="tie the month before as well (the P&L Flux)")
     args = ap.parse_args(argv)
     period = shift(args.period.strip(), 0)

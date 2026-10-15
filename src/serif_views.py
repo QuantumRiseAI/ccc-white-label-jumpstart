@@ -1967,7 +1967,14 @@ def build_views(run, args):
             extra_views["payroll"] = payroll_analytics(current, prior, staff, period,
                                                        names=getattr(args, "keep_names", False))
     if getattr(args, "balance_sheet", None):
-        extra_views["balance_sheet"] = balance_sheet(args.balance_sheet, period, inputs)
+        # A report that ends before the month (last month's, say) leaves the view out
+        # rather than stopping the run.
+        try:
+            extra_views["balance_sheet"] = balance_sheet(args.balance_sheet, period, inputs)
+        except SystemExit:
+            dark.append({"id": "balance_sheet", "title": "Balance sheet",
+                         "needs": f"the NetSuite Balance Sheet report through {period} "
+                                  f"({os.path.basename(args.balance_sheet)} ends before it)"})
     elif uc == "flux":
         dark.append({"id": "balance_sheet", "title": "Balance sheet",
                      "needs": "the NetSuite Balance Sheet report (--balance-sheet)"})

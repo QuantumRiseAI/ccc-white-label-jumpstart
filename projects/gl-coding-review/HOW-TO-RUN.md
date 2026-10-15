@@ -21,7 +21,7 @@ Statement, account by account:
 ```sh
 python3 serif_sources.py tie --period "Sep 2026" \
   --gl netsuite_gl_* \
-  --income-statement netsuite_income_statement_by_month_*.xls
+  --income-statement netsuite_income_statement_by_*
 ```
 
 It prints that every account ties, or each account that does not, with both figures and the
@@ -54,7 +54,7 @@ rolling forecast workbook whose prior cut is the plan; `--plan-vintage` names th
 
 ```sh
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
-  --gl netsuite_gl_* --income-statement netsuite_income_statement_by_month_*.xls \
+  --gl netsuite_gl_* --income-statement netsuite_income_statement_by_* \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 

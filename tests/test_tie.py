@@ -88,6 +88,13 @@ with tempfile.TemporaryDirectory() as d:
     open(bad, "w").write(spreadsheetml([r_ if r_[0] != "6410000 - Lab Supplies/Consumables" else [r_[0], "100.50", "210.00"] for r_ in IS_ROWS]))
     r = run(bad)
     ok(r.returncode == 2 and "6410000" in r.stdout and "-10.00" in r.stdout, "exits 2 and names the account that does not tie")
+    julx = os.path.join(d, "netsuite_income_statement_by_month_jul.xls")
+    open(julx, "w").write(spreadsheetml([[c for c in r_[:2]] for r_ in IS_ROWS]))
+    r = run(julx, isx)
+    ok(r.returncode == 0 and "(netsuite_income_statement_by_month.xls)" in r.stdout,
+       "given two reports, the one that holds the month is tied")
+    r = run(julx)
+    ok(r.returncode == 1 and "no column for Aug 2026" in r.stderr, "a report without the month stops, saying so")
 
 # The console build, on the Aug exports, against an Income Statement missing an account.
 I = os.path.join(B, "inputs", "aug2026")

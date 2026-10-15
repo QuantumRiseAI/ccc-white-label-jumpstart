@@ -53,7 +53,7 @@ Put the Project's files and the month's exports in one folder, and run from ther
 
 ```sh
 python3 serif_sources.py tie --period "Sep 2026" --gl netsuite_gl_* \
-  --income-statement netsuite_income_statement_by_month_*.xls
+  --income-statement netsuite_income_statement_by_*
 
 python3 serif_uc1_engine.py --period "Sep 2026" --gl netsuite_gl_* \
   --coupa coupa_po_lines_2026.csv --pending . --out out
@@ -64,7 +64,7 @@ python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_* \
   --netsuite-ids netsuite_link_ids_sep2026.csv --keep-names
 
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
-  --gl netsuite_gl_* --income-statement netsuite_income_statement_by_month_*.xls \
+  --gl netsuite_gl_* --income-statement netsuite_income_statement_by_* \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 
@@ -172,7 +172,8 @@ in place of the exports. Run both queries in one go, so an entry posted in betwe
 Page through each result until every row is read. Save the rows with code, straight from
 the results; never retype, summarize or edit a row. The scripts read these files as they
 are: pass the GL file with `--gl`, beside any saved search exports for earlier months (no
-month in two files), and the Income Statement file with `--income-statement`. The GL file
+month in two files), and the Income Statement file with `--income-statement`. Given both
+the report and the query's result, the scripts tie to the one that holds every month needed. The GL file
 carries each line's internal ID and Coupa fields, so the link IDs query is not needed with it.
 
 The Income Statement query groups by accounting period, as NetSuite's report does; a query
@@ -311,7 +312,7 @@ After the three scripts run, write `drafts.json` and build the console again wit
 
 ```sh
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
-  --gl netsuite_gl_* --income-statement netsuite_income_statement_by_month_*.xls \
+  --gl netsuite_gl_* --income-statement netsuite_income_statement_by_* \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026 --drafts drafts.json
 ```
 
