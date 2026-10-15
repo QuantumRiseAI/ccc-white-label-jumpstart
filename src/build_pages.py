@@ -2655,7 +2655,8 @@ def coding():
         A card covering several bills names the bill each line is about."""
         if document not in {b["document"] for b in PT_BILLS}:
             return ""
-        rv, who = PT_REV.get(document), ("Bill %s: " % e(document)) if named else ""
+        kind = next((b.get("txn_type") or "Bill" for b in PT_BILLS if b["document"] == document), "Bill")
+        rv, who = PT_REV.get(document), ("%s %s: " % (e(kind), e(document))) if named else ""
         if not rv:
             return ('<div class="ptflag"><b>%sPass-through bill.</b> One line here may hold several items. Attach its cost breakdown from Coupa '
                     'to review them; see Pass-Through Bills.</div>' % who)
@@ -2895,7 +2896,7 @@ def coding():
                 seen[(l.get("vendor_or_name") or "", norm(l["description"]))][l["account_code"]] += abs(l["amount"])
     # A line another Dept & Entity entry already moves is left to that entry.
     moved = {(d, l.get("account")) for f in dfind for l in (ents.get(f["finding_id"]) or {}).get("lines", []) for d in (l.get("documents") or [])}
-    flips = defaultdict(list)
+    flips, same_item_codings = defaultdict(list), set()
     for l in by_period.get(PERIOD, []):
         k = (l.get("vendor_or_name") or "", norm(l.get("description")))
         if (l["document_number"], l["account_code"]) in moved:
@@ -2909,6 +2910,7 @@ def coding():
         by_dept = defaultdict(float)
         for l in ls:
             by_dept[l.get("department") or ""] += l["amount"]
+            same_item_codings.add((vname, now, l.get("department") or ""))
         src = {"project": ls[0].get("project"), "program": ls[0].get("program")}
         je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": ls[0].get("date") or "", "memo": "Recode %s %s from %s to %s, as billed before" % (vname, ls[0]["description"][:40], now, before),
                    "lines": je_lines([x for d, v in sorted(by_dept.items()) if round(v, 2)
@@ -2931,16 +2933,18 @@ def coding():
         c = max(r.get("by_coding") or [{"account": "", "department": "", "current": 0}], key=lambda x: abs(x.get("current") or 0))
         return c.get("department") or "Non-Specific", c["account"], c.get("current") or r["amount"]
 
-    def vcard(iid, r, tag, why, actions, checks=False, coding=None, flag=False, amt=None):
-        dept, a, camt = coding or coding_of(r)
+    def vcard(iid, r, tag, why, actions, checks=False, flag=False, move=None):
+        """A vendor card. `move`, for a flag, names the codings the card is about: their lines, the
+        Journal Entry moving them, its memo, amount and document."""
+        dept, a, camt = coding_of(r)
         dv = (RAW_DRAFTS.get("vendors") or {}).get(r["vendor"]) or {}
         dh = ""
-        if dv.get("recommend") in ("clear", "question", "entry"):
+        doc = (move or {}).get("doc") or line_doc(r["vendor"])
+        if dv.get("recommend") in ("clear", "question", "entry") and (not move or note_fits(r["vendor"], dv, doc)):
             used_ven.add(r["vendor"])
             v_ = {"clear": "confirm", "entry": "recode"}.get(dv["recommend"])
             dh = draft("ven:" + iid, txt(dv.get("note")), iid, iid if v_ else None, v_,
                        {"confirm": "Confirm.", "recode": "Recode."}.get(v_, "Ask the owner."))
-        doc = line_doc(r["vendor"])
         if doc:
             nsdoc[iid] = doc["type"] + " " + doc["document"]
         cur = "<br>".join(coding_(c["account"], c.get("department")) for c in (r.get("by_coding") or []) if round(c.get("current") or 0)) or coding_(a)
@@ -2949,11 +2953,13 @@ def coding():
         je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": (doc or {}).get("date") or "", "memo": "Recode %s from %s %s" % (r["vendor"], a, dept),
                    "lines": je_lines([{"account": a, "department": dept, "debit": camt}, {"account": a, "department": dept, "credit": camt, "reverses_line": True}],
                                      dict(zip(("project", "program"), pp.pop())) if len(pp) == 1 else None), "when": "recode"}
-        amts[iid] = (r["amount"] if amt is None else amt) or 0
+        if move:
+            je[iid].update(memo=move["memo"], lines=je_lines(move["lines"]))
+        amts[iid] = (move["amount"] if move else r["amount"]) or 0
         return ('<div class="item" data-item="%s" data-amt="%s"%s><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span><span class="tag%s">%s</span></div>'
                 '<div class="ib"><div class="kv"><div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Document / item</div><div class="x">%s%s</div></div>'
                 '<div><div class="l">%s</div><div class="x">%s</div></div></div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
-                % (iid, round(amts[iid], 2), ' data-flag data-thr="thr"' if flag else "", iid, e(r["vendor"]), money(r["amount"], True), " hi" if tag == "Review" else (" plain" if not tag else ""), tag, cur,
+                % (iid, round(amts[iid], 2), ' data-flag data-thr="thr"' if flag else "", iid, e(r["vendor"]), money(amts[iid], True), " hi" if tag == "Review" else (" plain" if not tag else ""), tag, cur,
                    (e(doc["type"] + " " + doc["document"]) + "<small>" + e(doc["text"]) + "</small>") if doc else "&ndash;", doc_links(doc["document"]) if doc else "",
                    "Lines this month", str(((r.get("detail") or {}).get("count") or 0)), (why if checks else '<div class="why">' + why + "</div>") if why else "",
                    "".join(pt_flag(d, True) for d in dict.fromkeys(str(i["document"]) for i in (r.get("detail") or {}).get("items") or [])) + dh + history(r["vendor"]), je_editor(iid, je[iid]["lines"], "recode"), lines_html(r["vendor"]), acts(iid, r["vendor"], actions), iid))
@@ -3005,26 +3011,70 @@ def coding():
     # is flagged in the run with no screen of its own. Each gets a vendor card on Dept &
     # Entity: the coding stands (Confirm) or is recoded with a filled-in Journal Entry.
     VC_FLAGS = {"changed": "Coding changed", "plan": "Coded off plan"}
+    # A coding another card already moves (CapEx, Prepaid, a Dept & Entity entry, Same item)
+    # is left to that card, and a new vendor is on New This Period: one bill, one card.
+    carded = {(r_["vendor"], r_["from_account"], r_["department"]) for k in screen for r_ in screen[k]}
+    for f in dfind:
+        x = ents.get(f["finding_id"])
+        t = f.get("transaction") or {}
+        vn = t.get("vendor_or_name") or ""
+        carded |= {(vn, l["account"], l.get("department") or "") for l in (x or {}).get("lines", []) if l.get("reverses_line") or l.get("credit")}
+        if t.get("account_code"):
+            carded.add((vn, t["account_code"], t.get("department") or ""))
+    carded |= same_item_codings
     vc_cards = []
-    for r in sorted((r for r in vrows if any(f.get("id") in VC_FLAGS for f in r.get("flags") or [])),
-                    key=lambda r: -max(f["amount"] for f in r["flags"] if f.get("id") in VC_FLAGS)):
-        fls = [f for f in r["flags"] if f.get("id") in VC_FLAGS]
-        amt = max(f["amount"] for f in fls)
-        coding = None
-        ch = next((f for f in fls if f["id"] == "changed"), None)
-        if ch and ch.get("match"):
-            m = ch["match"][0]
-            cur = next((c.get("current") or 0 for c in r.get("by_coding") or []
-                        if c["account"] == m.get("account") and (c.get("department") or "") == (m.get("department") or "")), 0)
-            if round(cur, 2):
-                coding = (m.get("department") or "Non-Specific", m["account"], cur)
+    vc = []
+    for r in vrows:
+        fls = [f for f in r.get("flags") or [] if f.get("id") in VC_FLAGS]
+        if not fls or any(f.get("id") == "new" for f in r["flags"]):
+            continue
+        cods = {(c["account"], c.get("department") or ""): c for c in r.get("by_coding") or [] if round(c.get("current") or 0, 2)}
+        keys = {}
+        for f in fls:
+            if f["id"] == "changed":
+                ks = [(m.get("account"), m.get("department") or "") for m in f.get("match") or []]
+            else:
+                planned = {(q.get("account"), q.get("department") or "") for m in f.get("match") or [] for q in m.get("not") or []}
+                ks = [k for k in cods if k not in planned]
+            for k in ks:
+                if k in cods and (r["vendor"],) + k not in carded:
+                    keys.setdefault(k, f["id"])
+        if keys:
+            vc.append((r, fls, keys, cods))
+    for r, fls, keys, cods in sorted(vc, key=lambda x: -sum(abs(x[3][k]["current"]) for k in x[2])):
+        # Where the lines go back to: the coding the vendor used before, or the planned one.
+        hist = lambda c: abs(c.get("prior") or 0) + abs(c.get("prior2") or 0)
+        past = [c for c in r.get("by_coding") or [] if (c["account"], c.get("department") or "") not in keys and hist(c) > 0.005]
+        before = max(past, key=hist) if past else None
+        before = (before["account"], before.get("department") or "") if before else None
+        plan = max(r.get("planned") or [], key=lambda q: q.get("amount") or 0, default=None)
+        plan_to = (plan.get("account"), plan.get("department") or "") if plan else None
+        its = (r.get("detail") or {}).get("items") or []
+        lines = []
+        ch = next((f.get("before") for f in fls if f["id"] == "changed" and f.get("before")), None)
+        usual = (ch["account"], ch.get("department") or "") if ch else None
+        for k, why_id in keys.items():
+            to = (plan_to if why_id == "plan" else (usual or before)) or usual or before or plan_to or k
+            v = round(cods[k]["current"], 2)
+            pp = {(i.get("project") or "", i.get("program") or "") for i in its if i["account"] == k[0] and (i.get("department") or "") == k[1]}
+            src = dict(zip(("project", "program"), next(iter(pp)))) if len(pp) == 1 else {}
+            lines += [dict(src, account=to[0], department=to[1] or "Non-Specific", **{("debit" if v > 0 else "credit"): abs(v)}),
+                      dict(src, account=k[0], department=k[1] or "Non-Specific", reverses_line=True, **{("credit" if v > 0 else "debit"): abs(v)})]
+        amt = round(sum(abs(cods[k]["current"]) for k in keys), 2)
+        on = [i for i in its if (i["account"], i.get("department") or "") in keys]
+        top = max(on, key=lambda i: abs(i.get("amount") or 0), default=None)
+        doc = {"type": top.get("type") or "Bill", "document": str(top["document"]), "text": top.get("text") or "", "date": top.get("date") or ""} if top else None
+        tos = sorted({(l["account"], l["department"]) for l in lines if not l.get("reverses_line")})
+        memo = "Recode %s from %s to %s" % (r["vendor"], ", ".join("%s %s" % (a_, d_ or "Non-Specific") for a_, d_ in keys), ", ".join("%s %s" % t_ for t_ in tos))
         iid = sid("VC", r["vendor"])
-        items.append(("dept", iid, " / ".join(VC_FLAGS[f["id"]] for f in fls), r["vendor"], "", amt,
-                      (coding or coding_of(r))[1], ""))
+        items.append(("dept", iid, " / ".join(VC_FLAGS[f["id"]] for f in fls), r["vendor"], (doc or {}).get("text") or "", amt,
+                      ", ".join(a_ for a_, _ in keys), ", ".join(a_ for a_, _ in tos)))
         vc_cards.append(vcard(iid, r, "Review" if amt >= thr else "Routine",
-                              " ".join("<b>%s:</b> %s%s" % (VC_FLAGS[f["id"]], en(f.get("why") or ""), (" <b>Action:</b> " + en(f["do"])) if f.get("do") else "") for f in fls),
+                              " ".join("<b>%s:</b> %s%s" % (VC_FLAGS[f["id"]], en(f.get("why") or ""), (" <b>Action:</b> " + en(f["do"])) if f.get("do") else "") for f in fls)
+                              + " The entry moves %s on %s to %s; edit it if the lines belong elsewhere." % (money(amt, True), ", ".join("%s / %s" % (a_, d_ or "Non-Specific") for a_, d_ in keys),
+                                                                                                            ", ".join("%s / %s" % t_ for t_ in tos)),
                               (("confirm", "Confirm, Coding Stands"), ("recode", "Recode This Line"), ("netsuite", "Edited in NetSuite")),
-                              coding=coding, flag=True, amt=amt))
+                              flag=True, move={"lines": lines, "memo": memo, "amount": amt, "doc": doc}))
 
     pt_cards = []
     for b in PT_BILLS:

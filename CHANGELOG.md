@@ -42,15 +42,18 @@ serif-pl-flux-aug2026-v1.8.2.html
 Found by running both Projects on Sep 2026 and writing the drafts as the Project would.
 
 - **Coding changed or off plan**, on Dept & Entity in the GL Coding Review: a vendor card, CODING-NN,
-  for each vendor flagged Coding changed or Coded off plan, to confirm or recode with a filled-in
-  Journal Entry. These flags had no card on any page: in Sep 2026, 13 vendors and $295,491.93 of
+  for each vendor flagged Coding changed or Coded off plan, to confirm or recode. The card covers
+  the flagged codings no other card already moves (a new vendor stays on New This Period), and its
+  Journal Entry moves them back to the vendor's usual coding or to the plan. These flags had no
+  card on any page: in Sep 2026, 13 vendors and $295,491.93 of
   flagged spend (Aldevron $180,261.56, UMass Chan, Jubilant, Beacon Hill, Fisher's facility-repairs
   coding) were nowhere in the console, and drafts for them were left out. A vendor card names each
   pass-through bill it covers.
 - **A bill a Journal Entry already moves is not proposed again** (ruleset
   `2026.10-uc2-flux-serif-thresholds+journal-moved`): the capital and prepaid checks, in both
   consoles, skip a bill when a journal line in the month on the same account, for its amount the
-  other way, names its document number. Sep 2026's VWR freezer (bill 8822578887), which Serif's
+  other way, names its document number. The naming journal lines must net to the move: a
+  department move on the account, or a reclass reversed in the month, does not count. Sep 2026's VWR freezer (bill 8822578887), which Serif's
   30 Sep entry JE1536973474623 capitalized, was proposed for capitalization a second time.
 
 ## Unreleased: the import with its support, and the September review fixes

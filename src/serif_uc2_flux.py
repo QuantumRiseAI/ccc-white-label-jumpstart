@@ -1004,11 +1004,14 @@ def vendor_dropped_findings(gl_lines, history, leaves, period, seq):
 
 
 def moved_by_journal(gl_lines):
-    """The bill lines a Journal Entry in the month already moves off their account: a
-    journal line on the same account, for the line's amount (or its document's total
-    there) the other way, whose memo or description names the bill's document number.
-    Serif's close entries say what they move ("Capitalize freezer VWR International LLC
-    bill 8822578887 ..."); a bill already moved is not proposed again."""
+    """The bill lines a Journal Entry in the month already moves off their account. The
+    journal lines on the bill's account whose memo or description names its document number
+    must, together, take the bill off: their net is the bill's total there the other way, or
+    each line they move is matched by its own journal line and the net is those lines the other
+    way. A move between departments on the account, or a reclass reversed later in the month,
+    nets to nothing and moves nothing. Serif's close entries say what they move ("Capitalize
+    freezer VWR International LLC bill 8822578887 ..."); a bill already moved is not proposed
+    again."""
     named = defaultdict(list)
     for j in gl_lines:
         if j.get("txn_type") == "Journal":
@@ -1021,16 +1024,22 @@ def moved_by_journal(gl_lines):
             docs[(doc, t["account_code"])].append(t)
     moved = set()
     for (doc, code), lines in docs.items():
-        says = re.compile(r"(?<![\w])" + re.escape(doc) + r"(?![\w])")
+        says = re.compile(r"(?<![\w-])" + re.escape(doc) + r"(?![\w-])")
         js = [a for a, text in named[code] if says.search(text)]
         if not js:
             continue
-        if abs(sum(js) + sum(num(t["amount"]) for t in lines)) < 0.005:
+        net = sum(js)
+        if abs(net + sum(num(t["amount"]) for t in lines)) < 0.005:
             moved.update(id(t) for t in lines)
             continue
+        pool, hit = list(js), []
         for t in lines:
-            if any(abs(a + num(t["amount"])) < 0.005 for a in js):
-                moved.add(id(t))
+            i = next((i for i, a in enumerate(pool) if abs(a + num(t["amount"])) < 0.005), None)
+            if i is not None:
+                pool.pop(i)
+                hit.append(t)
+        if hit and abs(net + sum(num(t["amount"]) for t in hit)) < 0.005:
+            moved.update(id(t) for t in hit)
     return moved
 
 

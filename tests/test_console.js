@@ -254,16 +254,24 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(['CAPEX', 'PREPAID', 'PPD', 'DEPT'].every(s => refs.some(r => r.ref === s + '-01')) && refs.some(r => r.ref.startsWith('CAPEX-') && r.id.startsWith('C-'))
         && refs.some(r => r.ref.startsWith('PREPAID-') && r.id.startsWith('P-')) && refs.some(r => r.ref.startsWith('PPD-') && r.id.startsWith('PB-'))
         && refs.some(r => r.ref.startsWith('DEPT-') && r.id.startsWith('D-')), 'gl: CapEx, Prepaid and Dept & Entity cards are numbered by screen');
-      // a vendor flagged Coding changed or Coded off plan has a card on Dept & Entity, numbered CODING-NN
+      // a vendor flagged Coding changed or Coded off plan has a card on Dept & Entity, numbered CODING-NN,
+      // unless another card already moves that coding or the vendor is new this month
       { const run = JSON.parse(fs.readFileSync(B + 'out/aug2026/gl-coding-review/run.json', 'utf8'));
         const vt = run.views.tables.find(t => t.id === 'vendors'), rows = vt.sections.flatMap(s => s.rows);
-        const want = rows.filter(r => (r.flags || []).some(f => f.id === 'changed' || f.id === 'plan')).map(r => r.vendor).sort();
-        const got = await p.evaluate(() => [...document.querySelectorAll('#p-dept [data-item^="VC-"]')].map(x => ({v: x.querySelector('.ih b').textContent, flag: x.hasAttribute('data-flag'),
-          ref: refOf(x.dataset.item), acts: [...x.querySelectorAll('[data-v]')].map(b => b.dataset.v).join(','), amt: Number(x.dataset.amt)})));
-        ok(want.length > 0 && JSON.stringify(got.map(g => g.v).sort()) === JSON.stringify(want) && got.every(g => g.flag && /^CODING-\d{2}$/.test(g.ref) && g.acts === 'confirm,recode,netsuite'),
-          'gl: every vendor flagged Coding changed or Coded off plan has a Dept & Entity card, CODING-NN, Confirm or Recode (' + want.length + ')');
-        ok(got.every(g => { const r = rows.find(x => x.vendor === g.v); return Math.abs(g.amt - Math.max(...r.flags.filter(f => f.id === 'changed' || f.id === 'plan').map(f => f.amount))) < 0.01; }),
-          'gl: each such card carries the flagged amount, not the vendor\'s whole month'); }
+        const flagged = rows.filter(r => (r.flags || []).some(f => f.id === 'changed' || f.id === 'plan')).map(r => r.vendor);
+        const got = await p.evaluate(() => [...document.querySelectorAll('#p-dept [data-item^="VC-"]')].map(x => { const j = DATA.je[x.dataset.item];
+          return {id: x.dataset.item, v: x.querySelector('.ih b').textContent, flag: x.hasAttribute('data-flag'), ref: refOf(x.dataset.item),
+            acts: [...x.querySelectorAll('[data-v]')].map(b => b.dataset.v).join(','), amt: Number(x.dataset.amt),
+            dr: j.lines.reduce((s, l) => s + l.debit, 0), cr: j.lines.reduce((s, l) => s + l.credit, 0),
+            moves: j.lines.some(l => l.debit) && j.lines.filter(l => l.debit).every(d => !j.lines.some(c => c.credit && c.account === d.account && c.department === d.department))}; }));
+        const newv = await p.evaluate(() => [...document.querySelectorAll('[data-item^="N-"] .ih b')].map(b => b.textContent));
+        ok(got.length > 0 && got.every(g => flagged.includes(g.v) && g.flag && /^CODING-\d{2}$/.test(g.ref) && g.acts === 'confirm,recode,netsuite'),
+          'gl: vendors flagged Coding changed or Coded off plan have a Dept & Entity card, CODING-NN, Confirm or Recode (' + got.length + ' of ' + flagged.length + ')');
+        ok(!got.some(g => newv.includes(g.v)), 'gl: a vendor new this month is on New This Period only');
+        const capped = await p.evaluate(() => [...document.querySelectorAll('[data-item^="C-"], [data-item^="P-"]')].map(x => x.querySelector('.ih b').textContent));
+        ok(got.every(g => Math.abs(g.dr - g.cr) < 0.01 && Math.abs(Math.max(g.dr, g.cr) - Math.abs(g.amt)) < 0.01),
+          'gl: each such card\'s entry balances and moves the card\'s amount');
+        ok(got.length && got.every(g => g.moves), 'gl: the entry moves the flagged codings to the vendor\'s usual or planned coding (' + got.filter(g => g.moves).length + ')'); }
       ok(Object.values(refs.reduce((m, r) => { const [s, n] = r.ref.split('-'); (m[s] = m[s] || [])[Number(n) - 1] = r; return m; }, {}))
         .every(xs => Array.from(xs).every((r, i) => r && (!i || xs[i - 1].amt >= r.amt))), 'gl: within a screen, numbered from 01 with no gaps, largest amount first');
       ok(await p.evaluate(() => Object.keys(DATA.je).every(id => refOf(id) && DATA.je[id].memo.startsWith(refOf(id) + ' | ') && / \| Aug'26$/.test(DATA.je[id].memo)

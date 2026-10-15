@@ -109,6 +109,13 @@ ok(len(F.capex_findings([frz, jline("6415000", -17_729.41, "Capitalize freezer b
 two = [bill("Fisher Scientific", "6415000", 6_000, "Centrifuge", doc="9001"), bill("Fisher Scientific", "6415000", 4_000, "Rotor", doc="9001")]
 ok(not F.capex_findings(two + [jline("6415000", -10_000, "Reclass bill 9001 to CIP")], LEAVES, "Aug 2026", [0]),
    "a journal moving a document's whole total on the account clears every line of it")
+ok(len(F.capex_findings([frz, jline("6415000", -17_729.41, "Move bill 8822578887 to Production"), jline("6415000", 17_729.41, "Move bill 8822578887 to Production", dept="Production")], LEAVES, "Aug 2026", [0])) == 1
+   and len(F.capex_findings([frz, jline("6415000", -17_729.41, "Capitalize bill 8822578887"), jline("6415000", 17_729.41, "Reverse capitalization of bill 8822578887")], LEAVES, "Aug 2026", [0])) == 1,
+   "a move between departments on the account, or a capitalization reversed in the month, leaves the bill flagged")
+eq = [bill("Fisher Scientific", "6415000", 6_000, "Centrifuge", doc="9002"), bill("Fisher Scientific", "6415000", 6_000, "Centrifuge", doc="9002")]
+ok(len(F.capex_findings(eq + [jline("6415000", -6_000, "Reclass part of bill 9002")], LEAVES, "Aug 2026", [0])) == 1
+   and len(F.capex_findings([frz, jline("6415000", -17_729.41, "Capitalize bill 8822578887-2")], LEAVES, "Aug 2026", [0])) == 1,
+   "one journal line clears one bill line, not two; a document number inside a longer one does not match")
 sub = bill("Acme Insurance", "6891000", 30_000, "Annual policy renewal", doc="INS-77")
 ok(len(F.prepaid_findings([sub], {}, LEAVES, "Aug 2026", [0])) == 1
    and not F.prepaid_findings([sub, jline("6891000", -30_000, "To record prepaid insurance INS-77")], {}, LEAVES, "Aug 2026", [0]),
