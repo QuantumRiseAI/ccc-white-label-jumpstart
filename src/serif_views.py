@@ -1799,7 +1799,7 @@ def explain(f, accounts, period):
         mm = re.match(r"bill (\S+) for (\$[\d,.]+)(?:: (.+))?", ev.get("observed", ""))
         why = [('Bill %s is %s for "%s".' % (mm.group(1), mm.group(2), mm.group(3)) if mm and mm.group(3)
                 else "Bill %s is %s." % (mm.group(1), mm.group(2)) if mm else ""),
-               "It is on %s. The asset policy tells you to review purchases on this account." % c.get("current", "")]
+               "It is on %s, an account the asset policy reviews for capital purchases." % c.get("current", "")]
         place = c.get("placement") or {}
         if amt < CAPITALIZATION:
             why.append("It is under the %s capitalization threshold, so it stays expense "

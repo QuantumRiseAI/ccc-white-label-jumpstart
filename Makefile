@@ -16,6 +16,7 @@ test:     ## the console tests, accepted exceptions, the export readers, the Inc
 	python3 tests/test_tie.py
 	python3 tests/test_screens.py
 	python3 tests/test_passthrough.py
+	python3 tests/test_facts.py
 	node tests/test_flux_coding.js
 	node tests/audit_account_names.js
 	node tests/audit_table_width.js 1280

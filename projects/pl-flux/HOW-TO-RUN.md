@@ -71,7 +71,7 @@ To carry the GL Coding Review's booked corrections into Actual vs. Actual (MoM),
 run and its decision record to the build:
 `--coding-run <coding run.json> --coding-record <coding decision record .json>`. Each account
 shows the correction, the adjusted movement, and flags on the adjusted figure. A fix marked
-Edited in NetSuite counts as a correction, named apart, when the flux reads the coding run's own
+Edited Manually in NetSuite counts as a correction, named apart, when the flux reads the coding run's own
 GL export; on a later export, which may already hold the edit, it is left out and the run log
 says so. Open coding findings are noted on the affected row, never applied. A coding `drafts.json` goes in with
 `--coding-drafts`, so decisions on Journal Entries Claude drafted there apply too.
@@ -96,7 +96,7 @@ In a Claude Project every uploaded file sits at the top level, so all of these a
 filenames. In the repo, `make build PERIOD=sep2026` runs the same commands from the packaged
 Project folder on the exports in `inputs/sep2026/`.
 
-The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.0.0.html`, one self-contained
+The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.1.0.html`, one self-contained
 file that opens in any browser. The filename carries the period and the console version.
 Inside, the **Run log** has a Build record listing the console, engine and ruleset versions,
 the run id, and a fingerprint for every input file, so if a figure moves between two builds
@@ -338,10 +338,10 @@ console renders in those.
 ## Working the Console
 
 The HTML is a working surface, not a report, laid out as the controller's August flux pack.
-The bar holds three section titles; clicking one opens its pages beside it, each with what is
-left on it. Run log and Settings are the icons at the right.
+The bar holds three section titles; clicking one opens its pages in a bar under the header,
+each with what is left on it. Run log and Settings are the icons at the right.
 
-* **Executive Overview**: total operating expense, net loss, cash and headcount, the tie to
+* **Executive Overview**: total operating expense, the adjustments still to decide, cash and headcount, the tie to
   NetSuite's Income Statement (every account for the month and the month before, or the ones
   that differ), the cards,
   the executive summary Claude drafts (**Accept**, or **Edit** to change it), the net loss
@@ -355,7 +355,7 @@ left on it. Run log and Settings are the icons at the right.
 ### Commentary
 
 Commentary is the deliverable. A line at or over the threshold is marked Review and needs
-commentary; the close checklist counts it open until it has some. Actual vs. Actual, Actual
+commentary; the Review Checklist counts it open until it has some. Actual vs. Actual, Actual
 vs. Budget, By Department and Balance Sheet Flux each take commentary on their lines. A draft
 from Claude sits on its line with **Accept**, which copies it into the field, and **Edit**, which
 copies it to change; a long draft shows its first lines, with Show all. Written commentary, the
@@ -386,8 +386,10 @@ not the ledger's. Payroll tax on the bonus needs the payroll register.
 
 * **Section A, accounting adjustments**: every proposed Journal Entry, with its P&L and
   balance sheet impact, the evidence and the policy. The entry is filled in and editable:
-  **Approve** books it as proposed, **Reject** leaves the ledger as it is, and editing any
-  account, department, Project, Program or amount marks it **Modified**, which needs a note. The
+  **Add to NetSuite CSV** books it as proposed and **Reject** leaves the ledger as it is; the
+  buttons sit under the card's folds, and the card opens folded to its header. There is no
+  Modify button: editing any account, department, Project, Program, Vendor, Coupa PO or amount
+  marks it **Added to NetSuite CSV, edited**, which needs a note. The
   entry shows whether it balances; **Reset** brings back the proposal. Entries Claude drafted are
   here too. Both sides of an entry carry the Project and Program of the bill it corrects; an
   accrual from Coupa receipts or a reclass staged in the forecast has no bill behind it and
@@ -401,7 +403,7 @@ not the ledger's. Payroll tax on the bonus needs the payroll register.
   times its usual month and at or over the threshold. It may be a missed accrual coming back,
   so the commentary says whether last month needed one.
 
-**Export to NetSuite, CSV** holds every entry approved, or modified with a note, as edited: External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs.
+**Export to NetSuite, CSV** holds every entry added to the NetSuite CSV (an edited one with a note), as edited: External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Name (the vendor, NetSuite's entity), Coupa PO Number, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs.
 An entry out of balance or unchanged is left out. The same export saves the support file beside it (`...-support.html`): every entry in the import, by External ID, with its reason, the decision and who made it, the note and its lines, to attach in NetSuite with the import.
 
 ### SOX & GAAP

@@ -13,9 +13,9 @@ Engine findings, in `findings`:
 | `T0.TIE_OUT` | SOX Documentation, GL Tie-Out | Debits equal credits. A failure stops the run. |
 | `T0.DUPLICATE_LINE` | Run log | One document posting the same account, amount, department and description more than once |
 | `T0.ABERRANT_POSTING_LAG` | Run log | A line dated three or more months before its period, or after it |
-| `T1.DEPT_INCONSISTENCY` | Dept & Entity, "Department" | A department other than the vendor's usual one in earlier months |
-| `T4.PO_ACCOUNT_MISMATCH` | Dept & Entity, "Account vs. Coupa" | An account other than the one the vendor's Coupa POs were approved against |
-| `T4.ITEM_ACCOUNT_DRIFT` | Dept & Entity, "Account vs. Coupa" | A Coupa PO line in the close month on an account other than the one the same item had on earlier lines of the year (a tie in that history sets no expectation). Lines under the review threshold are a count and a total. Not run when the Coupa export has no Item column |
+| `T1.DEPT_INCONSISTENCY` | Organization & Account, Coding Inconsistencies, vs. Vendor History ("Department") | A department other than the vendor's usual one in earlier months |
+| `T4.PO_ACCOUNT_MISMATCH` | Organization & Account, Coding Inconsistencies, vs. Coupa PO ("Account vs. Coupa") | An account other than the one the vendor's Coupa POs were approved against. When it did not run, the tab shows a dash and the run's reason |
+| `T4.ITEM_ACCOUNT_DRIFT` | Organization & Account, Coding Inconsistencies, vs. Coupa PO ("Account vs. Coupa") | A Coupa PO line in the close month on an account other than the one the same item had on earlier lines of the year (a tie in that history sets no expectation). Lines under the review threshold are a count and a total. Not run when the Coupa export has no Item column |
 | `T3.IRC_274A_ENTERTAINMENT` | Run log | Entertainment, 0% deductible |
 | `T3.IRC_274N_MEALS` | Run log | Meals, 50% deductible |
 | `T3.IRC_274B_GIFTS` | Run log | Gifts, $25 per recipient |
@@ -40,15 +40,22 @@ Flags the schedules step adds to vendor rows:
 | Flag | What it means |
 |---|---|
 | New vendor | No bills from the vendor in the two prior months or the same month last year |
-| Coding changed | An account and department the vendor did not use in those months. Codings an engine finding covers are left to that finding. |
-| Coded off plan | The June forecast plans the vendor on other coding |
+| Coding changed | An account and department the vendor did not use in those months. Codings an engine finding covers are left to that finding. A CODING card on Organization & Account, Coding Inconsistencies, vs. Vendor History |
+| Coded off plan | The June forecast plans the vendor on other coding. A CODING card on Organization & Account, Coding Inconsistencies, vs. Forecast (a vendor also flagged Coding changed stays on vs. Vendor History) |
 | Requested by a department | People in another department raised the vendor's Coupa POs, by UKG department |
 | May be prepaid | Bills for one good or service that total $2,500 or more and name a service term, or sit on a term account the vendor does not bill most months. Under the $25,000 prepaid threshold it says it stays expense |
 | May be capital | A bill of $2,500 or more on an account the asset policy names for review, or on repairs and maintenance, that does not name a service term. It says whether it goes to Capital in Process or to its fixed asset account, and why |
 
+The build adds **Same item, two accounts** from the ledger alone: an item billed this month to
+6410000 Lab Supplies/Consumables or 6415000 Lab Non-Capital Equipment that went only to the
+other in the six months before. It shows on Organization & Account, Coding Inconsistencies,
+Same Item, Different Accounts. A Journal Entry Claude drafted goes to the page its change
+belongs to: CapEx for a debit to 15xxxxx, Prepaid for 13xxxxx, and otherwise Organization &
+Account, vs. Vendor History.
+
 The threshold that decides what needs a look is the reviewer's, in dollars, one per screen:
 CapEx $5,000 (Serif's capitalization threshold), Prepaid $25,000 (Serif's prepaid threshold),
-and $2,500 for the account recodes on Dept & Entity and drafted entries. Department flags
+and $2,500 for the account recodes on Organization & Account and drafted entries. Department flags
 have none: every line off Non-Specific is recoded, whatever its size. Both screens list from
 $2,500, so a lower threshold shows more: a capital bill under $5,000, or a prepaid under
 $25,000, is still listed, not marked Review, and says it is under the threshold.

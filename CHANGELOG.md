@@ -37,6 +37,75 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## 2.1.0: reviewer UI from the 15 Oct walkthrough with Scott
+
+Console 2.1.0. Decisions keep their stored verbs (`approve`, `modify`, `netsuite`, `reject`,
+`confirm`, `recode`); only the buttons' words changed, so saved reviews and decision records
+load as before.
+
+- **Review Checklist**: the Overview's close checklist is renamed, in both consoles, at Scott's request.
+- **Decision buttons** (SERIF-160): a flag offers **Add to NetSuite CSV** (`approve`), **Edited
+  Manually in NetSuite** (`netsuite`) and **Reject** (`reject`). The Modify button is gone from
+  both consoles: editing an entry's lines still marks it `modify`, still sends it to the CSV and
+  still needs a note. Same item, two accounts offers Reject in place of Coding Stands. Vendor
+  cards: **Confirm, No Recode**, **Confirm, Coding Stands** and **Confirm Vendor & Coding**,
+  with **Recode, Add to NetSuite CSV** and **Edited Manually in NetSuite**. Bills booked to fixed
+  assets or prepaid: **Confirm, Stays on Balance Sheet** and **Recode to Expense, Add to NetSuite
+  CSV**. P&L Flux adjustments: **Add to NetSuite CSV** and **Reject**. Statuses read "Added to
+  NetSuite CSV", "Added to NetSuite CSV, edited" and "Edited manually in NetSuite". The buttons sit
+  under the folds (Why it was flagged, Journal Entry, Last three months, Lines).
+- **Drafted entries in their category** (SERIF-158): a Journal Entry Claude drafted is built like
+  any other item (vendor title, Current coding, Proposed recode, Document / item, Lines, Last
+  three months), carries no Draft marker, and offers Edited Manually in NetSuite too. A debit to
+  15xxxxx puts it on CapEx as CAPEX-NN, to 13xxxxx on Prepaid as PREPAID-NN, otherwise on
+  Organization & Account as DEPT-NN, numbered after the run's own items in that category, so a
+  draft added later moves no existing reference ID. Item ids keep `DR-`, so saved decisions carry
+  over; the work paper's decision Path adds ", drafted by Claude". DRAFT-NN is gone. The P&L Flux
+  keeps drafts on Adjustments, Section A.
+- **Vendor and Coupa PO on every entry line** (SERIF-161): the Journal Entry has editable Vendor
+  and Coupa PO columns, and the NetSuite CSV has **Name** (the vendor, NetSuite's entity) and
+  **Coupa PO Number** after Program, in both consoles. They are filled from the item's bill
+  lines: the PO on the line's account and department, for the same amount where one matches; the
+  debit receiving a cost carries the PO of the credit removing it. The PO is the PO number as the
+  GL reader holds it.
+- **Organization & Account** (SERIF-163): Dept & Entity is renamed, and its items sit in a
+  **Coding Inconsistencies** box with four tabs: vs. Vendor History (Department flags, Coding
+  changed vendors, drafted account or department recodes), vs. Coupa PO (account flags against
+  the PO; a dash and the run's reason when that check did not run), vs. Forecast (Coded off
+  plan) and Same Item, Different Accounts. Each item is tagged Account, Department, or Account and
+  department, for what its entry changes. Reviewed & Cleared is now **Vendors Reviewed &
+  Cleared** and New This Period **New Vendors This Period**, each with a folder tab per
+  department.
+- **Headers say what they count** (SERIF-164, SERIF-171): each review and vendor page has one
+  Decided counter (0 of 5) with a line saying what its items are. The Overview has Vendor Spend
+  (and what it leaves out), Items to Review (booked-to-fixed-assets and prepaid lines included,
+  matching the Review badge) and Vendors to Confirm (matching the Confirm badge). Total Period
+  Spend, Flags Identified, Clean Vendors, Resolved, the per-page Flagged, Booked, Open, Bills,
+  $2,500 or more and Drafted entries tiles, the Audit Log's counts, SOX's Flagged of GL and
+  Export's Agreed fixes are gone. In the P&L
+  Flux, Total OpEx, Adjustments to Decide, the department, payroll and SOX tiles are relabeled to
+  say what they cover; Net Loss, YoY Net Loss, To Review (MoM), Departments, Total P&L, Monthly
+  Run Rate and AI Disclosed are gone.
+- **Navigation and folding** (SERIF-167, SERIF-168): a section's pages open in a bar under the
+  header. Every page opens with all its items folded, in both consoles; the 12-card threshold
+  and the Expand all / Collapse all bar are gone.
+- **A coding the vendor used before proposes no move** (SERIF-156): a Coded off plan vendor whose
+  codings the vendor used before says "The coding matches the vendor's earlier months; only the
+  plan differs.", with the memo `Recode <vendor>`, in place of an entry recoding accounts to
+  themselves.
+- **Pass-through bills stay on Pass-Through Bills** (SERIF-157): a Coding changed or off plan card
+  leaves the vendor's pass-through bills to their own cards; its codings, line count, Lines and
+  notes cover the vendor's other bills only.
+- **Facts, not instructions** (SERIF-172): items state what was found and why, never what to do.
+  The "Action:" steps, the CapEx and Prepaid step text, the "Ask the owner" labels and the
+  imperative sentences in reasons and Claude's notes are gone. A Department item states the
+  vendor's earlier coding ("Of the vendor's 8 earlier lines, 6 are coded Chemistry") in place of
+  "Recode to …". `facts()` drops instructions from vendor and adjustment notes and from flux
+  adjustment reasons: imperative forms only ("Read the…", "Check that…", "If …, reclass it",
+  "Book it or reject it"), and a question to an owner with the "If yes / If not" that answers it.
+  A fact that starts with the same word stays; the flux summary and commentary are not filtered.
+  A `question` draft shows no label. The questions email still comes from the reviewer's notes.
+
 ## Unreleased: every flagged vendor has a card; a bill already moved is not proposed again
 
 Found by running both Projects on Sep 2026 and writing the drafts as the Project would.

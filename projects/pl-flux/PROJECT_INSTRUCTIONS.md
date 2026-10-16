@@ -84,8 +84,8 @@ When the reviewer attaches the GL Coding Review's run (`run.json`, from that Pro
 record, add `--coding-run <that run.json> --coding-record <that record>` (and `--coding-drafts <its drafts.json>`
 when it has drafted Journal Entries) to the build (and to the
 build with `--drafts`). Actual vs. Actual (MoM) then shows each account's booked correction (a
-Journal Entry approved, or modified or recoded with a note), the adjusted movement, and flags on the
-adjusted figure. A fix marked Edited in NetSuite is applied too, and named apart, when this flux reads
+Journal Entry added to the NetSuite CSV, or edited or recoded with a note), the adjusted movement, and flags on the
+adjusted figure. A fix marked Edited Manually in NetSuite is applied too, and named apart, when this flux reads
 the coding run's own GL export; on a later export, which may already hold the edit, it is not applied
 and the run log says so. Open coding findings are listed on the affected row and never applied. Say in the chat that the flux carries the corrections.
 
@@ -104,7 +104,7 @@ bonus accrual, interest) and none at this one. That says the GL was pulled befor
 closed. Say so first, name the accounts, and ask for the GL again after close. The list
 leads the first page of the console too.
 
-The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.0.0.html`. Publish it as
+The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.1.0.html`. Publish it as
 [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML yourself:
 if it needs a change, change the script and build again.
 
@@ -260,15 +260,15 @@ Coupa has no connector yet. When it has one, the same rules apply.
 
 ## What the Reviewer Sees
 
-The console is laid out as the controller's August flux pack. The bar holds three sections; a section
-opens its pages beside its title.
+The console is laid out as the controller's August flux pack. The bar holds three sections; a section's
+pages open in a bar under the header.
 
 * **Executive Overview**: the month's figures, the cards, the net loss bridge from the prior
-  month, the executive summary, and the close checklist: each page, what is open on it and what that is worth.
+  month, the executive summary, and the Review Checklist: each page, what is open on it and what that is worth.
 * **Analysis**:
   * **Actual vs. Actual (MoM)**, with a YoY tab: one line per P&L account, marked Review at or
     over the threshold, with its 3- and 6-month trailing averages and a commentary field;
-  * **Actual vs. Budget**, against the June plan, with year-to-date burn;
+  * **Actual vs. Budget**, against the June plan, with year-to-date operating expense;
   * **By Department (MoM)**, with each department's accounts and top vendors, then **Credits in
     Expense Accounts**: each account and department whose month or year to date nets below
     zero, with its largest credit lines;
@@ -279,11 +279,13 @@ opens its pages beside its title.
   * **Balance Sheet Flux**, against the prior month, year end and the prior year, with
     commentary on each line;
   * **Adjustments**: Section A holds the proposed Journal Entries, each filled in and
-    editable, to approve, reject or edit (Modified, with a note); Section B holds the forecast
+    editable, with **Add to NetSuite CSV** and **Reject** under the card's folds (no Modify
+    button: editing the entry marks it Added to NetSuite CSV, edited, with a note), and a
+    Vendor and a Coupa PO on each line; Section B holds the forecast
     revisions, to acknowledge or mark No Action; Section C lists vendors **billed twice after a
     gap**: two or more bills this month, none last month, billed in at least two of the four
     months before, and at least 1.5 times the usual month and at or over the threshold, which
-    may be a missed accrual coming back. **Export to NetSuite, CSV** downloads here: External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs.
+    may be a missed accrual coming back. **Export to NetSuite, CSV** downloads here: External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Name (the vendor, NetSuite's entity), Coupa PO Number, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs.
     The same export saves the support file beside it (`...-support.html`): every entry in the import, by External ID, with its reason, the decision and who made it, the note and its lines, to attach in NetSuite with the import. Both sides of
     an entry carry the Project and Program of the bill it corrects (an accrual from Coupa receipts
     or a reclass staged in the forecast has none, and leaves them to fill); a new balance sheet
@@ -343,7 +345,7 @@ you drafted.
 
 `commentary` is keyed by account code, `adjustments` by `finding_id`; `summary` is the
 executive summary, paragraphs separated by a blank line; `recommend` is `book`
-(Approve) or `no_entry` (Reject). Every part is optional. When the reviewer asks for a table or a CSV in the chat,
+(Add to NetSuite CSV) or `no_entry` (Reject). Every part is optional. When the reviewer asks for a table or a CSV in the chat,
 give that too.
 
 Read from `out/<period>/run.json`:
@@ -414,7 +416,7 @@ changed, not Serif's activity. Say so.
 
 ### 2. Notes on Adjustments
 
-For each adjustment over the threshold, recommend **Approve** (`book`) or **Reject**
+For each adjustment over the threshold, recommend **Add to NetSuite CSV** (`book`) or **Reject**
 (`no_entry`) in `adjustments`, with one reason, and say what would change the answer.
 
 * **Forecast vs. Actual**: name what the forecast line is staged as, quoting its note and
@@ -455,12 +457,12 @@ covers it.
 * Patterns and accounts are in [`PL_FLUX_SKILL.md`](PL_FLUX_SKILL.md).
 
 The entry joins Adjustments, Section A, as `SERIF-DRAFT-1` and on, marked "Draft" with a sparkle.
-Once the reviewer approves it, it is in the NetSuite CSV.
+Once the reviewer adds it to the NetSuite CSV, it is in the CSV.
 
 The reviewer can also propose an entry from a variance. **Propose entry** on a row of Actual vs.
 Actual (MoM) opens a two-line Journal Entry: the row's account and an offset line to fill, with
 the memo prefilled from the account, the period and the move. It is a suggestion: entering
-an amount or editing any field approves it as Modified once the reviewer adds a note, and only
+an amount or editing any field adds it as Added to NetSuite CSV, edited once the reviewer adds a note, and only
 then is it in the NetSuite CSV. **Reset** on the entry removes the proposal. Nothing is
 created or posted in NetSuite.
 
@@ -483,7 +485,9 @@ Serif's senior leadership. Write it last, from your commentary, in plain paragra
 300 words in all:
 
 1. Total operating expense and the net loss for the month, and their moves from the prior
-   month, from `F0.OPEX` in `metrics` and the pack.
+   month. Operating expense is accounts 6xxxxxx and 7xxxxxx, as the console's Total OpEx tile
+   shows. `F0.OPEX` in `metrics` sums every P&L account, interest income included, so it is the
+   net loss; do not call it operating expense.
 2. The largest moves over the threshold, a few sentences each, from the commentary: the
    driver, and whether it is timing that will reverse next month.
 3. The adjustments the run proposes, by kind, and open PO commitments as a disclosure, not
@@ -511,6 +515,10 @@ hand-off is written in the chat, on request; see Requests.
 * Do not classify a movement as timing, structural or coding. Name the driver and say
   whether the period is right.
 * Every Serif policy is a draft. Say so when you cite one.
+* State what was found and why. In a note on an adjustment, the build drops instructions to the
+  reviewer, such as "Check the…", "Book it or reject it" or "If …, book it", and a question to an
+  owner with the "If yes / If not" that answers it. A sentence that says what would change the
+  answer stays, and the summary and commentary are shown as written.
 
 ## Later Runs in the Same Chat
 
@@ -578,7 +586,8 @@ The record (`kind` `serif-decision-record`, `format` 3, `console_kind` `flux`) h
 by item:
 
 * `dec`: decisions by item id (`v`: `approve`, `reject`, `modify`, `ack`, `none`; `at`;
-  `by_uid` in shared mode);
+  `by_uid` in shared mode). The verbs are stored as before; `approve` is Add to NetSuite CSV and
+  `modify` an entry edited before adding it;
 * `notes`: commentary and notes, keyed `mom:<account>`, `yoy:<account>`, `avb:<account>`,
   `dept:<department>:<account>`, `bs:<tab>:<line>`, `asc:<item>` or by item id;
 * `je`: the reviewer's edits to an entry's lines;
@@ -627,7 +636,7 @@ confirmations."
 NetSuite."
 
 1. The import comes from the console: **Export to NetSuite, CSV** on Adjustments. It holds
-   every entry approved or modified with a note, as edited, and leaves out any that is out of
+   every entry added to the NetSuite CSV (an edited one with a note), as edited, and leaves out any that is out of
    balance or unchanged. Never write the import yourself.
 2. If an entry the reviewer wants is not on Adjustments, draft it (What You Write, 3) and build
    the console again.
@@ -651,7 +660,7 @@ latest run and the record:
    Without the record, give the run's figures and say decisions are not counted.
 4. Commentary: accounts explained, and accounts still needing commentary.
 5. Questions still waiting on someone, by department, from the notes.
-6. Journal Entries approved, and whether the NetSuite CSV has been downloaded and uploaded.
+6. Journal Entries added to the NetSuite CSV, and whether the NetSuite CSV has been downloaded and uploaded.
 7. Every check that did not run, and what it needs.
 8. Where the record is: the decision record, saved from Settings, to keep with the close file
    and attach to the next run.
@@ -667,10 +676,10 @@ they are not attached.
 1. Find what is open, with code: every item in the console (`data-item` in the HTML) with no
    decision in `dec`, and every line at or over the threshold with no commentary in `notes`.
    If anything is open, list it with its page and amount, and stop. The Executive Overview's
-   close checklist shows the same. Only the reviewer settles an item, in the console.
+   Review Checklist shows the same. Only the reviewer settles an item, in the console.
 2. Summarize the session, as above.
 3. Check the CSV with code, as in Build the NetSuite import, step 3, and that its entries are
-   the ones the record has approved or modified. Report what does not.
+   the ones the record has added to the CSV, edited or not. Report what does not.
 4. Hand over the upload file: give the reviewer the CSV back unchanged, with its file name,
    entries and lines. Never edit, rebuild or re-export it.
 5. A person uploads it to NetSuite. You never post it.
