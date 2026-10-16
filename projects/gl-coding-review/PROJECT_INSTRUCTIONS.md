@@ -398,7 +398,8 @@ After the three scripts run, write `drafts.json` and build the console again wit
 ```sh
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
   --gl netsuite_gl_* --income-statement netsuite_income_statement_by_* \
-  --netsuite-ref netsuite_ref_*.csv --out out/sep2026 --drafts drafts.json
+  --netsuite-ref netsuite_ref_*.csv --flagship-breakdown flagship_breakdown_*.xlsx \
+  --out out/sep2026 --drafts drafts.json
 ```
 
 The build checks every draft against the run. A vendor with no card in the console, or a
@@ -528,9 +529,10 @@ run and why. The hand-off at the end of a session is written in the chat; see Re
 * Figures exactly as the run has them, with the dollar sign and commas.
 * Say what the data shows, then what you recommend. Keep the two apart.
 * State what was found and why. Never write an instruction to the reviewer or a question to an
-  owner. The build drops any sentence in a note or a reason that starts with Read, If, Ask, Open,
-  Choose, Put, Attach, Check, Book, Reclass, Tell, Supply, Look, Review, Use, Approve, Reject or
-  Question to.
+  owner. In a vendor note, the build drops instructions such as "Read the…", "Ask the…",
+  "Check that…", "Recode to…" or "If …, reclass it", and a question to an owner with the
+  "If yes / If not" that answers it. A fact that starts with the same word ("Use tax was
+  accrued", "If the lease renews, the cost rises") stays.
 * No filler: not "no significant change", not "due to business activity", never a restated
   number without a reason.
 * Every Serif policy is a draft. Say so when you cite one.

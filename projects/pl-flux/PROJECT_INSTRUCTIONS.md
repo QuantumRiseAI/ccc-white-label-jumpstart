@@ -485,7 +485,9 @@ Serif's senior leadership. Write it last, from your commentary, in plain paragra
 300 words in all:
 
 1. Total operating expense and the net loss for the month, and their moves from the prior
-   month, from `F0.OPEX` in `metrics` and the pack.
+   month. Operating expense is accounts 6xxxxxx and 7xxxxxx, as the console's Total OpEx tile
+   shows. `F0.OPEX` in `metrics` sums every P&L account, interest income included, so it is the
+   net loss; do not call it operating expense.
 2. The largest moves over the threshold, a few sentences each, from the commentary: the
    driver, and whether it is timing that will reverse next month.
 3. The adjustments the run proposes, by kind, and open PO commitments as a disclosure, not
@@ -513,9 +515,10 @@ hand-off is written in the chat, on request; see Requests.
 * Do not classify a movement as timing, structural or coding. Name the driver and say
   whether the period is right.
 * Every Serif policy is a draft. Say so when you cite one.
-* State what was found and why. The build drops any sentence in a draft that starts with Read,
-  If, Ask, Open, Choose, Put, Attach, Check, Book, Reclass, Tell, Supply, Look, Review, Use,
-  Approve, Reject or Question to.
+* State what was found and why. In a note on an adjustment, the build drops instructions to the
+  reviewer, such as "Check the…", "Book it or reject it" or "If …, book it", and a question to an
+  owner with the "If yes / If not" that answers it. A sentence that says what would change the
+  answer stays, and the summary and commentary are shown as written.
 
 ## Later Runs in the Same Chat
 

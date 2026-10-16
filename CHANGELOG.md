@@ -98,10 +98,13 @@ load as before.
   notes cover the vendor's other bills only.
 - **Facts, not instructions** (SERIF-172): items state what was found and why, never what to do.
   The "Action:" steps, the CapEx and Prepaid step text, the "Ask the owner" labels and the
-  imperative sentences in reasons and Claude's notes are gone: `facts()` drops any sentence that
-  starts Read, If, Ask, Open, Choose, Put, Attach, Check, Book, Reclass, Tell, Supply, Look,
-  Review, Use, Approve, Reject or Question to. A `question` draft shows no label. The questions
-  email still comes from the reviewer's notes.
+  imperative sentences in reasons and Claude's notes are gone. A Department item states the
+  vendor's earlier coding ("Of the vendor's 8 earlier lines, 6 are coded Chemistry") in place of
+  "Recode to …". `facts()` drops instructions from vendor and adjustment notes and from flux
+  adjustment reasons: imperative forms only ("Read the…", "Check that…", "If …, reclass it",
+  "Book it or reject it"), and a question to an owner with the "If yes / If not" that answers it.
+  A fact that starts with the same word stays; the flux summary and commentary are not filtered.
+  A `question` draft shows no label. The questions email still comes from the reviewer's notes.
 
 ## Unreleased: every flagged vendor has a card; a bill already moved is not proposed again
 

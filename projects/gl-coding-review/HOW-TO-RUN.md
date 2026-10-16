@@ -46,6 +46,7 @@ python3 serif_views.py out/sep2026/run.json \
   --plan   serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
   --coupa  coupa_po_lines_*.csv \
   --roster ukg_full_roster_*.csv \
+  --netsuite-ids netsuite_link_ids_*.csv \
   --keep-names
 ```
 
@@ -55,7 +56,8 @@ rolling forecast workbook whose prior cut is the plan; `--plan-vintage` names th
 ```sh
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
   --gl netsuite_gl_* --income-statement netsuite_income_statement_by_* \
-  --netsuite-ref netsuite_ref_*.csv --out out/sep2026
+  --netsuite-ref netsuite_ref_*.csv --flagship-breakdown flagship_breakdown_*.xlsx \
+  --out out/sep2026
 ```
 
 The build ties the ledger to the Income Statement as the first command does, and stops when an
@@ -520,7 +522,7 @@ The engine prints a load summary before any finding. Read it in this order:
    and the report says so on its own page.
 3. **Findings**, grouped by the action they call for rather than by rule.
 
-The Aug 2026 run is the reference: 56 findings (engine 0.2.4), tie-out PASS, 50 proposed Journal Entries,
+The Aug 2026 run is the reference: 56 findings (engine 0.2.7), tie-out PASS, 50 proposed Journal Entries,
 all in balance. After any change to a script, run Aug 2026 again. If its numbers move, the
 script changed what it finds; say so rather than explaining the new figure as though it
 were expected.

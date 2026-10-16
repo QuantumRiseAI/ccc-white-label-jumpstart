@@ -333,16 +333,22 @@ STEP = re.compile(
     r"(?:Read (?:the|it|each|its)|Ask (?:the|who|when|which|whether|them|for)|Open (?:the|a|its|it)\b|Choose\b|Put (?:the|it)\b"
     r"|Attach (?:the|its|a)\b|Check (?:the|that|whether|with)\b|Book (?:it|the|this|them)\b|Reclass (?:the|it|them)\b"
     r"|Tell (?:FP&(?:amp;)?A|the)\b|Supply (?:the|its)\b|Look (?:at|in)\b|Review (?:the|it|each)\b|Approve (?:the|it)\b|Reject (?:the|it)\b"
-    r"|Question to\b|If [^.?!]*?,\s*(?:choose|reclass|book|move|capitalize|approve|reject|recode|tell|ask|put|read|open)\b)")
+    r"|Question to\b|If [^.?!]*?,\s*(?:choose|reclass|book|move|capitalize|approve|reject|recode|tell|ask|put|read|open)\b"
+    r"|Read bill\b|Confirm (?:with|that|whether)\b|Approve at\b|Reject (?:until|for now)\b|Recode to\b|Book it or reject it\b)")
+# A sentence answering the question just dropped ("If not, the bill belongs on Platform.") goes with it.
+FOLLOW = re.compile(r"If (?:yes|no|not|so)\b")
 
 
 def facts(text):
     """text without its instruction sentences, its spacing and paragraphs as they were."""
     parts = re.split(r"((?<=[.?!])\s+(?=[A-Z<]))", text or "")
-    out = []
+    out, dropped = [], False
     for k in range(0, len(parts), 2):
-        if STEP.match(re.sub(r"^(?:<[^>]+>\s*)+", "", parts[k].strip())):
+        s_ = re.sub(r"^(?:<[^>]+>\s*)+", "", parts[k].strip())
+        if STEP.match(s_) or (dropped and FOLLOW.match(s_)):
+            dropped = True
             continue
+        dropped = False
         out.append(parts[k] + (parts[k + 1] if k + 1 < len(parts) else ""))
     return "".join(out).rstrip() if out else ""
 
@@ -364,7 +370,7 @@ def drafted_entries(fids_ok=None):
     """Drafted Journal Entries: each must balance and every line name an account."""
     out = []
     for i, x in enumerate(RAW_DRAFTS.get("entries") or [], 1):
-        lines = [{"account": txt(l.get("account")), "department": txt(l.get("department")), "vendor": txt(l.get("vendor")),
+        lines = [{"account": txt(l.get("account")), "department": txt(l.get("department")), "vendor": txt(l.get("vendor") or x.get("vendor")),
                   "project": txt(l.get("project")), "program": txt(l.get("program")), "reverses_line": l.get("reverses_line") is True,
                   "debit": round(float(l.get("debit") or 0), 2), "credit": round(float(l.get("credit") or 0), 2),
                   "documents": [txt(d) for d in (l.get("documents") or [])]} for l in x.get("lines") or []]
@@ -419,7 +425,8 @@ def vendor_po(iid, lines):
     def po(acct, dept, amt):
         on = [l for l in gl if l["account_code"] == acct and dep(l["department"]) == dep(dept) and l.get("coupa_po")]
         hit = sorted({l["coupa_po"] for l in on if abs(abs(l["amount"]) - amt) < 0.005}) or sorted({l["coupa_po"] for l in on})
-        return ", ".join(hit) if len(hit) <= 3 else "Multiple POs (%d)" % len(hit)
+        # NetSuite's Coupa PO field holds one PO: a line that moves several is left for the reviewer
+        return hit[0] if len(hit) == 1 else ""
     credit = {round(l["credit"], 2): po(l["account"], l["department"], l["credit"]) for l in lines if l.get("credit")}
     any_po = next((v for v in credit.values() if v), "")
     for l in lines:
@@ -1825,14 +1832,15 @@ function importSupport(csvName){
     const note = S.notes[id] || '', doc = (DATA.docs || {})[id] || '';
     const lines = j.lines.map(l => { dr += Number(l.debit) || 0; cr += Number(l.credit) || 0;
       return '<tr><td class="m">' + esc(l.account) + '</td><td>' + esc(DATA.acct[l.account] || '') + '</td><td>' + esc(l.department || '') + '</td><td>' + esc(l.project || '')
-        + '</td><td>' + esc(NO_PROG(l.program) ? '' : (l.program || '')) + '</td><td class="n">' + (Number(l.debit) ? usd(l.debit) : '') + '</td><td class="n">' + (Number(l.credit) ? usd(l.credit) : '')
+        + '</td><td>' + esc(NO_PROG(l.program) ? '' : (l.program || '')) + '</td><td>' + esc(l.vendor || '') + '</td><td class="m">' + esc(l.po || '')
+        + '</td><td class="n">' + (Number(l.debit) ? usd(l.debit) : '') + '</td><td class="n">' + (Number(l.credit) ? usd(l.credit) : '')
         + '</td><td>' + esc(l.memo || '') + '</td></tr>'; }).join('');
     return '<section><h2><span class="m">' + esc(j.id) + '</span>' + (refOf(id) ? ' &middot; ' + esc(refOf(id)) : '') + '</h2>'
       + '<dl><dt>Item</dt><dd>' + esc(what) + (pageOf(el || row) ? ' <span class="mut">(' + esc(pageOf(el || row)) + ')</span>' : '') + '</dd>'
       + '<dt>Decision</dt><dd><b>' + esc(LABEL[d.v] || d.v || 'Approved') + '</b>' + (d.by_uid ? ' by ' + esc(Shared.name(d.by_uid)) : '') + (d.at ? ', ' + esc(when(d.at)) : '') + '</dd>'
       + '<dt>Reason</dt><dd>' + esc(why) + '</dd>' + (note ? '<dt>Reviewer note</dt><dd>' + esc(note) + '</dd>' : '') + (doc ? '<dt>Document</dt><dd>' + esc(doc) + '</dd>' : '')
       + '<dt>Entry</dt><dd>' + esc(nsDate(j.date)) + ', ' + esc(j.period) + (j.reversing === 'Y' ? ', reverses ' + esc(nsDate(j.reversal_date)) : '') + '. ' + esc(j.memo) + '</dd></dl>'
-      + '<table><thead><tr><th>Account</th><th></th><th>Department</th><th>Project</th><th>Program</th><th class="n">Debit</th><th class="n">Credit</th><th>Line Memo</th></tr></thead><tbody>' + lines
+      + '<table><thead><tr><th>Account</th><th></th><th>Department</th><th>Project</th><th>Program</th><th>Name</th><th>Coupa PO</th><th class="n">Debit</th><th class="n">Credit</th><th>Line Memo</th></tr></thead><tbody>' + lines
       + '</tbody></table></section>'; });
   const ns = nsIds().map(id => { const el = $('[data-item="' + id + '"]'), d = S.dec[id] || {};
     return '<tr><td class="m">' + esc(refOf(id)) + '</td><td>' + esc(el ? txt(el.querySelector('.ih b')) : id) + '</td><td>' + esc((DATA.docs || {})[id] || '') + '</td><td>' + esc(S.notes[id] || '')
@@ -2455,7 +2463,7 @@ def flux():
                           fav(imp, ("&#9660; Favorable " if imp > 0 else "&#9650; Unfavorable " if imp < 0 else "No P&amp;L impact") + (money(abs(imp), True) if round(imp) else "")),
                           e(", ".join(vend) or "&ndash;"), e(", ".join("%s %s %s" % (l["account"], acct_name(l["account"]), money((l.get("debit") or 0) - (l.get("credit") or 0), True).replace("&ndash;", "-")) for l in bsl)) or "&ndash;",
                           e(", ".join(sorted({l.get("department") for l in x["lines"] if l.get("department") and not BS(l["account"])})) or "&ndash;"),
-                          en(f.get("recommendation") or x.get("support") or x["memo"]), (" " + " ".join(doc_links(d) for d in docs)) if docs else "", en(f.get("policy_basis") or ""), je_editor(aid, je[aid]["lines"]) + dhtml,
+                          facts(en(f.get("recommendation") or x.get("support") or x["memo"])), (" " + " ".join(doc_links(d) for d in docs)) if docs else "", en(f.get("policy_basis") or ""), je_editor(aid, je[aid]["lines"]) + dhtml,
                           aid, e(x["memo"]), aid, e(x["memo"]), aid))
     for r in revs:
         rid = sid("REV", r["account"], r.get("department"))
@@ -2467,7 +2475,7 @@ def flux():
                        '<div class="acts"><button class="pill" data-d="%s" data-v="ack" data-label="%s">Acknowledge &amp; Flag</button><button class="pill" data-d="%s" data-v="none" data-label="%s">No Action</button>'
                        '<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
                        % (rid, round(abs(v), 2), e(r["account"] + " " + acct_name(r["account"]) + ((" / " + r["department"]) if r.get("department") else "")), e(r["account"]), e(acct_name(r["account"])), (" / " + e(r["department"])) if r.get("department") else "",
-                          "Ledger %s, forecast %s, difference %s" % (money(r.get("ledger")), money(r.get("model")), money(v)), en(f.get("recommendation") or f.get("title") or ""), rid, "Forecast revision " + e(r["account"]), rid, "Forecast revision " + e(r["account"]), rid))
+                          "Ledger %s, forecast %s, difference %s" % (money(r.get("ledger")), money(r.get("model")), money(v)), facts(en(f.get("recommendation") or f.get("title") or "")), rid, "Forecast revision " + e(r["account"]), rid, "Forecast revision " + e(r["account"]), rid))
     # Billed twice after a gap: two or more bills this month, none last month, billed in
     # at least two of the four months before, and this month at least 1.5 times the usual
     # month and at or over the threshold. It may be a missed accrual coming back.
@@ -2592,7 +2600,7 @@ function refresh(){
   const thr = S.thr || DATA.thr, over = vs => vs.filter(overThr);
   const mom = over($$('#p-ava [data-pane="mom"] tr[data-var]'));
   $$('[data-cm]').forEach(x => x.textContent = mom.length);
-  $$('[data-cmn]').forEach(x => x.textContent = 'Moved more than ' + money(thr) + ' vs. ' + DATA.prior);
+  $$('[data-cmn]').forEach(x => x.textContent = 'Moved ' + money(thr) + ' or more vs. ' + DATA.prior);
   $$('[data-pane]').forEach(p => { const cc = p.querySelector('[data-ccount]'); if (cc) cc.textContent = over(Array.from(p.querySelectorAll('tr[data-var]'))).length; });
   const items = $$('#p-adj [data-item]'), done = items.filter(x => decided(x.dataset.item));
   const ap = done.filter(x => ['approve','modify','ack'].indexOf(S.dec[x.dataset.item].v) > -1).length, rj = done.length - ap;
@@ -2913,6 +2921,19 @@ def coding():
     # ORG_TAB names each item's Coding Inconsistencies tab: what its coding disagrees with.
     dcards, ORG_TAB, DRAFT_CAT = [], {}, {}
 
+    def finding_fact(f):
+        """What a department or Coupa account finding saw, from its evidence: the coding and what
+        the vendor's earlier lines were coded to."""
+        ev = f.get("evidence") or {}
+        sc = {k: v for k, v in (ev.get("supporting_counts") or {}).items() if isinstance(v, (int, float))}
+        seen = en(ev.get("observed") or "")
+        if sc:
+            n_ = sum(sc.values())
+            return "Coded to %s. Of the vendor's %d earlier lines, %s." % (
+                seen.replace("department ", "").replace("account ", ""), n_,
+                ", ".join("%d %s %s" % (v, "is" if v == 1 else "are", "coded " + e(k)) for k, v in sorted(sc.items(), key=lambda kv: -kv[1])))
+        return facts(en(f.get("recommendation") or "")) or seen
+
     def what_changes(lines):
         cr = {(l["account"], l.get("department") or "") for l in lines if l.get("credit")}
         dr = {(l["account"], l.get("department") or "") for l in lines if l.get("debit")}
@@ -2935,7 +2956,8 @@ def coding():
         DRAFT_CAT[iid] = {"capex": "CAPEX", "prepaid": "PREPAID", "dept": "DEPT"}[cat]
         docs = sorted({d for l in x["lines"] for d in l["documents"]})
         doc = next((i for r in vrows if r["vendor"] == vname for i in (r.get("detail") or {}).get("items") or [] if i["document"] in docs), None)
-        note_item(iid, vs[0] if len(vs) == 1 else None, docs)
+        ITEM_VENDOR[iid] = vs[0] if len(vs) == 1 else ""   # set before card(), which would take the title
+        note_item(iid, None, docs)
         if docs:
             nsdoc[iid] = ", ".join(doc_of(vname, d) for d in docs)
         typ = what_changes(x["lines"]) or "Account"
@@ -2989,7 +3011,7 @@ def coding():
         ORG_TAB[iid] = "hist" if typ == "Department" else "po"
         items.append(("dept", iid, typ, vname, (doc or {}).get("text") or "", f.get("amount_at_risk") or 0, "", ""))
         dcards.append(card(iid, vname, f.get("amount_at_risk") or 0, (f.get("amount_at_risk") or 0) >= thr, cur, rec, doc,
-                           '<div><div class="l">Type</div><div class="x">' + e(typ) + "</div></div>", en(f.get("recommendation") or ""), "", FLAG_ACTS,
+                           '<div><div class="l">Type</div><div class="x">' + e(typ) + "</div></div>", finding_fact(f), "", FLAG_ACTS,
                            lines_html(vname, docs=set(d for l in (x or {}).get("lines", []) for d in (l.get("documents") or [])) or None),
                            (je_editor(iid, je[iid]["lines"]) if iid in je else "") + history(vname), thr="all" if typ == "Department" else "thr"))
 
@@ -3479,7 +3501,7 @@ function workPaper(){
   const lines = [];
   Object.keys(DATA.je).filter(jeReady).forEach(id => { const j = jeOf(id);
     j.lines.forEach((l, i) => lines.push('<tr>' + td(i ? '' : refOf(id), 'm') + td(i ? '' : j.id, 'm') + td(i ? '' : j.memo) + td(l.account, 'm') + td(l.department || '') + td(l.project || '') + td(l.program || '')
-      + td(Number(l.debit) ? usd(l.debit) : '', 'n') + td(Number(l.credit) ? usd(l.credit) : '', 'n') + '</tr>')); });
+      + td(l.vendor || '') + td(l.po || '', 'm') + td(Number(l.debit) ? usd(l.debit) : '', 'n') + td(Number(l.credit) ? usd(l.credit) : '', 'n') + '</tr>')); });
   const signs = Object.keys(S.sign).map(r => { const s = S.sign[r], lb = $('[data-sname="' + r + '"]'); return '<tr>' + td(lb ? lb.closest('.sign').querySelector('b').textContent : r) + td(s.name) + td(s.date) + '</tr>'; });
   const table = (head, rows, none) => '<table><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + (rows.join('') || '<tr><td colspan="' + head.length + '">' + none + '</td></tr>') + '</tbody></table>';
   const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>GL Coding Review work paper, ' + esc(DATA.period) + '</title><style>'
@@ -3490,7 +3512,7 @@ function workPaper(){
     + '<p>' + items.length + ' items, ' + (items.length - open.length) + ' decided, ' + open.length + ' open. Agreed fixes: ' + fx.length + '; ' + rc.length + ' booked as reclasses (' + rc.filter(f => f.in_import).length
     + ' in the import), ' + (fx.length - rc.length) + ' edited in NetSuite, not in the import.</p>'
     + '<h2>Decisions</h2>' + table(['Ref ID', 'Page', 'Item', 'Amount', 'Decision', 'Path', 'Document', 'External ID', 'Change', 'Note', 'Decided by', 'When (UTC)'], dec, 'No decisions recorded.')
-    + '<h2>Reclasses in the NetSuite import</h2>' + table(['Ref ID', 'External ID', 'Memo', 'Account', 'Department', 'Project', 'Program', 'Debit', 'Credit'], lines, 'None ready.')
+    + '<h2>Reclasses in the NetSuite import</h2>' + table(['Ref ID', 'External ID', 'Memo', 'Account', 'Department', 'Project', 'Program', 'Name', 'Coupa PO', 'Debit', 'Credit'], lines, 'None ready.')
     + '<h2>Sign-off</h2>' + table(['Role', 'Name', 'Date'], signs, 'Not signed.') + '</body></html>';
   download('serif-' + DATA.kind + '-work-paper-' + DATA.slug + '.html', html, 'text/html');
 }

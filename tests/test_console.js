@@ -193,9 +193,10 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
          'gl: the CSV carries each line\'s Project, and its Program as NetSuite\'s internal ID with the name for the reviewer');
       // SERIF-161: each entry line names its vendor (NetSuite's Name), one name each. The Aug 2026 export has no Coupa PO
       // column, so every PO here is blank; Sep 2026's fill the PO where the bill has one.
-      ok(await p.evaluate(() => { const ls = Object.keys(DATA.je).filter(i => /^(C|P|D)-/.test(i)).flatMap(i => DATA.je[i].lines);
-        return ls.length > 0 && ls.filter(l => l.vendor).length >= 0.9 * ls.length && ls.every(l => !/, .*, |\(no vendor\)/.test(l.vendor || '')) && ls.every(l => 'po' in l); }),
-         'gl: entry lines carry their vendor, one name each, and a Coupa PO field');
+      ok(await p.evaluate(() => { const ids = Object.keys(DATA.je).filter(i => /^(C|P|D|DR)-/.test(i)), ls = ids.flatMap(i => DATA.je[i].lines);
+        return ls.length > 0 && ls.filter(l => l.vendor).length >= 0.9 * ls.length && ls.every(l => !/, .*, |\(no vendor\)/.test(l.vendor || ''))
+          && ls.every(l => 'po' in l && !/,|Multiple/.test(l.po || '') && !/\| [A-Z][a-z]{2}'\d\d$/.test(l.vendor || '')); }),   // a Name is a vendor, never a memo
+         'gl: entry lines carry their vendor, one name each and never a memo, and at most one Coupa PO');
       ok(rows.every(r => /^[^,]+,97,\d{1,2}\/\d{1,2}\/\d{4},/.test(r)) && rows.every(r => { const c = (r.match(/("([^"]|"")*"|[^,]*)(,|$)/g) || []).map(x => x.replace(/,$/, '')); return /^\d+$/.test(c[6] || '') && /^\d+$/.test(c[7] || ''); }),
          'gl: Subsidiary is internal ID 97, dates are M/D/YYYY and accounts are internal IDs');
       ok(await p.evaluate(() => { const ids = Object.keys(DATA.je).filter(i => /^(C|P|CB|PB|D)-/.test(i));
