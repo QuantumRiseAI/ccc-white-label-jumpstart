@@ -153,10 +153,17 @@ MONTHLY_EXPORTS = [
     ("plan", "Rolling forecast, the plan", "Actual vs. plan and planned coding"),
     ("hris_roster", "UKG roster", "Requester departments, names and pay"),
     ("netsuite_link_ids", "NetSuite link IDs, from the connector", "Links to NetSuite records"),
+    ("netsuite_income_statement", "NetSuite Income Statement by month", "The tie to NetSuite, account by account"),
+    ("netsuite_balance_sheet", "NetSuite Balance Sheet", "Balance Sheet Flux and its tie-outs"),
+    ("netsuite_ref", "NetSuite lists: accounts, departments, programs", "NetSuite internal IDs in the import CSV"),
 ]
+FLUX_ONLY = ("forecast", "netsuite_balance_sheet")
 
 
-def exports_card(m, views):
+def exports_card(m, views, extra=None):
+    """The month's exports, each file read or Not supplied, and what each feeds. extra adds
+    the reports the console build reads itself, {role: [paths]}. A Coupa report that stops at a
+    row limit, or lacks columns the checks read, says so on its row."""
     flux = "uc2" in str(m.get("ruleset_version", ""))
     got, many = {}, {}
     for item in m.get("inputs", []):
@@ -170,15 +177,26 @@ def exports_card(m, views):
     for item in views.get("inputs", []):
         role = {"forecast_workbook": "plan"}.get(item.get("role"), item.get("role"))
         got.setdefault(role, item)
+    for role, paths in (extra or {}).items():
+        if paths:
+            many[role] = [{"path": x} for x in paths]
+            got.setdefault(role, many[role][0])
+    cc = m.get("coupa_coverage") or {}
+    limits = []
+    if cc.get("row_limit"):
+        limits.append("It stops at the %s-row limit, so it holds only part of the year." % format(cc["row_limit"], ","))
+    if cc.get("columns_absent"):
+        limits.append("It lacks or leaves empty: %s. What each check found, below, names the checks that did not run for it." % ", ".join(cc["columns_absent"]))
     rows = []
     for role, label, feeds in MONTHLY_EXPORTS:
-        if role == "forecast" and not flux:
+        if role in FLUX_ONLY and not flux:
             continue
         item = got.get(role)
+        note = (' <span class="expmiss">' + esc(" ".join(limits)) + "</span>") if role == "coupa" and item and limits else ""
         rows.append("<tr><td>" + esc(label) + "</td><td>"
                     + ("<br>".join('<span class="mono">' + esc(os.path.basename(str(x.get("path")))) + "</span>" for x in (many.get(role) or [item]))
                        if item else '<span class="expmiss">Not supplied</span>')
-                    + "</td><td>" + esc(feeds) + "</td></tr>")
+                    + "</td><td>" + esc(feeds) + note + "</td></tr>")
     return ('<div class="card"><h3>Exports this month</h3>'
             '<div class="tblwrap"><table><thead><tr><th>Export</th><th>File</th>'
             '<th>Feeds</th></tr></thead><tbody>' + "".join(rows)

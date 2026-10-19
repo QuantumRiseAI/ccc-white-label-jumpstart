@@ -3,14 +3,14 @@
 // record and the work paper), then shared mode on a mocked Artifact db:
 // two reviewers, attribution, a conflict, a read-only viewer, downloads, and a rerun
 // bringing in the earlier run's decisions. Needs Playwright with Chromium.
-//   node tests/test_console.js [folder holding the two aug2026 v2.2.0 consoles]   (or: make test)
+//   node tests/test_console.js [folder holding the two aug2026 v2.2.1 consoles]   (or: make test)
 // With no folder, it tests consoles/.
 let chromium; try { ({ chromium } = require('playwright')); }
 catch (e) { ({ chromium } = require(process.env.PLAYWRIGHT || '/Users/anniebritton/.npm/_npx/520e866687cefe78/node_modules/playwright')); }
 const fs = require('fs'), path = require('path'), os = require('os');
 const B = path.resolve(__dirname, '..') + '/';
 const DIR = process.argv[2];
-const FILES = DIR ? {gl: path.join(DIR, 'serif-gl-coding-review-aug2026-v2.2.0.html'), pl: path.join(DIR, 'serif-pl-flux-aug2026-v2.2.0.html')}
+const FILES = DIR ? {gl: path.join(DIR, 'serif-gl-coding-review-aug2026-v2.2.1.html'), pl: path.join(DIR, 'serif-pl-flux-aug2026-v2.2.1.html')}
   : {gl: B + 'consoles/serif-gl-coding-review.html', pl: B + 'consoles/serif-pl-flux.html'};
 let fails = 0;
 const ok = (c, m) => { console.log((c ? '  PASS ' : '  FAIL ') + m); if (!c) fails++; };
@@ -480,7 +480,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     // the run log
     await p.evaluate(() => show('runlog'));
     ok(await p.locator('#p-runlog h3', {hasText: 'What each check found'}).count() === 1, k + ': run log shows each check');
-    ok(await p.locator('#p-runlog td', {hasText: '2.2.0'}).count() >= 1, k + ': build record names 2.2.0');
+    ok(await p.locator('#p-runlog td', {hasText: '2.2.1'}).count() >= 1, k + ': build record names 2.2.1');
     // the decision record: save, then load into a clean browser
     await p.evaluate(() => show('settings'));
     const [rd] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('[data-recsave]')]);

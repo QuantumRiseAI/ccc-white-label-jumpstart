@@ -29,14 +29,14 @@ import os
 import re
 import statistics
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import serif_sources as SS  # noqa: E402
 import serif_design as DS   # noqa: E402
 
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 ap = argparse.ArgumentParser(description="Build the GL Coding Review and P&L Flux consoles.")
 ap.add_argument("--only", choices=("coding", "flux"), help="build one console; both by default")
 ap.add_argument("--coding-run", help="the GL Coding Review run.json, after serif_views.py --keep-names")
@@ -975,7 +975,10 @@ def runlog(run, kind, also=None, read=()):
     """The run log: the exports, what each check found, the estimated cost of a
     run, every input, and the build record."""
     m, views = run.get("manifest") or {}, run.get("views") or {}
-    out = [DS.exports_card(m, views), DS.checks_card(run)]
+    # the reports the build itself reads, beside the exports the engine and schedules read
+    extra = {"netsuite_income_statement": [p_ for p_ in IS_X or [] if os.path.exists(p_)],
+             "netsuite_ref": [p_ for p_ in A.netsuite_ref or [] if os.path.exists(p_)]}
+    out = [DS.exports_card(m, views, extra), DS.checks_card(run)]
     if SKIPPED:
         out.append('<div class="card"><h3>Drafts Left Out</h3><div class="tw"><table><tbody>%s</tbody></table></div></div>'
                    % "".join("<tr><td>%s</td></tr>" % e(x) for x in SKIPPED))
@@ -2507,9 +2510,17 @@ def flux():
         if obs:
             return " ".join(t for t in (stop(cap(obs)), stop(cap(sup))) if t)
         return f.get("recommendation") or x.get("support") or x["memo"]
+    # An adjustment's id is its kind and memo. Two that share both (two Flagship bills
+    # capitalized alike, two receipt accruals) also take their bills' documents, or their Coupa
+    # POs, so each keeps its own id, and its decision, whatever order a later run lists them in;
+    # every other id is as before.
+    twins = Counter((x.get("kind"), x["memo"]) for x in ent)
     for x in ent:
         f = F.get(x["finding_id"]) or {}
-        aid = sid("ADJ", x.get("kind"), x["memo"])
+        bills = {d for l in x["lines"] for d in (l.get("documents") or [])} or \
+            {t.get("document_number") for t in f.get("transactions") or [] if t.get("document_number")} or \
+            {x.get("support") or ""}   # a receipt accrual has no bill; its Coupa POs tell it apart
+        aid = sid("ADJ", x.get("kind"), x["memo"], *(sorted(bills) if twins[(x.get("kind"), x["memo"])] > 1 else []))
         pl = [l for l in x["lines"] if PNL(l["account"])]
         imp = sum((l.get("credit") or 0) - (l.get("debit") or 0) for l in pl)
         impact += imp
@@ -2621,6 +2632,9 @@ def flux():
         tie("Expense accounts 6xxxxxx", gsum("6"), isv("Total - 6000000 - Operating Expenses"), "GL 6xxxxxx", "Income Statement")
         tie("Total expense", gsum("6") + gsum("7"), isv("Total - Expense"), "GL 6xxxxxx and 7xxxxxx", "Income Statement")
         tie("Net income", gl_ni, isv("Total - Income") - isv("Total - Expense") + isv("Total - Other Income") - isv("Total - Other Expense"), "GL", "Income Statement")
+    if not bs["rows"]:
+        ties.append('<tr><td>Balance Sheet tie-outs: net income, balances, cash, prepaids, fixed assets, depreciation, payables and accruals</td>'
+                    '<td class="n2" colspan="2">They need the NetSuite Balance Sheet report</td><td>Not run</td></tr>')
     if bs["rows"]:
         tie("Net income", gl_ni, bsv("Net Income", PERIOD) - bsv("Net Income", PRIOR), "GL", "Balance Sheet, change in Net Income")
         tie("Balance sheet balances", bsv("Total ASSETS", PERIOD), bsv("Total Liabilities & Equity", PERIOD), "Total assets", "Total liabilities and equity")
@@ -2951,10 +2965,11 @@ def coding():
             for m in ms:
                 it = next((i for i in its if i["document"] == m.get("document") and i["account"] == m.get("account")), None)
                 to = re.search(r"\b(1\d{6})\b", fl.get("do") or "")
-                # The flag's words are its first bill's; a capital bill says where it goes in its own.
+                # Each bill gives its own finding's reason; a run from before views 1.7.2 gives
+                # the flag's, its first bill's, so a capital bill says where it goes in its own.
                 p = m.get("placement") or {}
-                why, do = fl.get("why") or "", fl.get("do") or ""
-                if p and p0 and p != p0:
+                why, do = (m.get("why") or "", m.get("do") or "") if "why" in m else (fl.get("why") or "", fl.get("do") or "")
+                if "why" not in m and p and p0 and p != p0:
                     why, do = (why.replace(p0["why"], p["why"]) if p0["why"] and p0["why"] in why else (why + " " + p["why"]).strip() if p.get("kind") != "in_service" else why), (do.replace(p0["ask"], p["ask"]) if p0["ask"] else (do + " " + p["ask"]).strip())
                 screen[fl["id"]].append({"vendor": r["vendor"], "from_account": m.get("account") or (it or {}).get("account") or "",
                                          "to_account": m.get("to") or (to.group(1) if to else ""), "department": (it or {}).get("department") or "",
@@ -2969,10 +2984,21 @@ def coding():
               "not_in_service": ("Capital in Process: not yet in service", "Not yet; ask the date"),
               "no_account": ("Capital in Process: the chart has no fixed asset account for it", "Invoice date, %s, by policy: confirm"),
               "in_service": ("in service: fixed asset", "Invoice date, %s, by policy: confirm")}
-    cap_cards, pre_cards = [], []
+    cap_cards, pre_cards, pt_settled = [], [], []
     for sec_id, prefix, bucket, typ in (("capital", "C", cap_cards, "CapEx missed"), ("prepaid", "P", pre_cards, "Prepaid missed")):
+        key = lambda r: (r["vendor"], r["from_account"], r["to_account"], r.get("what"), r.get("department"))
+        twins = Counter(key(r) for r in screen[sec_id])
         for r in screen[sec_id]:
-            iid = sid(prefix, r["vendor"], r["from_account"], r["to_account"], r.get("what"), r.get("department"))
+            # A capital flag on a pass-through bill whose cost breakdown is in is settled by
+            # the breakdown: with no item at or over the threshold, nothing on it is capital,
+            # and Pass-Through Bills reviews it item by item.
+            rv_ = PT_REV.get(str((r["doc"] or {}).get("document") or ""))
+            if sec_id == "capital" and rv_ and not any(f[0] == "capital" for i in rv_["items"] for f in i["flags"]):
+                pt_settled.append((r["vendor"], r["doc"]["document"], r["amount"]))
+                continue
+            # Two bills alike in all of these (two Flagship bills on one account) also take their
+            # document, so each keeps its id whatever order a later run lists them in.
+            iid = sid(prefix, *key(r), *([(r["doc"] or {}).get("document")] if twins[key(r)] > 1 else []))
             doc = r["doc"] or line_doc(r["vendor"], r["from_account"])
             p = r["placement"]
             memo, placed = PLACED.get(p.get("kind"), ("", ""))
@@ -3026,14 +3052,28 @@ def coding():
         """What a department or Coupa account finding saw, from its evidence: the coding and what
         the vendor's earlier lines were coded to."""
         ev = f.get("evidence") or {}
-        sc = {k: v for k, v in (ev.get("supporting_counts") or {}).items() if isinstance(v, (int, float))}
+        raw = ev.get("supporting_counts") or {}
+        sc = {k: v for k, v in raw.items() if isinstance(v, (int, float))}
         seen = en(ev.get("observed") or "")
-        if sc:
+        A_ = lambda c: ("%s %s" % (c, acct_name(c))).strip()
+        # The Coupa checks count lines and dollars, not codings: each says what it compared.
+        if f.get("rule_id") == "T4.PO_ACCOUNT_MISMATCH":
+            m_ = re.search(r"has ([\d,]+) Coupa PO line\(s\), (\d+)% approved against account (\d{7})", ev.get("basis") or "")
+            return "%s%s.%s" % (stop_(seen.replace("line(s)", "lines" if raw.get("gl_lines") != 1 else "line")).rstrip("."),
+                                (", %s" % money(raw["gl_exposure"], True)) if raw.get("gl_exposure") else "",
+                                (" The vendor's %s Coupa PO lines were %s%% approved against %s." % (m_.group(1), m_.group(2), A_(m_.group(3)))) if m_ else "")
+        if f.get("rule_id") == "T4.ITEM_ACCOUNT_DRIFT" and raw.get("usual_account"):
+            return "Coupa PO %s line %s (%s, %s) is on %s; %s of the item's %s earlier lines were on %s, its usual account." % (
+                e(raw.get("po_number") or ""), e(str(raw.get("po_line") or "")), e(raw.get("item") or ""), money(raw.get("po_amount") or 0, True),
+                A_(raw.get("account") or ""), raw.get("earlier_lines_on_usual", 0), raw.get("earlier_lines", 0), A_(raw["usual_account"]))
+        if sc and f.get("rule_id") == "T1.DEPT_INCONSISTENCY":
             n_ = sum(sc.values())
             return "Coded to %s. Of the vendor's %d earlier lines, %s." % (
                 seen.replace("department ", "").replace("account ", ""), n_,
                 ", ".join("%d %s %s" % (v, "is" if v == 1 else "are", "coded " + e(k)) for k, v in sorted(sc.items(), key=lambda kv: -kv[1])))
         return facts(en(f.get("recommendation") or "")) or seen
+
+    stop_ = lambda t: t if not t or t.endswith(".") else t + "."
 
     def what_changes(lines):
         cr = {(l["account"], l.get("department") or "") for l in lines if l.get("credit")}
@@ -3470,7 +3510,9 @@ def coding():
         if booked_:
             what.append("%d booked to a %s account (%s): %s" % (len(booked_), acct, prefix, money(booked_amt(booked_), True)))
         return hero(title + ", " + PERIOD, "", [("Decided", live("done", pid), ". ".join(what) or "Nothing flagged in " + PERIOD)])
-    pages.append(page("capex", screen_hero("CapEx Flags", "capex", "capex", cap_cards, cap_booked, "Fixed Assets") + two_way("Capital", cap_cards, cap_booked, "capex", "Fixed Assets")))
+    pt_note = ('<p class="note">Left to Pass-Through Bills, whose cost breakdown has no item at or over %s, so none is a capital asset: %s.</p>'
+               % (money(THR["thr_capex"]), "; ".join("%s %s, %s" % (e(v), e(d), money(a, True)) for v, d, a in pt_settled))) if pt_settled else ""
+    pages.append(page("capex", screen_hero("CapEx Flags", "capex", "capex", cap_cards, cap_booked, "Fixed Assets") + pt_note + two_way("Capital", cap_cards, cap_booked, "capex", "Fixed Assets")))
     pages.append(page("prepaid", screen_hero("Prepaid Flags", "prepaid", "prepaid", pre_cards, pre_booked, "Prepaid") + two_way("Prepaid", pre_cards, pre_booked, "prepaid", "Prepaid")))
     exc_html = ""
     issues = ([("Not applied", "the file is malformed: " + exc_run.get("error", ""))] if exc_run.get("status") == "malformed" else []) \

@@ -522,8 +522,8 @@ Serif's senior leadership. Write it last, from your commentary, in plain paragra
 
 1. Total operating expense and the net loss for the month, and their moves from the prior
    month. Operating expense is accounts 6xxxxxx and 7xxxxxx, as the console's Total OpEx tile
-   shows. `F0.OPEX` in `metrics` sums every P&L account, interest income included, so it is the
-   net loss; do not call it operating expense.
+   shows. `F0.OPEX` in `metrics`, titled "Net P&L", sums every P&L account, interest income
+   included, so it is the net loss; do not call it operating expense.
 2. The largest moves over the threshold, a few sentences each, from the commentary: the
    driver, and whether it is timing that will reverse next month.
 3. The adjustments the run proposes, by kind, and open PO commitments as a disclosure, not

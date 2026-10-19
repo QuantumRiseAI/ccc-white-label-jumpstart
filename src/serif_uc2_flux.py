@@ -47,7 +47,7 @@ from collections import defaultdict
 
 import serif_sources as sources
 
-ENGINE_VERSION = "0.8.1"
+ENGINE_VERSION = "0.8.2"
 RULESET_VERSION = "2026.10-uc2-flux-serif-thresholds+journal-moved"
 ENTITY = "FL87 Serif Biomedicines, Inc."
 
@@ -1275,7 +1275,7 @@ def build_metrics(cur, prior, prior_year, period, prior_period, coupa_rows):
 
     now, then, year = opex(cur), opex(prior), opex(prior_year)
     metrics = [
-        {"metric_id": "F0.OPEX", "title": "Total operating expense", "period": period,
+        {"metric_id": "F0.OPEX", "title": "Net P&L, every P&L account (the net loss)", "period": period,
          "value": round(now, 2), "unit": "usd", "population": round(now, 2), "share": None,
          "policy_basis": "Population measure, not a policy test",
          "prior_value": round(then, 2), "prior_share": None,
@@ -1641,6 +1641,24 @@ def main(argv=None):
         },
     }
     run["summary"]["metric_count"] = len(run["metrics"])
+    # Which checks ran, and why any did not. A check without its input reports nothing found,
+    # which reads as clean, so it is listed as not run, with the reason (design Rule 10).
+    absent_cols = set(coupa_coverage.get("columns_absent") or [])
+    not_run = {}
+    if not args.forecast:
+        not_run["F5.MODEL_TIE"] = "No forecast cut for %s was supplied." % period
+    if not args.plan:
+        not_run["F2.BUDGET"] = "No plan was supplied."
+    if not args.coupa:
+        not_run["F3.ACCRUAL_RECEIPT"] = "No Coupa export supplied."
+    elif absent_cols & {"Received", "Supplier"}:
+        not_run["F3.ACCRUAL_RECEIPT"] = "The Coupa report has no %s column." % " or ".join(
+            sorted(absent_cols & {"Received", "Supplier"}))
+    if not (gl_lines and history):
+        not_run["F6.ACCRUAL_PATTERN"] = not_run["F8.VENDOR_DROPPED"] = "No earlier months in the NetSuite exports."
+    every = [r for g in run["report"]["groups"] for r in g["rules"]]
+    run["manifest"]["rules_run"] = [r for r in every if r not in not_run]
+    run["manifest"]["rules_not_run"] = [{"rule_id": r, "status": "not_run", "reason": why} for r, why in not_run.items()]
 
     out_dir = os.path.join(args.out, period.replace(" ", "").lower())
     os.makedirs(out_dir, exist_ok=True)

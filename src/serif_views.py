@@ -56,7 +56,7 @@ from collections import defaultdict
 
 import serif_sources as sources
 
-VIEWS_VERSION = "1.7.1"
+VIEWS_VERSION = "1.7.2"
 
 # The flux engine's definition, so the two agree on what counts as P&L.
 PL_PREFIXES = ("6", "7", "8")
@@ -1134,6 +1134,8 @@ def vendors_table(current, prior, prior2, prior_year, periods, findings, account
             place = (f.get("correction") or {}).get("placement")
             for m in flags[-1]["match"]:
                 m["total"] = r2(abs(f.get("amount_at_risk") or 0))
+                # its own finding's reason, which the merged flag below does not keep
+                m["why"], m["do"] = x.get("why", ""), x.get("do", "")
                 if place:
                     m.update(to=place["to"], placement=place)
         # One flag per reason: three findings of one rule on one vendor are one
