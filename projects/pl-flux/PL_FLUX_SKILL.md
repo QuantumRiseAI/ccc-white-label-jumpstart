@@ -25,7 +25,7 @@ default, in dollars.
 
 | Account group | What drives it | In commentary |
 |---|---|---|
-| `6100000` Employee Expenses | Headcount, bonus cycle, benefits | Without the payroll register, headcount does not explain a salary move. Say the driver is not attributed. |
+| `6100000` Employee Expenses | Headcount, bonus cycle, benefits | Explain the move from the UKG roster: hires, job and pay changes, and each department's roster salary against its GL (see [`PROJECT_INSTRUCTIONS.md`](PROJECT_INSTRUCTIONS.md), Payroll accounts). The payroll register adds the cutoff accrual and the payroll tax on the bonus. |
 | `6200000` Consulting | `Flagship Labs LLC`, about $9.1M net | Related party. Keep Flagship apart from other consulting. |
 | `6300000` Legal & Professional | `K&L Gates LLP` corporate, IP legal apart | Milestone driven. Check for unbilled legal against `2204000`. |
 | `6400000` Lab Expenses | Fisher Scientific, New England BioLabs, Life Technologies | Explain by vendor and order cycle, not one line. |
@@ -109,7 +109,8 @@ Dr [account] / [correct department]    [amount]
 
 ## Load Summary
 
-Print this before anything else:
+Print this after the month, the tie's result and any missing exports or columns (the order
+in [`PROJECT_INSTRUCTIONS.md`](PROJECT_INSTRUCTIONS.md), Each Month), before any finding:
 
 ```
 P&L FLUX, DATA LOAD

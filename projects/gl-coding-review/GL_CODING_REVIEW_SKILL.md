@@ -142,7 +142,8 @@ will begin, using the space.
 
 ## Load Summary
 
-Print this before anything else:
+Print this after the month, the tie's result and any missing Coupa columns (the order in
+[`PROJECT_INSTRUCTIONS.md`](PROJECT_INSTRUCTIONS.md), Each Month), before any finding:
 
 ```
 GL CODING REVIEW, DATA LOAD

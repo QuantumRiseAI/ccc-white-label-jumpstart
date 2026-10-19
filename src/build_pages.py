@@ -36,7 +36,7 @@ sys.path.insert(0, HERE)
 import serif_sources as SS  # noqa: E402
 import serif_design as DS   # noqa: E402
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 ap = argparse.ArgumentParser(description="Build the GL Coding Review and P&L Flux consoles.")
 ap.add_argument("--only", choices=("coding", "flux"), help="build one console; both by default")
 ap.add_argument("--coding-run", help="the GL Coding Review run.json, after serif_views.py --keep-names")
@@ -569,6 +569,8 @@ def je_finish(je):
             continue
         vendor_po(iid, j["lines"])
         rev = j.pop("reverses", "") or ""
+        if not re.search(r"\| [A-Z][a-z]{2}'\d\d$", j["memo"]):   # Specific description | Mon'YY
+            j["memo"] = j["memo"] + " | " + PERIOD[:3] + "'" + PERIOD[-2:]
         was, j["date"] = j["date"], PERIOD_END   # corrections are booked in the open close month
         j.update({"subsidiary": JE_SUBSIDIARY, "period": PERIOD, "currency": JE_CURRENCY, "rate": JE_RATE,
                   "reversing": "Y" if rev else "N", "reversal_date": rev})
@@ -968,6 +970,9 @@ def runlog(run, kind, also=None, read=()):
     run, every input, and the build record."""
     m, views = run.get("manifest") or {}, run.get("views") or {}
     out = [DS.exports_card(m, views), DS.checks_card(run)]
+    if SKIPPED:
+        out.append('<div class="card"><h3>Drafts Left Out</h3><div class="tw"><table><tbody>%s</tbody></table></div></div>'
+                   % "".join("<tr><td>%s</td></tr>" % e(x) for x in SKIPPED))
     cost = DS.cost_estimate(HERE, run)
     if cost:
         main_ = cost["priced"][0]
@@ -1794,6 +1799,11 @@ function paintJE(){
 }
 /* NetSuite rejects a Memo over 999 characters; a reviewer's note or edit can take one past it */
 const memoCut = m => m.length > 999 ? m.slice(0, 996).trimEnd() + '...' : m;
+/* The import's Memo: the entry's, with the reviewer's note before its closing "| Mon'YY", which
+   the Data Entry Policy puts last; a long note is cut, never the month. */
+const memoWith = (memo, note) => { if (!note) return memoCut(memo); const k = / \| [A-Z][a-z]{2}'\d\d$/.exec(memo), end = k ? k[0] : '';
+  const head = (k ? memo.slice(0, k.index) : memo) + ' | ', room = 999 - head.length - end.length;
+  return room > 3 ? head + (note.length > room ? note.slice(0, room - 3).trimEnd() + '...' : note) + end : memoCut(memo + ' | ' + note); };
 /* NetSuite reads an import's dates in the importing user's format, M/D/YYYY at Serif */
 const nsDate = d => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || ''); return m ? +m[2] + '/' + +m[3] + '/' + m[1] : (d || ''); };
 function exportCSV(){
@@ -1805,7 +1815,7 @@ function exportCSV(){
   const held = Object.keys(DATA.je).filter(id => jeLive(id) && !jeReady(id)).map(id => jeOf(id).memo.slice(0, 60) + ': ' + jeWhy(id)).join('; ');
   Object.keys(DATA.je).forEach(id => { if (!jeReady(id)) return;
     const j = jeOf(id); j.lines.forEach(l => { const prog = NO_PROG(l.program) ? '' : l.program;
-      rows.push([j.id, R.acct ? DATA.sub_id : j.subsidiary, nsDate(j.date), j.period, memoCut(j.memo + (S.notes[id] ? ' | ' + S.notes[id] : '')),
+      rows.push([j.id, R.acct ? DATA.sub_id : j.subsidiary, nsDate(j.date), j.period, memoWith(j.memo, S.notes[id]),
         j.reversing === 'Y' ? nsDate(j.reversal_date) : '', id_(R.acct, l.account), id_(R.dept, l.department || ''), l.project || '', id_(R.prog, prog), l.vendor || '', l.po || '',
         l.debit || '', l.credit || '', memoCut(l.memo || ''), l.account, l.department || '', prog, j.reversing]); }); });
   const ns = nsIds().length, edited = ns ? plural(ns, 'item') + ' edited in NetSuite, not in the import: the CSV holds only the reclasses to book' : '';
@@ -1875,7 +1885,7 @@ function checklist(){
     let total = 0, open = 0, value = 0;
     pg.querySelectorAll('[data-item]').forEach(x => { total++; if (!decided(x.dataset.item)){ open++; value += Number(x.dataset.amt) || 0; } });
     /* A page's other comparisons (year on year, year to date) restate its lines; they count once, on the first. */
-    pg.querySelectorAll('tr[data-var]').forEach(tr => { if (tr.closest('[data-alt]')) return; const a = Math.abs(Number(tr.dataset.var) || 0); if (!overThr(tr)) return;
+    pg.querySelectorAll('tr[data-var]').forEach(tr => { if (tr.closest('[data-alt], [data-info]')) return; const a = Math.abs(Number(tr.dataset.var) || 0); if (!overThr(tr)) return;
       total++; const t = tr.querySelector('textarea[data-note]'); if (!t || !explained(t.dataset.note)){ open++; value += a; } });
     $$('#p-' + pid + ' [data-jerow]').filter(r => jeEdited(r.dataset.jerow)).forEach(r => { total++; });
     jeOpen(pid).forEach(r => { open++; value += jeOf(r.dataset.jerow).lines.reduce((a, l) => a + (Number(l.debit) || 0), 0); });
@@ -2058,7 +2068,7 @@ def flux():
         j = next(i for i, r in enumerate(bs["rows"]) if r["name"] == "Total Bank")
         banks = [r for r in bs["rows"][i:j] if r["kind"] == "account" and round(r["values"].get(PERIOD) or 0)]
     ent = (V.get("entries") or []) + drafted_entries()
-    used_com = set()
+    used_com, used_bud = set(), set()
     mt = next((t for t in V["tables"] if t["id"] == "model_tie"), {"sections": []})
     revs = [r for s in mt["sections"] for r in s["rows"]]
     pages, je = [], {}
@@ -2226,10 +2236,13 @@ def flux():
                 continue
             v = (r["budget"] or 0) - (r["actual"] or 0)
             line = money(abs(v)) + (" under plan" if v > 0 else " over plan") + (" (" + format(abs(100 * v / r["budget"]), ".1f") + "%)." if r["budget"] else ".")
+            bn = txt((RAW_DRAFTS.get("budget_commentary") or {}).get(r["account_code"]))
+            if bn:
+                used_bud.add(r["account_code"])
             out.append('<tr data-var="%s"><td><span class="code">%s</span>%s</td><td class="n2">%s</td><td class="n2">%s</td><td class="n2">%s</td><td class="n2">%s</td>'
-                       '<td><div class="cm">%s</div><textarea class="c" rows="1" data-note="avb:%s" placeholder="Commentary"></textarea></td></tr>'
+                       '<td><div class="cm">%s</div>%s<textarea class="c" rows="1" data-note="avb:%s" placeholder="Commentary"></textarea></td></tr>'
                        % ('%s" data-base="%s' % (round(v, 2), round(r["budget"] or 0, 2)), e(r["account_code"]), e(leaf_of(r)), money(r["actual"]), money(r["budget"]), fav(v), fav(v, pct(v, r["budget"])) if r["budget"] else "&ndash;",
-                          line if round(v) else "On plan.", e(r["account_code"])))
+                          line if round(v) else "On plan.", draft("bud:" + r["account_code"], bn, "avb:" + r["account_code"]) if bn else "", e(r["account_code"])))
     pages.append(page("avb", hero("Actual vs. Budget, " + PERIOD, "Plan: the " + e(PLR["views"]["tables"][[t["id"] for t in PLR["views"]["tables"]].index("dept_plan")].get("vintage") or "2026-06") + " vintage of the rolling forecast", [
         ("Actual OpEx, Planned Accounts", short(act_p), "%s, only accounts the plan covers (of %s total OpEx)" % (PERIOD, short(opex["actual"]))),
         ("Plan, " + PERIOD, short(bud), "Same accounts, the %s forecast" % e(PLR["views"]["tables"][[t["id"] for t in PLR["views"]["tables"]].index("dept_plan")].get("vintage") or "")),
@@ -2453,13 +2466,13 @@ def flux():
             used_adj.add(x["finding_id"])
             v_ = "approve" if da["recommend"] == "book" else "reject"
             dhtml = draft("adj:" + aid, txt(da.get("note")), aid, aid, v_, "Add to NetSuite CSV." if v_ == "approve" else "Reject.")
-        cards_a.append('<div class="item%s" data-item="%s" data-amt="%s"><div class="ih"><span class="tag ink">%s</span><b>%s</b>%s<span class="stp">Pending</span></div><div class="ib"><div class="kv">'
+        cards_a.append('<div class="item%s" data-item="%s" data-amt="%s"><div class="ih"><span class="tag ink">%s</span><b>%s</b>%s<span class="stp">Pending</span><span class="mono">%s</span></div><div class="ib"><div class="kv">'
                        '<div><div class="l">Account</div><div class="x">%s %s</div></div><div><div class="l">Amount</div><div class="x">%s</div></div><div><div class="l">P&amp;L impact</div><div class="x">%s</div></div>'
                        '<div><div class="l">Vendor (GL)</div><div class="x">%s</div></div><div><div class="l">BS impact</div><div class="x">%s</div></div><div><div class="l">Dept</div><div class="x">%s</div></div></div>'
                        '<div class="why">%s%s</div><div class="pol">%s</div>%s'
                        '<div class="acts"><button class="pill" data-d="%s" data-v="approve" data-label="%s">Add to NetSuite CSV</button><button class="pill" data-d="%s" data-v="reject" data-label="%s">Reject</button>'
                        '<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
-                       % (" hi" if hi else "", aid, round(x["debits"], 2), e(x.get("kind") or ""), en(x["memo"]), "", e(acct["account"]), e(acct_name(acct["account"])), money(x["debits"], True),
+                       % (" hi" if hi else "", aid, round(x["debits"], 2), e(x.get("kind") or ""), en(x["memo"]), "", money(x["debits"], True), e(acct["account"]), e(acct_name(acct["account"])), money(x["debits"], True),
                           fav(imp, ("&#9660; Favorable " if imp > 0 else "&#9650; Unfavorable " if imp < 0 else "No P&amp;L impact") + (money(abs(imp), True) if round(imp) else "")),
                           e(", ".join(vend) or "&ndash;"), e(", ".join("%s %s %s" % (l["account"], acct_name(l["account"]), money((l.get("debit") or 0) - (l.get("credit") or 0), True).replace("&ndash;", "-")) for l in bsl)) or "&ndash;",
                           e(", ".join(sorted({l.get("department") for l in x["lines"] if l.get("department") and not BS(l["account"])})) or "&ndash;"),
@@ -2506,7 +2519,7 @@ def flux():
                       '<textarea class="c" rows="1" data-note="dbl:%s" placeholder="Commentary"></textarea></td></tr>'
                       % (round(amt, 2), e(vname), money(amt, True), count(len(bydoc), "bill"), money(usual), e(", ".join(m[:3] for m in sorted(billed, key=SS.period_key))),
                          "None in " + e(PRIOR[:3]) + ". " + docs_, e(vname)))
-    dbl_section = ('<h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section C: Billed Twice After a Gap</h3><div class="card"><div class="tw"><table><thead><tr><th>Vendor</th>'
+    dbl_section = ('<div data-info><h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section C: Billed Twice After a Gap</h3><div class="card"><div class="tw"><table><thead><tr><th>Vendor</th>'
                    '<th class="n2">%s</th><th class="n2">Usual month</th><th>Billed in</th><th style="width:40%%">Commentary</th></tr></thead><tbody>%s</tbody></table></div></div>'
                    % (e(PERIOD), "".join(drows_) or '<tr><td colspan="5" class="note">None this month.</td></tr>'))
     pages.append(page("adj", hero("Accounting Adjustments &amp; Forecast Revisions, ".replace("&amp;", "&") + PERIOD, "", [
@@ -2514,7 +2527,10 @@ def flux():
          + ("; %s in Section B" % count(len(revs), "forecast revision") if revs else "")),
         ("P&amp;L Impact if All Added to CSV", fav(impact, ("&#9660; " if impact > 0 else "&#9650; ") + short(abs(impact))), "Favorable" if impact > 0 else "Unfavorable")])
         + '<div class="card"><div class="ch">NetSuite Journal Entries<button class="pill solid r" data-export>Export to NetSuite, CSV</button></div></div><h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section A: Accounting Adjustments</h3>' + "".join(cards_a)
-        + '<h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section B: Forecast / Budget Revisions</h3>' + "".join(cards_b) + dbl_section))
+        + '<h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section B: Forecast / Budget Revisions</h3>'
+        + ("".join(cards_b) or '<p class="note">%s</p>' % ("No forecast revisions in %s." % PERIOD if any("forecast" in (i.get("roles") or []) for i in M.get("inputs") or [])
+                                                          else "Not run for %s: no forecast was supplied." % PERIOD))
+        + dbl_section + "</div>"))
 
     # ----- SOX & GAAP
     asc = [("ASC 225-10", "Income Statement Presentation"), ("ASC 250-10", "Consistent Accounting Periods"), ("ASC 280-10", "Segment / Department Reporting"),
@@ -2592,6 +2608,7 @@ def flux():
                 ("Analysis", [("ava", "Actual vs. Actual (MoM)"), ("avb", "Actual vs. Budget"), ("dept", "By Department (MoM)"), ("pay", "Payroll Analytics")]),
                 ("Close Workflow", ([("bs", "Balance Sheet Flux")] if bs["rows"] else []) + [("adj", "Adjustments"), ("sox", "SOX & GAAP")])]
     SKIPPED.extend("commentary for " + k for k in (RAW_DRAFTS.get("commentary") or {}) if k not in used_com)
+    SKIPPED.extend("budget commentary for " + k for k in (RAW_DRAFTS.get("budget_commentary") or {}) if k not in used_bud)
     SKIPPED.extend("adjustment note for " + k for k in (RAW_DRAFTS.get("adjustments") or {}) if k not in used_adj)
     data = {"kind": "flux", "run": M["run_id"], "slug": SLUG, "thr": thr, "prior": PRIOR, "je": je_finish(je), "icons": {}, "drafts": DRAFTS, "nsref": NSREF, "sub_id": JE_SUBSIDIARY_ID}
     js = r"""
@@ -2762,10 +2779,11 @@ def coding():
         its = [i for i in (r.get("detail") or {}).get("items") or [] if not account or i["account"] == account]
         return max(its, key=lambda i: abs(i["amount"])) if its else None
 
-    def lines_html(vname, account=None, docs=None):
+    def lines_html(vname, account=None, docs=None, codings=None):
         r = next((x for x in vrows if x["vendor"] == vname), None)
         its = [i for i in ((r or {}).get("detail") or {}).get("items") or []
-               if (not account or i["account"] == account) and (not docs or i["document"] in docs)]
+               if (not account or i["account"] == account) and (not docs or i["document"] in docs)
+               and (not codings or (i["account"], i.get("department") or "") in codings)]
         if not its:
             return ""
         rows = "".join('<tr><td class="mono">%s</td><td>%s %s%s</td><td>%s</td><td><span class="mono">%s</span><small>%s</small></td><td>%s</td><td>%s</td><td class="n2">%s</td></tr>'
@@ -2786,6 +2804,20 @@ def coding():
         return "".join('<button class="pill" data-d="%s" data-v="%s" data-label="%s">%s</button>' % (iid, v, e(label), lab) for v, lab in actions)
 
     used_ven, amts = set(), {}   # amts: each card's amount, for its reference ID
+    # Claude's notes, one per item (SERIF-162): each names its vendor, the item's category (its
+    # reference ID's prefix: capex, fa, prepaid, ppd, dept, coding, pass, new or clear) and, for an
+    # item about a bill, that bill's document number. A note goes on the first item it fits and on
+    # no other. The older vendor-keyed notes apply only when a file has no `notes`.
+    notes_left = [n for n in (RAW_DRAFTS.get("notes") or []) if isinstance(n, dict) and txt(n.get("note"))]
+    by_vendor = {} if RAW_DRAFTS.get("notes") else (RAW_DRAFTS.get("vendors") or {})
+
+    def take_note(iid, vendor, docs):
+        cat = REF_SCREENS.get(iid.split("-")[0], "").lower()
+        for k, n in enumerate(notes_left):
+            d = txt(n.get("document"))
+            if txt(n.get("vendor")) == vendor and txt(n.get("check")).lower() in ("", cat) and (not d or d in docs):
+                return notes_left.pop(k)
+        return None
     nsdoc = {}   # item -> the document the fix changes, recorded with an Edited in NetSuite decision
 
     def doc_of(vname, d):
@@ -2797,18 +2829,24 @@ def coding():
         note_item(iid, vendor, [doc["document"]] if doc else [])
         if doc:
             nsdoc.setdefault(iid, doc["type"] + " " + doc["document"])
-        dv = (RAW_DRAFTS.get("vendors") or {}).get(vendor) or {}
-        if flag and dv.get("recommend") in ("clear", "question", "entry") and note_fits(vendor, dv, doc):
-            used_ven.add(vendor)
+        n_ = take_note(iid, vendor, ITEM_DOCS.get(iid) or set()) if flag or counted else None
+        dv = n_ or by_vendor.get(vendor) or {}
+        if (n_ or flag) and dv.get("recommend") in ("clear", "question", "entry") and (n_ or note_fits(vendor, dv, doc)):
+            if not n_:
+                used_ven.add(vendor)
             v_ = {"clear": "reject", "entry": "approve"}.get(dv["recommend"])
-            # A draft's decision is one the card offers: a pass-through card is reviewed, not rejected.
+            # A draft's decision is one the card offers: a pass-through card is reviewed, not rejected,
+            # and a line booked to the balance sheet is confirmed or recoded.
             offered = {v for v, _ in actions}
             if v_ == "reject" and "reject" not in offered:
                 v_ = "confirm" if "confirm" in offered else None
+            if v_ == "approve" and "approve" not in offered:
+                v_ = "recode" if "recode" in offered else None
             if v_ and v_ not in offered:
                 v_ = None
             more = draft("ven:" + iid, txt(dv.get("note")), iid, iid if v_ else None, v_,
-                         {"reject": "Coding stands: reject the recode.", "approve": "Add to NetSuite CSV.", "confirm": "Reviewed: the coding stands."}.get(v_, "")) + more
+                         {"reject": "Coding stands: reject the recode.", "approve": "Add to NetSuite CSV.", "confirm": "Reviewed: the coding stands.",
+                          "recode": "Recode, add to NetSuite CSV."}.get(v_, "")) + more
         if doc and not iid.startswith("PT-"):
             more = pt_flag(doc["document"]) + more
         amts[iid] = amount or 0
@@ -2965,7 +3003,8 @@ def coding():
         c_ = card(iid, vname, x["debits"], x["debits"] >= thr, "<br>".join(sorted({coding_(l["account"], l["department"]) for l in crl})),
                   '<span class="arrow">&rarr;</span> ' + "<br>".join(sorted({coding_(l["account"], l["department"]) for l in drl})), doc,
                   '<div><div class="l">Type</div><div class="x">' + e(typ) + "</div></div>", e(x["support"]), "", DRAFT_ACTS,
-                  lines_html(vname, docs=set(docs) or None), je_editor(iid, je[iid]["lines"]) + history(vname),
+                  lines_html(vname, docs=set(docs) or None, codings={(l["account"], l["department"]) for l in crl} or None),
+                  je_editor(iid, je[iid]["lines"]) + history(vname),
                   thr={"capex": "thr_capex", "prepaid": "thr_prepaid"}.get(cat, "thr"))
         (cap_cards if cat == "capex" else pre_cards if cat == "prepaid" else dcards).append(c_)
         ORG_TAB[iid] = "hist"
@@ -3069,14 +3108,8 @@ def coding():
         """A vendor card. `move`, for a flag, names the codings the card is about: their lines, the
         Journal Entry moving them, its memo, amount and document."""
         dept, a, camt = coding_of(r)
-        dv = (RAW_DRAFTS.get("vendors") or {}).get(r["vendor"]) or {}
         dh = ""
         doc = (move or {}).get("doc") or line_doc(r["vendor"])
-        if dv.get("recommend") in ("clear", "question", "entry") and (not move or note_fits(r["vendor"], dv, doc)):
-            used_ven.add(r["vendor"])
-            v_ = {"clear": "confirm", "entry": "recode"}.get(dv["recommend"])
-            dh = draft("ven:" + iid, txt(dv.get("note")), iid, iid if v_ else None, v_,
-                       {"confirm": "Confirm.", "recode": "Recode."}.get(v_, ""))
         if doc:
             nsdoc[iid] = doc["type"] + " " + doc["document"]
         cur = "<br>".join(coding_(c["account"], c.get("department")) for c in (r.get("by_coding") or []) if round(c.get("current") or 0)) or coding_(a)
@@ -3093,6 +3126,14 @@ def coding():
             cur = "<br>".join(coding_(a_, d_) for (a_, d_), v_ in sorted(sums.items(), key=lambda kv: -abs(kv[1])) if round(v_)) or cur
             n_lines = len(own)
         note_item(iid, r["vendor"], [i["document"] for i in own])
+        n_ = take_note(iid, r["vendor"], {str(i["document"]) for i in own})
+        dv = n_ or by_vendor.get(r["vendor"]) or {}
+        if dv.get("recommend") in ("clear", "question", "entry") and (n_ or not move or note_fits(r["vendor"], dv, doc)):
+            if not n_:
+                used_ven.add(r["vendor"])
+            v_ = {"clear": "confirm", "entry": "recode"}.get(dv["recommend"])
+            dh = draft("ven:" + iid, txt(dv.get("note")), iid, iid if v_ else None, v_,
+                       {"confirm": "Confirm.", "recode": "Recode."}.get(v_, ""))
         pp = {(i.get("project") or "", i.get("program") or "") for i in (r.get("detail") or {}).get("items") or []
               if i["account"] == a and (i.get("department") or "Non-Specific") == dept}
         je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": (doc or {}).get("date") or "", "memo": "Recode %s from %s %s" % (r["vendor"], a, dept),
@@ -3228,10 +3269,17 @@ def coding():
             v = round(cods[k]["current"], 2)
             if to == k:
                 continue
-            pp = {(i.get("project") or "", i.get("program") or "") for i in its if i["account"] == k[0] and (i.get("department") or "") == k[1]}
-            src = dict(zip(("project", "program"), next(iter(pp)))) if len(pp) == 1 else {}
-            lines += [dict(src, account=to[0], department=to[1] or "Non-Specific", **{("debit" if v > 0 else "credit"): abs(v)}),
-                      dict(src, account=k[0], department=k[1] or "Non-Specific", reverses_line=True, **{("credit" if v > 0 else "debit"): abs(v)})]
+            # One pair of lines per Project and Program the coding's lines carry, so both sides of
+            # the reclass keep them (a coding whose lines mix Projects moves each part on its own).
+            pp = defaultdict(float)
+            for i in its:
+                if i["account"] == k[0] and (i.get("department") or "") == k[1]:
+                    pp[(i.get("project") or "", i.get("program") or "")] += i.get("amount") or 0
+            parts = [(dict(zip(("project", "program"), p_)), round(a_, 2)) for p_, a_ in sorted(pp.items()) if round(a_, 2)] \
+                if len(pp) > 1 and round(sum(pp.values()), 2) == v else [(dict(zip(("project", "program"), next(iter(pp)))) if len(pp) == 1 else {}, v)]
+            for src, v_ in parts:
+                lines += [dict(src, account=to[0], department=to[1] or "Non-Specific", **{("debit" if v_ > 0 else "credit"): abs(v_)}),
+                          dict(src, account=k[0], department=k[1] or "Non-Specific", reverses_line=True, **{("credit" if v_ > 0 else "debit"): abs(v_)})]
         amt = round(sum(abs(cods[k]["current"]) for k in keys), 2)
         steady = not lines
         if not lines:
@@ -3425,7 +3473,8 @@ def coding():
                         '<button class="pill" data-wpsave>Work paper, HTML</button><button class="pill solid" data-export>Export to NetSuite, CSV</button>',
                         "Sign once the review is complete. The work paper carries every decision, the reclasses in the import and these signatures.")
     pages.append(page("sox", hero("SOX Documentation, " + PERIOD, "", [
-                          ("Input Files", str(len(GLR["manifest"]["inputs"])), "Exports the run read, as exported"),
+                          ("Input Files", str(len({i.get("sha256") or i.get("path") for i in (GLR["manifest"].get("inputs") or []) + (V.get("inputs") or [])})),
+                           "Files the engine and schedules read, as exported"),
                           ("Ledger Ties to Income Statement", ("Pass" if not TIE or TIE["passed"] else "Fail") if TIE else "Not run",
                            "%s accounts match, %s" % (TIE["accounts"], PERIOD) if TIE else "No Income Statement"),
                           ("Sign-offs", live("signs"), "Prepared, reviewed, approved")]) + '<div class="card"><div class="ch">Source Citations</div><div class="tw"><table><tbody>' + srcs + "</tbody></table></div></div>"
@@ -3443,7 +3492,9 @@ def coding():
                 ("Review", [("capex", "CapEx Flags"), ("prepaid", "Prepaid Flags"), ("dept", "Organization & Account")] + ([("pass", "Pass-Through Bills")] if PT_BILLS else [])),
                 ("Confirm", [("clear", "Vendors Reviewed & Cleared"), ("new", "New Vendors This Period")]),
                 ("Documentation", [("audit", "Audit Log"), ("sox", "SOX Documentation"), ("export", "Export")])]
-    SKIPPED.extend("vendor note for " + k for k in (RAW_DRAFTS.get("vendors") or {}) if k not in used_ven)
+    SKIPPED.extend("vendor note for " + k for k in by_vendor if k not in used_ven)
+    SKIPPED.extend("note for %s%s%s: no item fits it" % (txt(n.get("vendor")), (", " + txt(n.get("check"))) if n.get("check") else "",
+                                                          (", document " + txt(n.get("document"))) if n.get("document") else "") for n in notes_left)
     # Reference IDs: numbered by screen within the close, largest first, then by item id, so a
     # rebuild of the same data numbers them the same. Each entry's Memo starts with its card's.
     # A drafted entry takes its category's prefix but is numbered after the run's own items, so

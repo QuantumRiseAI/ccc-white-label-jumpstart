@@ -21,7 +21,7 @@ Statement, account by account, for the month and the month before:
 
 ```sh
 python3 serif_sources.py tie --period "Sep 2026" --prior \
-  --gl netsuite_gl_* \
+  --gl netsuite_gl_detail_* \
   --income-statement netsuite_income_statement_by_*
 ```
 
@@ -32,7 +32,7 @@ Income Statement again. Then:
 ```sh
 # Leave out --forecast when the month has no cut of its own (see Each Month).
 python3 serif_uc2_flux.py --period "Sep 2026" \
-  --gl       netsuite_gl_* \
+  --gl       netsuite_gl_detail_* \
   --coupa    coupa_po_lines_*.csv \
   --forecast serif_rolling_forecast_2026-09.xlsx \
   --plan     serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
@@ -52,7 +52,7 @@ python3 serif_uc2_flux.py --period "Sep 2026" \
 
 ```sh
 python3 serif_views.py out/sep2026/run.json \
-  --gl     netsuite_gl_* \
+  --gl     netsuite_gl_detail_* \
   --plan   serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
   --coupa  coupa_po_lines_*.csv \
   --roster ukg_full_roster_*.csv \
@@ -62,7 +62,7 @@ python3 serif_views.py out/sep2026/run.json \
 
 ```sh
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json \
-  --gl netsuite_gl_* \
+  --gl netsuite_gl_detail_* \
   --income-statement netsuite_income_statement_by_* \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
@@ -78,8 +78,14 @@ says so. Open coding findings are noted on the affected row, never applied. A co
 
 In the Claude Project, Claude then writes `drafts.json` and builds again with
 `--drafts drafts.json`, which puts its drafts into the console beside the items they belong
-to. The build checks each draft against the run and lists any it leaves out. The format is in
-`PROJECT_INSTRUCTIONS.md`.
+to: commentary on Actual vs. Actual (MoM), budget commentary (`budget_commentary`) beside each
+plan line on Actual vs. Budget, notes on adjustments and the executive summary. The build checks
+each draft against the run; one it leaves out is printed and listed in the Run log under
+**Drafts Left Out**. The format is in `PROJECT_INSTRUCTIONS.md`.
+
+Leave out `--balance-sheet` or `--netsuite-ref` (or `--netsuite-ids`) when its file is absent: a
+pattern that matches no file can stop the command. Without the Balance Sheet, Balance Sheet Flux
+and the tie-outs to it do not run, and Claude says so in the chat.
 
 `serif_views.py` adds the schedules to the run artifact. It reads each input, lays it out
 and decides nothing; rerunning it replaces what it added.
@@ -96,7 +102,7 @@ In a Claude Project every uploaded file sits at the top level, so all of these a
 filenames. In the repo, `make build PERIOD=sep2026` runs the same commands from the packaged
 Project folder on the exports in `inputs/sep2026/`.
 
-The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.1.0.html`, one self-contained
+The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.2.0.html`, one self-contained
 file that opens in any browser. The filename carries the period and the console version.
 Inside, the **Run log** has a Build record listing the console, engine and ruleset versions,
 the run id, and a fingerprint for every input file, so if a figure moves between two builds
@@ -111,7 +117,7 @@ Python 3.9 or newer. Nothing else. Check with `python3 --version`.
 Serif sends these exports, uploaded as they are:
 
 1. The NetSuite Custom General Ledger saved search, exported as `.xls` (an `.xlsx` saved
-   from it also reads), named `netsuite_gl_<range>.xls`. Columns are found by name, so a
+   from it also reads), named `netsuite_gl_detail_<range>.xls`. Columns are found by name, so a
    search with columns added or moved reads the same. Exporting a month at a time keeps each file small: the
    month's own export is then the only new one.
    Claude can also pull the month through the NetSuite connector with `netsuite_gl_detail.sql`
@@ -358,7 +364,7 @@ Commentary is the deliverable. A line at or over the threshold is marked Review 
 commentary; the Review Checklist counts it open until it has some. Actual vs. Actual, Actual
 vs. Budget, By Department and Balance Sheet Flux each take commentary on their lines. A draft
 from Claude sits on its line with **Accept**, which copies it into the field, and **Edit**, which
-copies it to change; a long draft shows its first lines, with Show all. Written commentary, the
+copies it to change (on Actual vs. Budget, Claude's budget commentary sits beside the plan line); a long draft shows its first lines, with Show all. Written commentary, the
 summary and every note are saved with **Save** (or Cmd+Enter) and then read as finished text, with
 who saved them and when; until then they are marked Not saved. Edit opens a saved note again, and
 Cancel brings back what was saved. A line's commentary counts as written once it is saved. The review threshold shows beside the
@@ -390,18 +396,25 @@ not the ledger's. Payroll tax on the bonus needs the payroll register.
   buttons sit under the card's folds, and the card opens folded to its header. There is no
   Modify button: editing any account, department, Project, Program, Vendor, Coupa PO or amount
   marks it **Added to NetSuite CSV, edited**, which needs a note. The
-  entry shows whether it balances; **Reset** brings back the proposal. Entries Claude drafted are
-  here too. Both sides of an entry carry the Project and Program of the bill it corrects; an
+  entry shows whether it balances; **Reset** brings back the proposal. Each card's folded header
+  shows its amount. Every proposed entry's Memo ends with the close month, `| Mon'YY`, as the
+  Data Entry Policy requires. A note added to the entry goes into its NetSuite Memo after " | ",
+  cut at 999 characters, so Claude keeps its adjustment notes to two short sentences. Entries
+  Claude drafted are here too. Both sides of an entry carry the Project and Program of the bill it corrects; an
   accrual from Coupa receipts or a reclass staged in the forecast has no bill behind it and
   leaves them to fill. A new balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the
   `Non-Specific` department, as does a line moved to one; only income statement lines carry one.
   The line that reverses the posted line keeps its department, so it nets the original.
 * **Section B, forecast revisions**: where the month's forecast and the ledger differ.
-  **Acknowledge & Flag** sends it to FP&A; **No Action** leaves it.
+  **Acknowledge & Flag** sends it to FP&A; **No Action** leaves it. With none, it says "No
+  forecast revisions in <month>.", or, when no forecast was supplied, "Not run for <month>: no
+  forecast was supplied."
 * **Section C, billed twice after a gap**: a vendor with two or more bills this month and none
   last month, billed in at least two of the four months before, whose month is at least 1.5
   times its usual month and at or over the threshold. It may be a missed accrual coming back,
-  so the commentary says whether last month needed one.
+  so the commentary says whether last month needed one. It is for information: the Review
+  Checklist does not count its rows as open, so the checklist agrees with the badge and the
+  Decided counter.
 
 **Export to NetSuite, CSV** holds every entry added to the NetSuite CSV (an edited one with a note), as edited: External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Name (the vendor, NetSuite's entity), Coupa PO Number, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs.
 An entry out of balance or unchanged is left out. The same export saves the support file beside it (`...-support.html`): every entry in the import, by External ID, with its reason, the decision and who made it, the note and its lines, to attach in NetSuite with the import.
@@ -431,6 +444,8 @@ The engine reports every variance at or above **$2,500**, below which nothing is
 **Run log**, at the right of the bar, holds:
 - **Exports this month:** each export the month needs and the file supplied for it.
 - **What each check found:** every check, what it found and whether it ran.
+- **Drafts Left Out:** any of Claude's drafts the build could not place, such as commentary for
+  an account not in the pack or budget commentary for an account with no plan line.
 - **Estimated cost per close run:** one run through the API on Claude Sonnet 5.5 at medium
   effort, at list price. A run in the Claude Project is covered by the Claude seat.
 - **Inputs** and the **Build record:** the files, their fingerprints and the versions that

@@ -3,14 +3,14 @@
 // record and the work paper), then shared mode on a mocked Artifact db:
 // two reviewers, attribution, a conflict, a read-only viewer, downloads, and a rerun
 // bringing in the earlier run's decisions. Needs Playwright with Chromium.
-//   node tests/test_console.js [folder holding the two aug2026 v2.1.0 consoles]   (or: make test)
+//   node tests/test_console.js [folder holding the two aug2026 v2.2.0 consoles]   (or: make test)
 // With no folder, it tests consoles/.
 let chromium; try { ({ chromium } = require('playwright')); }
 catch (e) { ({ chromium } = require(process.env.PLAYWRIGHT || '/Users/anniebritton/.npm/_npx/520e866687cefe78/node_modules/playwright')); }
 const fs = require('fs'), path = require('path'), os = require('os');
 const B = path.resolve(__dirname, '..') + '/';
 const DIR = process.argv[2];
-const FILES = DIR ? {gl: path.join(DIR, 'serif-gl-coding-review-aug2026-v2.1.0.html'), pl: path.join(DIR, 'serif-pl-flux-aug2026-v2.1.0.html')}
+const FILES = DIR ? {gl: path.join(DIR, 'serif-gl-coding-review-aug2026-v2.2.0.html'), pl: path.join(DIR, 'serif-pl-flux-aug2026-v2.2.0.html')}
   : {gl: B + 'consoles/serif-gl-coding-review.html', pl: B + 'consoles/serif-pl-flux.html'};
 let fails = 0;
 const ok = (c, m) => { console.log((c ? '  PASS ' : '  FAIL ') + m); if (!c) fails++; };
@@ -308,6 +308,24 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
         const nextDept = 'DEPT-' + String(Object.values(mine).filter(r => r.startsWith('DEPT-')).length + 1).padStart(2, '0');
         ok(withDraft && Object.keys(mine).every(i => withDraft[i] === mine[i]) && Object.keys(withDraft).filter(i => !(i in mine)).map(i => withDraft[i]).join() === nextDept,
           'gl: a drafted account recode is ' + nextDept + ', after the run\'s own, and moves no other reference ID');
+        // SERIF-162: a note goes on the one item it names (vendor, check, document) and on no other; a note no item fits is listed
+        const cx0 = await p.evaluate(() => { const x = $('#p-capex [data-item^="C-"]'); return x && {id: x.dataset.item, vendor: x.querySelector('.ih b').textContent,
+          doc: (DATA.docs[x.dataset.item] || '').split(' ').pop()}; });
+        if (cx0 && cx0.doc){
+          const nd = path.join(tmp, 'notes.json');
+          fs.writeFileSync(nd, JSON.stringify({notes: [
+            {vendor: cx0.vendor, check: 'capex', document: cx0.doc, recommend: 'clear', note: 'A service agreement, not an asset. It stays expense.'},
+            {vendor: 'No Such Vendor', check: 'dept', document: '000', recommend: 'question', note: 'Nothing fits this.'}]}));
+          const outN = path.join(tmp, 'notes');
+          const r = cp.spawnSync('python3', ['build_pages.py', '--only', 'coding', '--coding-run', run, '--gl', ...GL, '--out', outN, '--drafts', nd], {cwd: DG, encoding: 'utf8'});
+          const h = r.status ? '' : fs.readFileSync(path.join(outN, fs.readdirSync(outN).find(f => /^serif-gl-coding-review-.*\.html$/.test(f))), 'utf8');
+          const D = h ? JSON.parse(h.match(/window\.DATA=(.*?);<\/script>/s)[1]) : {drafts: {}};
+          const placed = Object.keys(D.drafts).filter(k => /^ven:/.test(k));
+          ok(placed.length === 1 && placed[0] === 'ven:' + cx0.id && D.drafts[placed[0]].v === 'reject' && /stays expense/.test(D.drafts[placed[0]].note),
+             'gl: a note goes on the one item it names, with its recommendation, and on no other (' + placed.join() + ')');
+          ok(/Drafts Left Out/.test(h) && /No Such Vendor, dept, document 000: no item fits it/.test(h) && /no item fits it/.test(r.stdout),
+             'gl: a note no item fits is printed and listed in the Run log');
+        } else console.log('  SKIP gl: per-item notes (no CapEx item with a document in this month)');
       } else console.log('  SKIP gl: reference IDs across builds (needs out/dist, out/aug2026 and inputs/aug2026: run tools/build.sh first)');
     }
     if (k === 'gl'){
@@ -379,7 +397,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       const btn = p.locator('#p-ava [data-propose]').first(); const pid = await btn.getAttribute('data-propose');
       await btn.click();
       ok(await p.locator('[data-jerow="' + pid + '"]').isVisible(), 'pl: Propose entry opens a Journal Entry on the variance row');
-      ok(await p.evaluate(pid => !S.dec[pid] && /^P&L flux reclass, \d{7} .+, Aug 2026: \$[\d,]+ (un)?favorable MoM$/.test(jeOf(pid).memo) && jeOf(pid).memo.length < 200 && !jeLive(pid) && !jeReady(pid), pid), 'pl: the proposal is a suggestion with a short memo, nothing approved');
+      ok(await p.evaluate(pid => !S.dec[pid] && /^P&L flux reclass, \d{7} .+, Aug 2026: \$[\d,]+ (un)?favorable MoM \| Aug'26$/.test(jeOf(pid).memo) && jeOf(pid).memo.length < 200 && !jeLive(pid) && !jeReady(pid), pid), 'pl: the proposal is a suggestion with a short memo, nothing approved');
       ok(await p.evaluate(pid => $('[data-propose="' + pid + '"]').getAttribute('aria-expanded') === 'true' && jeOf(pid).date === '2026-08-31' && jeOf(pid).period === 'Aug 2026', pid), 'pl: Propose entry is expanded; dated the last day of the close month');
       ok(await p.locator('#p-ava [data-pane="mom"] tr[data-var="0"] [data-propose]').count() === 0, 'pl: no Propose entry on a row with no variance');
       // begun and not finished is open, with the reason on export; Reset is the way back
@@ -437,7 +455,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     // the run log
     await p.evaluate(() => show('runlog'));
     ok(await p.locator('#p-runlog h3', {hasText: 'What each check found'}).count() === 1, k + ': run log shows each check');
-    ok(await p.locator('#p-runlog td', {hasText: '2.1.0'}).count() >= 1, k + ': build record names 2.1.0');
+    ok(await p.locator('#p-runlog td', {hasText: '2.2.0'}).count() >= 1, k + ': build record names 2.2.0');
     // the decision record: save, then load into a clean browser
     await p.evaluate(() => show('settings'));
     const [rd] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('[data-recsave]')]);

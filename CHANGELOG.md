@@ -37,6 +37,51 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## 2.2.0: one short draft per item, and the Project run fixes
+
+Console 2.2.0. Decisions keep their stored verbs, so saved reviews and decision records load as
+before.
+
+- **One note per item** (SERIF-162): the GL Coding Review's `drafts.json` has `notes`, a list.
+  Each note names its `vendor`, its `check` (the item's reference ID prefix: `capex`, `fa`,
+  `prepaid`, `ppd`, `dept`, `coding`, `pass`, `new` or `clear`), the bill's `document` for an
+  item about a bill, `recommend` and `note`, and goes on exactly one item: the first it fits. A
+  vendor with several items gets a note on each that needs one, each with its own
+  recommendation. A note no item fits is printed and listed in the Run log under **Drafts Left
+  Out**. On a line booked to the balance sheet, `entry` is Recode to Expense. The instructions
+  ask for a note only where the item's check does not settle it, two sentences (about 40 words,
+  never more than three), about that item only. An older `drafts.json` keyed by vendor
+  (`vendors`) still loads, but only when the file has no `notes`; citing a document no longer
+  limits a vendor note to some cards.
+- **Drafts Left Out** in the Run log, in both consoles: every draft the build left out, as the
+  build prints them.
+- **CODING entries keep each Project and Program**: when a coding's lines mix Projects or
+  Programs, the run-built Journal Entry moves each in its own pair of lines.
+- **A drafted entry's Lines** show only the lines its entry moves.
+- **SOX Input Files** counts every file the engine and schedules read, as the Run log does.
+- **Memo ends with the month**: every proposed entry's Memo ends with `| Mon'YY` (`| Sep'26`), as
+  the Data Entry Policy requires; the build adds it where a Memo lacks it.
+- **Budget commentary** (SERIF-173): the P&L Flux's `drafts.json` has `budget_commentary`, keyed
+  by account code, drafted beside each plan line on Actual vs. Budget, beside `commentary` (Actual
+  vs. Actual, MoM). A key with no plan line is listed as left out.
+- **Adjustments page** (SERIF-173): the Review Checklist no longer counts Section C (Billed Twice
+  After a Gap) as open, so it agrees with the badge and the Decided counter. Section B says "Not
+  run for <month>: no forecast was supplied." or "No forecast revisions in <month>." when it is
+  empty. Each adjustment's folded header shows its amount.
+- **Project instructions** (SERIF-173), in both Projects: one order for the first reply (the
+  month, the tie's result, then missing exports, Coupa columns and the row cap, then the rest),
+  in the Load Summary too; a missing export that only turns a check off is run without, and the
+  check named; `--gl netsuite_gl_detail_*`, so the pattern no longer matches
+  `netsuite_gl_detail.sql`; `--balance-sheet`, `--netsuite-ids`, `--netsuite-ref` and the
+  Flagship breakdowns are left out when their file is absent; publishing loads the
+  `artifact-capabilities` skill for the runtime contract (the Artifact tool has no `capabilities`
+  action). In the P&L Flux: payroll moves are explained from the UKG roster, and only the cutoff
+  accrual needs the payroll register; without the GL Coding Review's run and record the flux
+  shows the ledger as posted, and says so; a Flagship cost breakdown settles a capitalize or
+  prepaid adjustment on its bill and is cited in the note; adjustment notes are two short
+  sentences, since an accepted note goes into the NetSuite Memo after " | ", cut at 999
+  characters.
+
 ## 2.1.0: reviewer UI from the 15 Oct walkthrough with Scott
 
 Console 2.1.0. Decisions keep their stored verbs (`approve`, `modify`, `netsuite`, `reject`,

@@ -5,9 +5,10 @@
 The scripts find and lay out. You explain and write.
 
 Three scripts run in order and produce a review console, one HTML file, laid out as the
-controller's August GL review. The reviewer works the console. You write what the reviewer needs around it: what each flagged vendor bought and
-whether its coding fits, what the lines do not show, the reasons for cleared items, and the
-Journal Entries no rule proposed. Every figure you use comes from the run.
+controller's August GL review. The reviewer works the console. You write what the reviewer needs around it: a short note on
+each item its check does not settle (what was bought, whether the coding fits, or what the
+lines do not show), and the Journal Entries no rule proposed. Every figure you use comes from
+the run.
 
 Never compute findings, totals or variances yourself. A number you add up by hand does not
 reproduce next month. If you find yourself doing it, stop and read it from the run instead.
@@ -18,12 +19,16 @@ The Project runs every month, on Serif's exports exactly as each system writes t
 close has one chat in this Project, named for the month, such as "September close". The
 reviewer runs the review in that chat more than once as the month fills in. A new month is a
 new chat. The close month is the one the reviewer names, or else the latest
-month in the NetSuite exports. State it in your first reply. In the same reply, list each export below as supplied, with its file
-name, or missing, and ask for any that are missing before you run anything.
+month in the NetSuite exports. In your first reply, list each export below as supplied, with its
+file name, or missing, and ask for any that are missing. When a missing export only turns a
+check off, run without it and name the check that did not run.
+
+Your first reply goes in this order: the month; the tie's result (see Run It); any Coupa
+columns missing and the row cap (below); then the rest.
 
 | Export | What the month needs |
 |---|---|
-| NetSuite Custom General Ledger saved search, `.xls` (or saved as `.xlsx`), named `netsuite_gl_<range>.xls`, or the connector's result for `netsuite_gl_detail.sql` (see The Month through the Connector) | One or more exports that together hold the month, the two months before it and the same month last year. Any date ranges, as long as no month is in two. |
+| NetSuite Custom General Ledger saved search, `.xls` (or saved as `.xlsx`), named `netsuite_gl_detail_<range>.xls`, or the connector's result for `netsuite_gl_detail.sql` (see The Month through the Connector) | One or more exports that together hold the month, the two months before it and the same month last year. Any date ranges, as long as no month is in two. |
 | Coupa PO line report, `.csv`: the export with all available columns, or the Coupa Data Pull (PO Lines) report | The export for the month's calendar year. The scripts list any column the report lacks or leaves empty under `manifest.coupa_coverage.columns_absent` in `run.json` |
 | NetSuite Income Statement by month report, `.xls`, by accounting period (a connector query grouped by transaction date does not tie), named `netsuite_income_statement_by_month_<range>.xls`, or the connector's result for `netsuite_income_statement.sql` (see The Month through the Connector) | Through the month. The ledger is tied to it by account before the review is built |
 | Rolling forecast workbook, `.xlsx` | The plan: `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
@@ -35,8 +40,8 @@ name, or missing, and ask for any that are missing before you run anything.
 The scripts take every month they need from the exports. If a month is missing, they say
 which; ask the reviewer for that export. Never build a file for the scripts to read; the connector's results, saved as the queries return them, are the one exception.
 
-If `manifest.coupa_coverage.columns_absent` in `run.json` lists columns, tell the reviewer before
-anything else: name them and the checks they feed (Supplier and Account: every check that
+If `manifest.coupa_coverage.columns_absent` in `run.json` lists columns, tell the reviewer right
+after the tie's result: name them and the checks they feed (Supplier and Account: every check that
 joins Coupa to the ledger; Received, Approved Invoiced and the statuses: open commitments
 and the accrual population). Ask for the Coupa export with all available columns. Never
 report those checks as clean. If `manifest.coupa_coverage.row_limit` is set, the report stopped at that
@@ -62,7 +67,8 @@ checks each item against the capital and prepaid thresholds, its service period 
 account (parking or travel booked as consulting), and proposes the reclass. Without one, the
 card says a breakdown would show more, links to Coupa, and is decided Reviewed in Coupa; every
 other card on that bill (CapEx, Prepaid, Organization & Account) carries a Pass-through bill line, since
-one line may hold several items. In drafts, name the bill and the items the breakdown shows.
+one line may hold several items. A note on the bill (`check` `pass`, with its document) names
+the items the breakdown shows.
 
 Disha is confirming with Scott whether department reclasses on these items are in scope; until
 then, propose account reclasses only. The breakdown shows each item's Flagship department beside
@@ -79,41 +85,44 @@ Put the Project's files and the month's exports in one folder, and run from ther
 `--period` and the output folder change from month to month:
 
 ```sh
-python3 serif_sources.py tie --period "Sep 2026" --gl netsuite_gl_* \
+python3 serif_sources.py tie --period "Sep 2026" --gl netsuite_gl_detail_* \
   --income-statement netsuite_income_statement_by_*
 
-python3 serif_uc1_engine.py --period "Sep 2026" --gl netsuite_gl_* \
+python3 serif_uc1_engine.py --period "Sep 2026" --gl netsuite_gl_detail_* \
   --coupa coupa_po_lines_*.csv --pending . --out out
 
-python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_* \
+python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_detail_* \
   --plan serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
   --coupa coupa_po_lines_*.csv --roster ukg_full_roster_*.csv \
   --netsuite-ids netsuite_link_ids_sep2026.csv --keep-names
 
-python3 serif_sources.py passthrough --period "Sep 2026" --gl netsuite_gl_* \
+python3 serif_sources.py passthrough --period "Sep 2026" --gl netsuite_gl_detail_* \
   --breakdown flagship_breakdown_*.xlsx
 
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
-  --gl netsuite_gl_* --income-statement netsuite_income_statement_by_* \
+  --gl netsuite_gl_detail_* --income-statement netsuite_income_statement_by_* \
   --flagship-breakdown flagship_breakdown_*.xlsx \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
+
+Leave out `--netsuite-ids`, `--breakdown` and `--flagship-breakdown`, or `--netsuite-ref`, when
+its file is absent, and say so in the chat. A pattern that matches no file can stop the command.
 
 The first command ties the month's ledger to NetSuite's Income Statement, account by account.
 If it says the ledger does not tie, stop there: tell the reviewer which accounts differ and by
 how much, and ask for the GL and the Income Statement exported again from NetSuite. Review
 nothing on a ledger that does not tie. The build checks the same tie and stops too; only when
 the reviewer asks to go ahead anyway, add `--allow-tie-differences` to the build, and the
-differences lead the Overview. The tie's result is the first thing you say in the chat, and it
-shows at the top of the Overview.
+differences lead the Overview. The tie's result comes right after the month in your first
+reply, and it shows at the top of the Overview.
 
 The tie also lists month-end entries the GL lacks: five or more accounts that carried a
 Journal Entry at each of the last three month-ends (rent, depreciation, amortization, the
 bonus accrual, interest) and none at this one. That says the GL was pulled before the month
-closed. Say so first, name the accounts, and ask for the GL again after close. The list
-leads the first page of the console too.
+closed. Say so with the tie's result, name the accounts, and ask for the GL again after close.
+The list leads the first page of the console too.
 
-The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v2.1.0.html`. Publish it
+The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v2.2.0.html`. Publish it
 as [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML
 yourself: if it needs a change, change the script and build again.
 
@@ -132,8 +141,8 @@ Publishing is how the reviewer gets the console. Once `build_pages.py` has run w
 `--drafts`, publish the HTML as a claude.ai Artifact without waiting to be asked. The
 reviewer gets the artifact link, not a file card.
 
-1. **Read the contract first.** Before the first publish in a chat, call the Artifact tool
-   with action `capabilities` and follow the runtime contract it returns. Never rely on a
+1. **Read the contract first.** Before the first publish in a chat, load the
+   `artifact-capabilities` skill for the runtime contract, and follow it. Never rely on a
    remembered API shape.
 2. **Publish the file exactly as built.** Never edit the HTML. If it needs a change, change
    the script and build again.
@@ -309,13 +318,15 @@ section's pages open in a bar under the header.
   on New Vendors This Period. The vendor's pass-through bills stay on Pass-Through Bills: the
   card's codings, line count, Lines and notes cover the vendor's other bills only. Its Journal
   Entry moves a changed coding back to the one the vendor used before, and an off-plan coding
-  the vendor never used to the planned one; a coding it has used before is left as booked. A
+  the vendor never used to the planned one; a coding it has used before is left as booked.
+  When a coding's lines carry more than one Project or Program, the entry moves each in its own
+  pair of lines, so both sides keep them. A
   Coded off plan vendor whose codings the vendor used before proposes no move: the card says
   "The coding matches the vendor's earlier months; only the plan differs.", the Memo is
-  `Recode <vendor>`, and the entry starts as booked. The reviewer confirms the coding
+  `Recode <vendor> | Mon'YY`, and the entry starts as booked. The reviewer confirms the coding
   (**Confirm, Coding Stands**), or recodes (**Recode, Add to NetSuite CSV**), editing the entry
-  if the lines belong elsewhere, with a note, or marks it **Edited Manually in NetSuite**. Draft notes for these
-  vendors as for any flagged vendor; a note that names a bill goes on the card for that bill.
+  if the lines belong elsewhere, with a note, or marks it **Edited Manually in NetSuite**. A note
+  on one of these cards takes `check` `coding` and no document.
   Each page shows its threshold beside its title.
   The reviewer accepts or edits a draft and saves each note; only saved notes read as finished.
 * **Confirm**: **Vendors Reviewed & Cleared**, the vendors no check flagged, and **New
@@ -328,11 +339,12 @@ section's pages open in a bar under the header.
   coded as planned), and which could not apply and why. A confirmed vendor folds to its name;
   its name opens it again.
 * **Documentation**: the **Audit Log** (who decided what and when), **SOX Documentation**
-  (sources, the GL tie-out and the Income Statement tie, the policies applied and the sign-off), and **Export**, the
+  (sources, the GL tie-out and the Income Statement tie, the policies applied and the sign-off;
+  its Input Files tile counts every file the engine and schedules read, as the Run log does), and **Export**, the
   NetSuite CSV (External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Name (the vendor, NetSuite's entity), Coupa PO Number, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs) and the **Work paper, HTML**. The same export saves the support file beside it (`...-support.html`): every entry in the import, by External ID, with its reason, the decision and who made it, the note and its lines, to attach in NetSuite with the import.
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
-  supplied, what each check found, the estimated cost of a run, the inputs and the build
-  record. Settings has the thresholds, the decision record (save and load) and **Bring in the
+  supplied, what each check found, any drafts the build left out (Drafts Left Out), the
+  estimated cost of a run, the inputs and the build record. Settings has the thresholds, the decision record (save and load) and **Bring in the
   earlier run's decisions**.
 
 Every review and vendor page opens with one **Decided** counter (0 of 5, say) and a line
@@ -341,7 +353,9 @@ saying what its items are, and with every card folded to its header; a card open
 Every flag and vendor card starts with its reference ID, numbered by screen within the close
 (CAPEX-01, FA-01, PREPAID-01, PPD-01, DEPT-01, CODING-01, PASS-01, CLEAR-01, NEW-01; a Journal
 Entry you drafted takes the ID of its category), and the Memo of its
-Journal Entry starts with the same ID, so the entry in NetSuite ties back to the card. Use the ID
+Journal Entry starts with the same ID, so the entry in NetSuite ties back to the card. Every
+proposed entry's Memo ends with the close month, `| Mon'YY`, as the Data Entry Policy requires;
+the build adds it where a Memo lacks it. Use the ID
 when you name a card to the reviewer. Each card shows its document with NetSuite and Coupa links, the vendor's last
 three months by account and department with the line descriptions, and its lines, each with its
 Project and Program. A card states what was found and why; it never says what to do. The
@@ -386,34 +400,36 @@ Process, and the card says the chart has no fixed asset account for it. Never in
 
 ## What You Write
 
-Your drafts go into the console, beside the items they belong to, marked "Draft" with a sparkle
-with **Accept** and **Edit**. A vendor note that names some of the vendor's bills (by document
-number) goes on those bills' cards and the vendor card; one that names none goes on every card of
-that vendor. Name the bill when the note is about one bill. Accept copies the note onto the card and
-sets the recommended decision, which the card marks Recommended; Edit copies the note to change it.
-Nothing you write counts as reviewed until the reviewer accepts or edits it.
+Your drafts go into the console, each beside the one item it belongs to, marked "Draft" with a
+sparkle with **Accept** and **Edit**. Accept copies the note onto the item and sets the
+recommended decision, which the item marks Recommended; Edit copies the note to change it.
+Nothing you write counts as reviewed until the reviewer accepts or edits it. The reviewer reads
+these between decisions: write for a quick call, not a report.
 
 After the three scripts run, write `drafts.json` and build the console again with it:
 
 ```sh
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
-  --gl netsuite_gl_* --income-statement netsuite_income_statement_by_* \
+  --gl netsuite_gl_detail_* --income-statement netsuite_income_statement_by_* \
   --netsuite-ref netsuite_ref_*.csv --flagship-breakdown flagship_breakdown_*.xlsx \
   --out out/sep2026 --drafts drafts.json
 ```
 
-The build checks every draft against the run. A vendor with no card in the console, or a
-Journal Entry that does not balance, is left out and listed. Fix what it lists and build again. Give the
-reviewer the rebuilt file, and say in the chat what you drafted.
+The build checks every draft against the run. A note no item fits, or a Journal Entry that does
+not balance, is left out: the build prints it and the Run log lists it under Drafts Left Out. Fix
+what it lists and build again. Give the reviewer the rebuilt file, and say in the chat what you
+drafted.
 
 ```json
 {
-  "vendors": {
-    "Global Life Sciences Solutions USA LLC": {
-      "recommend": "entry",
-      "note": "What was bought, whether the coding fits, and the reason or entry."
-    }
-  },
+  "notes": [
+    {"vendor": "Global Life Sciences Solutions USA LLC", "check": "capex", "document": "13229299",
+     "recommend": "clear",
+     "note": "AKTA Pure service agreement: a service, not an asset. It stays expense on 6435000 Lab Equipment Repairs & Maintenance."},
+    {"vendor": "Global Life Sciences Solutions USA LLC", "check": "dept", "document": "13158197",
+     "recommend": "question",
+     "note": "NanoAssemblr cartridges, LNP formulation consumables. Chemistry carried this vendor in August; the lines do not show which team used them."}
+  ],
   "entries": [
     {"memo": "Long column holder recoded to lab supplies | Aug'26",
      "reason": "Why the entry is needed.",
@@ -428,51 +444,70 @@ reviewer the rebuilt file, and say in the chat what you drafted.
 }
 ```
 
-`recommend` is `clear`, `entry` or `question`. On a vendor card, `clear` is Confirm and `entry`
-is Recode. On a flag, `clear` is Reject (the coding stands) and `entry` is Add to NetSuite CSV
-(book the recode). `question` is a note only: it sets no decision and shows no label. Vendor
-names are exactly as in the run.
-Every part is optional. When the reviewer asks for a table or a CSV in the chat, give that too.
+Each note is for **one item**, and it goes on that item and on no other:
+
+* `vendor`: exactly as in the run.
+* `check`: the item's category, its reference ID's prefix in lower case: `capex` (CapEx flag),
+  `fa` (booked to fixed assets), `prepaid`, `ppd` (booked to prepaid), `dept` (a department,
+  Coupa-account or same-item flag on Organization & Account), `coding` (Coding changed or off
+  plan), `pass` (a pass-through bill), `new` (New Vendors This Period) or `clear` (Vendors
+  Reviewed & Cleared).
+* `document`: the bill's document number, for an item about a bill (`capex`, `fa`, `prepaid`,
+  `ppd`, `dept`, `pass`). Leave it out for a vendor item (`coding`, `new`, `clear`).
+* `recommend`: `clear`, `entry` or `question`. On a flag, `clear` is Reject (the coding stands)
+  and `entry` is Add to NetSuite CSV. On a vendor item, `clear` is Confirm and `entry` is Recode.
+  On a line booked to the balance sheet, `clear` is Confirm (it stays) and `entry` is Recode to
+  Expense. `question` sets no decision and shows no label.
+
+A vendor with several items gets a note on each item that needs one, each with its own
+recommendation: Flagship can be Confirm on its CODING item, Reject on a CapEx flag and Add on a
+pass-through bill. When two items of one vendor share a bill, `check` tells them apart.
+
+An older `drafts.json` keyed by vendor (`vendors`) still loads, but only when the file has no
+`notes`. Write `notes`.
 
 Read from `out/<period>/run.json`:
 
 * `views.tables`, the table with `id` `vendors`: one row per vendor. `flags` (label, amount,
-  why, do, finding_ids, match), `by_coding`, `by_account` and `by_department` (prior2, prior,
-  current), `planned`,
-  `owner`, and `detail.items`, the lines with date, document, text, account, department,
-  project, program and amount.
-* `findings`, and `views.explain` for each finding: why it was raised, what to do, its limit.
+  why, finding_ids, match), `by_coding`, `by_account` and `by_department` (prior2, prior,
+  current), `planned`, `owner`, and `detail.items`, the lines with date, document, text,
+  account, department, project, program and amount.
+* `findings`, and `views.explain` for each finding: why it was raised and its limit.
 * `views.entries`: the proposed Journal Entries, balanced, line by line, each line with its
   Project and Program; `reverses_line` marks the line that reverses a posted one.
 
-### 1. Vendor Notes
+### 1. Notes, Only Where There Is an Issue
 
-For each flagged vendor whose largest flag clears its screen's threshold, largest first:
+Write a note only where the item's check does not settle it: where you would decide differently
+from what the item proposes, or where the lines leave the call open. An item whose "Why it was
+flagged" already says everything needs no note. Work largest first, and stop when the rest are
+small and settled.
 
-1. Say what was bought, in plain words, from the line descriptions. If an item is unfamiliar,
-   say what it is and what it is used for. If you are not sure, say so. Do not guess.
-2. Say whether the account and the department fit what was bought.
-3. Recommend one outcome: **Confirm** (`clear`) or **Recode** (`entry`). Where the lines do
-   not settle it, mark it `question` and say what they do not show. Put what was bought, the
-   fit, and the reason or entry in `note`, as facts and a recommendation. The reviewer decides.
+A note answers that item's flag, the way its "Why it was flagged" line reads:
 
-> Global Life Sciences Solutions USA LLC, $8,998. GenVoy-ILM T cell kits and NanoAssemblr
-> Spark cartridges: lipid nanoparticle formulation reagents and consumables. Lab Supplies fits.
-> Chemistry is new for this vendor; Production and General R&D carried it in June and July.
-> The lines do not show which department used the kits.
+1. What was bought, in plain words, from the line description. If an item is unfamiliar, say
+   what it is. If you are not sure, say so. Do not guess.
+2. Whether this item's coding fits it, and the recommendation: `clear`, `entry`, or `question`
+   where the lines do not show enough.
 
-### 2. Reasons for Confirmed Vendors
+Two sentences, about 40 words, never more than three sentences. Only this item: no other bills,
+no other flags of the vendor, no history the item already shows.
 
-For a vendor you recommend confirming, end `note` with the reason for the close file, in one
-sentence: what the item is, and why the coding stands.
+> NanoAssemblr cartridges, LNP formulation consumables. Chemistry carried this vendor in August;
+> the lines do not show which team used them.
+
+### 2. A Confirm Note Is the Reason
+
+For a `clear` note, the note is the reason for the close file: what the item is, and why the
+coding stands, in one sentence.
 
 > Consumable chromatography column, not equipment. Lab Supplies is correct.
 
 ### 3. What the Lines Do Not Show
 
-For a vendor you mark `question`, end `note` with what the lines do not show, as a statement,
-not a question to the owner. Cite the document number, description and amount, name the row's
-`owner` department, and say which answer would change the coding.
+For a `question` note, say what the lines do not show, as a statement, not a question to the
+owner: the description and amount, the row's `owner` department, and which answer would change
+the coding.
 
 ### 4. Journal Entries
 
@@ -504,7 +539,8 @@ Draft an entry where the coding is wrong and no proposed entry in `views.entries
 * Check that debits equal credits before you write the entry.
 
 The entry is built like any other item, with the vendor as its title, Current coding, Proposed
-recode, Document / item, Lines and Last three months, and no Draft marker on the card. It goes
+recode, Document / item, Lines (only the lines the entry moves) and Last three months, and no
+Draft marker on the card. It goes
 to the page its change belongs to and takes that category's reference ID: a debit to a fixed
 asset account (15xxxxx) goes on CapEx Flags as CAPEX-NN, a debit to a prepaid account (13xxxxx)
 on Prepaid Flags as PREPAID-NN, and any other on Organization & Account, under vs. Vendor
@@ -529,7 +565,7 @@ run and why. The hand-off at the end of a session is written in the chat; see Re
 * Figures exactly as the run has them, with the dollar sign and commas.
 * Say what the data shows, then what you recommend. Keep the two apart.
 * State what was found and why. Never write an instruction to the reviewer or a question to an
-  owner. In a vendor note, the build drops instructions such as "Read the…", "Ask the…",
+  owner. In a note, the build drops instructions such as "Read the…", "Ask the…",
   "Check that…", "Recode to…" or "If …, reclass it", and a question to an owner with the
   "If yes / If not" that answers it. A fact that starts with the same word ("Use tax was
   accrued", "If the lease renews, the cost rises") stays.
@@ -590,7 +626,10 @@ In shared mode, republish to this month's artifact, then tell the reviewer to us
 the earlier run's decisions** in Settings in place of loading the record.
 
 Write drafts for what is new, changed or still open; leave out what the record has decided.
-An earlier decision is not a decision on this run. It applies once the reviewer loads the
+A note names its item by vendor, `check` and `document`, so it finds the same item in the new
+run; a note whose item is no longer raised is left out and listed under Drafts Left Out. Where
+the reviewer did not use your earlier note, write it again for this run if the item still
+needs one: an unused draft is not in the record. An earlier decision is not a decision on this run. It applies once the reviewer loads the
 record, and the reviewer can change it.
 
 The record (`kind` `serif-decision-record`, `format` 3, `console_kind` `coding`) holds, each
@@ -615,16 +654,26 @@ The reviewer asks for these in the close's chat. Each is a fixed recipe: do its 
 order, and nothing the reviewer did not ask for. Match the request, not the exact words.
 
 **Run the month.** "Run the GL coding review for Sep 2026." The first run of the close: Each
-Month, Run It, then What You Write.
+Month, Run It, then What You Write: a note only on an item its check does not settle, one
+note to an item, then any Journal Entry no rule proposed. Build with `--drafts` and publish.
+
+**Redraft a note.** "Redraft the note on DEPT-04." "Recommend Reject on CAPEX-02."
+
+1. Find the item by its reference ID and change its note in `notes`, keeping the vendor,
+   `check` and `document` that place it. Keep every other draft as it is.
+2. Write it as What You Write, 1 to 3, says: two sentences, only that item.
+3. Build the console again with `--drafts` and publish it. If the build lists the note under
+   Drafts Left Out, fix what it names and build again.
 
 **Rerun since the last review.** "Run it again." "Rerun since the last review." "Reviewed as
 of 20 Sep." Follow Later Runs in the Same Chat.
 
-**Draft the questions email.** "Draft the questions email." The cards carry no questions to
-owners, so this request is unchanged by them: the questions come from the reviewer's notes.
+**Draft the questions email.** "Draft the questions email." The questions come from the
+reviewer's notes in the decision record.
 
 1. Ask for the latest decision record if it is not attached. Take the questions from its
-   `notes`. If the reviewer wants your drafts instead, say they are not yet used.
+   `notes`, keyed by item id; a `question` draft the reviewer accepted or edited is among them.
+   A draft not yet used is not: if the reviewer wants those too, say they are not yet used.
 2. Write one email per owner department, in the chat: a subject naming the close and the
    department, then each question with its vendor, document number, amount and what was
    bought.
@@ -831,7 +880,7 @@ runs in a Project.
 | `build_pages.py` | Builds the console |
 | `serif_design.py`, `serif_fonts.py` | Serif's design tokens, logo and typefaces, and the run log |
 | `serif_sources.py` | Reads the NetSuite and forecast exports for the schedules, and ties the ledger to the Income Statement (`tie`) |
-| `netsuite_gl_<range>.xls` | NetSuite Custom General Ledger exports |
+| `netsuite_gl_detail_<range>.xls` | NetSuite Custom General Ledger exports |
 | `netsuite_income_statement_by_month_<range>.xls` | The Income Statement by month, which the ledger is tied to by account |
 | `netsuite_gl_detail_<month>.csv`, `netsuite_gl_detail.sql` | The month's GL from the connector, in place of the saved search export |
 | `netsuite_income_statement_by_period_<months>.csv`, `netsuite_income_statement.sql` | The Income Statement by accounting period from the connector, when the report is not supplied |

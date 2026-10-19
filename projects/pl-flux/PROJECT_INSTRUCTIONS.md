@@ -21,12 +21,17 @@ The Project runs every month, on Serif's exports exactly as each system writes t
 close has one chat in this Project, named for the month, such as "September close". The
 reviewer runs the flux in that chat more than once as the close ends. A new month is a new
 chat. The close month is the one the reviewer names, or else the latest
-month in the NetSuite exports. State it in your first reply. In the same reply, list each export below as supplied, with its file
-name, or missing, and ask for any that are missing before you run anything.
+month in the NetSuite exports. In your first reply, list each export below as supplied, with its
+file name, or missing, and ask for any that are missing. When a missing export only turns a
+check off (the month's forecast cut, the Balance Sheet, the link IDs), run without it and name
+the check that did not run.
+
+Your first reply goes in this order: the month; the tie's result (see Run It); missing exports,
+any Coupa columns missing and the row cap (below); then the rest.
 
 | Export | What the month needs |
 |---|---|
-| NetSuite Custom General Ledger saved search, `.xls` (or saved as `.xlsx`), named `netsuite_gl_<range>.xls`, or the connector's result for `netsuite_gl_detail.sql` (see The Month through the Connector) | One or more exports that together hold the month, the six months before it and the same month last year. Any date ranges, as long as no month is in two. |
+| NetSuite Custom General Ledger saved search, `.xls` (or saved as `.xlsx`), named `netsuite_gl_detail_<range>.xls`, or the connector's result for `netsuite_gl_detail.sql` (see The Month through the Connector) | One or more exports that together hold the month, the six months before it and the same month last year. Any date ranges, as long as no month is in two. |
 | Coupa PO line report, `.csv`: the export with all available columns, or the Coupa Data Pull (PO Lines) report | The export for the month's calendar year. The scripts list any column the report lacks or leaves empty under `manifest.coupa_coverage.columns_absent` in `run.json` |
 | Rolling forecast workbook, `.xlsx`, the month's cut | The workbook FP&A saved after the month closed, such as `serif_rolling_forecast_2026-09.xlsx`, for Forecast vs. Actual |
 | Rolling forecast workbook, `.xlsx`, the plan | `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
@@ -43,8 +48,8 @@ the month's cut: its column for the month is a forecast, not posted actuals, so 
 with the ledger shows every difference between plan and actual as a forecast error. Never build a file for the
 scripts to read; the connector's results, saved as the queries return them, are the one exception.
 
-If `manifest.coupa_coverage.columns_absent` in `run.json` lists columns, tell the reviewer before
-anything else: name them and the checks they feed (Supplier and Account: every check that
+If `manifest.coupa_coverage.columns_absent` in `run.json` lists columns, tell the reviewer with
+the missing exports, right after the tie's result: name them and the checks they feed (Supplier and Account: every check that
 joins Coupa to the ledger; Received, Approved Invoiced and the statuses: open commitments
 and the accrual population). Ask for the Coupa export with all available columns. Never
 report those checks as clean. If `manifest.coupa_coverage.row_limit` is set, the report stopped at that
@@ -61,24 +66,28 @@ Put the Project's files and the month's exports in one folder, and run from ther
 `--period`, `--forecast` and the output folder change from month to month:
 
 ```sh
-python3 serif_sources.py tie --period "Sep 2026" --prior --gl netsuite_gl_* \
+python3 serif_sources.py tie --period "Sep 2026" --prior --gl netsuite_gl_detail_* \
   --income-statement netsuite_income_statement_by_*
 
 # Leave out --forecast when the month has no cut of its own (see Each Month).
-python3 serif_uc2_flux.py --period "Sep 2026" --gl netsuite_gl_* \
+python3 serif_uc2_flux.py --period "Sep 2026" --gl netsuite_gl_detail_* \
   --coupa coupa_po_lines_*.csv --forecast serif_rolling_forecast_2026-09.xlsx \
   --plan serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 --pending . --out out
 
-python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_* \
+python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_detail_* \
   --plan serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
   --coupa coupa_po_lines_*.csv --roster ukg_full_roster_*.csv \
   --netsuite-ids netsuite_link_ids_sep2026.csv \
   --balance-sheet netsuite_balance_sheet_*.xls --keep-names
 
-python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_* \
+python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_detail_* \
   --income-statement netsuite_income_statement_by_* \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
+
+Leave out `--balance-sheet`, `--netsuite-ids` or `--netsuite-ref` when its file is absent, and say
+so in the chat. A pattern that matches no file can stop the command. Without the Balance Sheet,
+Balance Sheet Flux and the tie-outs to it do not run; name them.
 
 When the reviewer attaches the GL Coding Review's run (`run.json`, from that Project) and its decision
 record, add `--coding-run <that run.json> --coding-record <that record>` (and `--coding-drafts <its drafts.json>`
@@ -88,6 +97,8 @@ Journal Entry added to the NetSuite CSV, or edited or recoded with a note), the 
 adjusted figure. A fix marked Edited Manually in NetSuite is applied too, and named apart, when this flux reads
 the coding run's own GL export; on a later export, which may already hold the edit, it is not applied
 and the run log says so. Open coding findings are listed on the affected row and never applied. Say in the chat that the flux carries the corrections.
+Without the GL Coding Review's run and decision record, the flux shows the ledger as posted;
+say so in the chat.
 
 The first command ties the ledger to NetSuite's Income Statement, account by account, for the
 month and the month before. If it says the ledger does not tie, stop there: tell the reviewer
@@ -95,16 +106,16 @@ which accounts differ, in which month and by how much, and ask for the GL and th
 Statement exported again from NetSuite. Build nothing on figures that do not tie. The build
 checks the same tie and stops too; only when the reviewer asks to go ahead anyway, add
 `--allow-tie-differences` to the build, and the differences lead the first page. The tie's
-result is the first thing you say in the chat, and it shows at the top of the Executive
-Overview.
+result comes right after the month in your first reply, and it shows at the top of the
+Executive Overview.
 
 The tie also lists month-end entries the GL lacks: five or more accounts that carried a
 Journal Entry at each of the last three month-ends (rent, depreciation, amortization, the
 bonus accrual, interest) and none at this one. That says the GL was pulled before the month
-closed. Say so first, name the accounts, and ask for the GL again after close. The list
-leads the first page of the console too.
+closed. Say so with the tie's result, name the accounts, and ask for the GL again after close.
+The list leads the first page of the console too.
 
-The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.1.0.html`. Publish it as
+The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.2.0.html`. Publish it as
 [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML yourself:
 if it needs a change, change the script and build again.
 
@@ -123,8 +134,8 @@ Publishing is how the reviewer gets the console. Once `build_pages.py` has run w
 `--drafts`, publish the HTML as a claude.ai Artifact without waiting to be asked. The
 reviewer gets the artifact link, not a file card.
 
-1. **Read the contract first.** Before the first publish in a chat, call the Artifact tool
-   with action `capabilities` and follow the runtime contract it returns. Never rely on a
+1. **Read the contract first.** Before the first publish in a chat, load the
+   `artifact-capabilities` skill for the runtime contract, and follow it. Never rely on a
    remembered API shape.
 2. **Publish the file exactly as built.** Never edit the HTML. If it needs a change, change
    the script and build again.
@@ -268,7 +279,8 @@ pages open in a bar under the header.
 * **Analysis**:
   * **Actual vs. Actual (MoM)**, with a YoY tab: one line per P&L account, marked Review at or
     over the threshold, with its 3- and 6-month trailing averages and a commentary field;
-  * **Actual vs. Budget**, against the June plan, with year-to-date operating expense;
+  * **Actual vs. Budget**, against the June plan, with year-to-date operating expense and a
+    commentary field on each plan line;
   * **By Department (MoM)**, with each department's accounts and top vendors, then **Credits in
     Expense Accounts**: each account and department whose month or year to date nets below
     zero, with its largest credit lines;
@@ -282,10 +294,12 @@ pages open in a bar under the header.
     editable, with **Add to NetSuite CSV** and **Reject** under the card's folds (no Modify
     button: editing the entry marks it Added to NetSuite CSV, edited, with a note), and a
     Vendor and a Coupa PO on each line; Section B holds the forecast
-    revisions, to acknowledge or mark No Action; Section C lists vendors **billed twice after a
+    revisions, to acknowledge or mark No Action (with none, it says "No forecast revisions in
+    <month>.", or "Not run for <month>: no forecast was supplied."); Section C lists vendors **billed twice after a
     gap**: two or more bills this month, none last month, billed in at least two of the four
     months before, and at least 1.5 times the usual month and at or over the threshold, which
-    may be a missed accrual coming back. **Export to NetSuite, CSV** downloads here: External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Name (the vendor, NetSuite's entity), Coupa PO Number, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs.
+    may be a missed accrual coming back; it is for information, and the Review Checklist does not
+    count its rows as open. Each adjustment's folded header shows its amount. **Export to NetSuite, CSV** downloads here: External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Name (the vendor, NetSuite's entity), Coupa PO Number, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs.
     The same export saves the support file beside it (`...-support.html`): every entry in the import, by External ID, with its reason, the decision and who made it, the note and its lines, to attach in NetSuite with the import. Both sides of
     an entry carry the Project and Program of the bill it corrects (an accrual from Coupa receipts
     or a reclass staged in the forecast has none, and leaves them to fill); a new balance sheet
@@ -309,25 +323,28 @@ threshold. A line needs commentary when its move reaches it.
 
 Your drafts go into the console, beside the items they belong to, marked "Draft" with a sparkle
 with **Accept** and **Edit**. Drafted commentary sits on the account's line on Actual vs. Actual
-(MoM); a drafted note on an adjustment carries your recommendation. Accept copies it into the
+(MoM), drafted budget commentary beside the account's plan line on Actual vs. Budget, and a
+drafted note on an adjustment carries your recommendation. Accept copies it into the
 commentary or the note, and sets the recommended decision; Edit copies it to change. Nothing you
 write counts as reviewed until the reviewer accepts or edits it.
 
 After the three scripts run, write `drafts.json` and build the console again with it:
 
 ```sh
-python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_* \
+python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_detail_* \
   --income-statement netsuite_income_statement_by_* --netsuite-ref netsuite_ref_*.csv --out out/sep2026 --drafts drafts.json
 ```
 
-The build checks every draft against the run. An account that is not in the pack, a finding
-that does not exist, or a Journal Entry that does not balance is left out and listed. Fix
-what it lists and build again. Give the reviewer the rebuilt file, and say in the chat what
+The build checks every draft against the run. Commentary for an account that is not in the
+pack, budget commentary for an account with no plan line, a note for a finding with no card on
+Adjustments, or a Journal Entry that does not balance is left out: the build prints it and the
+Run log lists it under Drafts Left Out. Fix what it lists and build again. Give the reviewer the rebuilt file, and say in the chat what
 you drafted.
 
 ```json
 {
   "commentary": {"6410000": "Down $1,262,568 from Jul 2026. ..."},
+  "budget_commentary": {"6504000": "$412,300 over plan. ..."},
   "summary": "August operating expense was ...\n\nLab Supplies ...",
   "adjustments": {"aug2026-0024": {"recommend": "book", "note": "What it is, and why."}},
   "entries": [
@@ -343,7 +360,8 @@ you drafted.
 }
 ```
 
-`commentary` is keyed by account code, `adjustments` by `finding_id`; `summary` is the
+`commentary` (Actual vs. Actual, MoM) and `budget_commentary` (Actual vs. Budget) are keyed by
+account code, `adjustments` by `finding_id`; `summary` is the
 executive summary, paragraphs separated by a blank line; `recommend` is `book`
 (Add to NetSuite CSV) or `no_entry` (Reject). Every part is optional. When the reviewer asks for a table or a CSV in the chat,
 give that too.
@@ -362,13 +380,16 @@ Read from `out/<period>/run.json`:
 
 ### 1. Commentary
 
-One commentary for each P&L account whose move against the prior month or plan reaches the
-threshold. It covers both comparisons. Settings can add a percent to the threshold (off unless
-set; Serif has not chosen one): a line then needs commentary only when it moved by both the
-dollar threshold and that percent of its comparison. The chip beside each page title shows both.
+Two kinds, each on its own page. `commentary` explains each P&L account whose move against the
+prior month reaches the threshold; it sits on the account's line on Actual vs. Actual (MoM).
+`budget_commentary` explains each account whose move against plan reaches the threshold; it
+sits beside the account's plan line on Actual vs. Budget. An account can need both. Settings can
+add a percent to the threshold (off unless set; Serif has not chosen one): a line then needs
+commentary only when it moved by both the dollar threshold and that percent of its comparison.
+The chip beside each page title shows both. The same rules apply to both kinds:
 
-1. Open with the move: up or down, by how much, from the prior month; then against plan
-   where that move also reaches the threshold.
+1. Open with the move: up or down, by how much, from the prior month (in `budget_commentary`,
+   over or under plan, and by how much).
 2. Find the driver. Start from `movers`: the vendor and department behind the change, the
    document and what the lines say was bought. If that does not explain the move, keep going
    with code: this month's and earlier months' lines through `serif_sources.read_gl` (memos,
@@ -417,14 +438,20 @@ changed, not Serif's activity. Say so.
 ### 2. Notes on Adjustments
 
 For each adjustment over the threshold, recommend **Add to NetSuite CSV** (`book`) or **Reject**
-(`no_entry`) in `adjustments`, with one reason, and say what would change the answer.
+(`no_entry`) in `adjustments`, with one reason, and say what would change the answer. Accepting
+the note writes it into the entry's NetSuite Memo: the CSV's Memo is the entry's Memo, " | ",
+then the note, cut at 999 characters. Keep each note to two short sentences: the facts, and the
+recommendation.
 
 * **Forecast vs. Actual**: name what the forecast line is staged as, quoting its note and
   cell. Say whether the ledger needs the entry or FP&A needs to correct the forecast.
 * **Accruals**: cite the Coupa PO and what was received for a receipt accrual. A
   billing-pattern accrual is an estimate: say so, and name who confirms the work was done.
 * **Prepaids and Capital**: say what the item is and what term or useful life the invoice
-  shows. If the invoice is needed, say so. A bill that a Journal Entry in the month already
+  shows. If the invoice is needed, say so. A Flagship cost breakdown
+  (`flagship_breakdown_<invoice>.xlsx`) itemizes a Flagship pass-through bill: read it with
+  `serif_sources.read_flagship_breakdowns` to settle a capitalize or prepaid adjustment on that
+  bill (an item under the $5,000 capitalization threshold stays expense), and cite it in the note. A bill that a Journal Entry in the month already
   moves off its account, with a memo naming the bill's document number, is not proposed: the
   close entry has booked it. Before recommending any adjustment, read the month's journals for
   one that already books it, and if one does, recommend Reject and name the journal.
@@ -453,7 +480,8 @@ covers it.
   `"reverses_line": true`: it keeps that line's department, on a balance sheet account too. Every
   other balance sheet line (accounts 1xxxxxx to 3xxxxxx) is new and takes the `Non-Specific`
   department; only income statement lines carry one. The build sets it on every entry.
-* Memo, per the Data Entry Policy: `Specific description | Mon'YY`.
+* Memo, per the Data Entry Policy: `Specific description | Mon'YY`. The build adds the close
+  month, `| Mon'YY`, to every proposed entry's Memo that lacks it.
 * Patterns and accounts are in [`PL_FLUX_SKILL.md`](PL_FLUX_SKILL.md).
 
 The entry joins Adjustments, Section A, as `SERIF-DRAFT-1` and on, marked "Draft" with a sparkle.
@@ -607,9 +635,11 @@ Run It, then What You Write.
 **Rerun since the last review.** "Run it again." "Rerun since the last review." "Reviewed as
 of 28 Sep." Follow Later Runs in the Same Chat.
 
-**Draft the commentary.** "Draft the commentary." "Redraft the commentary on 6504000." Follow
-What You Write, 1, for the accounts named, or else every account that needs commentary and
-is not explained. Build the console again with the drafts.
+**Draft the commentary.** "Draft the commentary." "Redraft the commentary on 6504000." "Draft
+the budget commentary." Follow What You Write, 1, for the accounts named, or else every account
+that needs commentary and is not explained: `commentary` for a move against the prior month,
+`budget_commentary` for a move against plan. Keep the other drafts. Build the console again
+with the drafts.
 
 **Redraft the executive summary.** "Redraft the executive summary." "Draft the leadership
 summary." Once the reviewer has worked the commentary.
@@ -833,7 +863,7 @@ flux runs in a Project.
 | `build_pages.py` | Builds the console |
 | `serif_design.py`, `serif_fonts.py` | Serif's design tokens, logo and typefaces, and the run log |
 | `serif_sources.py` | Reads the NetSuite, Coupa and forecast exports, and ties the ledger to the Income Statement (`tie`) |
-| `netsuite_gl_<range>.xls` | NetSuite Custom General Ledger exports. Each month's activity by account and department is read from them. |
+| `netsuite_gl_detail_<range>.xls` | NetSuite Custom General Ledger exports. Each month's activity by account and department is read from them. |
 | `netsuite_gl_detail_<month>.csv`, `netsuite_gl_detail.sql` | The month's GL from the connector, in place of the saved search export |
 | `netsuite_income_statement_by_period_<months>.csv`, `netsuite_income_statement.sql` | The Income Statement by accounting period from the connector, when the report is not supplied |
 | `netsuite_link_ids_<month>.csv`, `netsuite_link_ids.sql` | The month's NetSuite link IDs, and the query that pulls them |
@@ -842,6 +872,7 @@ flux runs in a Project.
 | `netsuite_balance_sheet_*.xls` | The Balance Sheet report, for Balance Sheet Flux and the tie-outs |
 | `netsuite_income_statement_by_month_*.xls` | The Income Statement by month, which the ledger is tied to by account |
 | `ukg_full_roster_*.csv` | UKG roster, for Payroll Analytics. Personal data. |
+| `flagship_breakdown_<invoice>.xlsx` | A Flagship pass-through bill's cost breakdown, from Coupa: optional, read for a capitalize or prepaid adjustment on that bill |
 | `serif-*.md` | Chart of accounts, policy rules |
 
 Header-only templates are feeds Serif has not sent. Each one's absence turns a check off:

@@ -18,7 +18,7 @@ Add the month's exports, as the systems write them:
 
 | Export | What it is |
 |---|---|
-| `netsuite_gl_<range>.xls` | NetSuite Custom General Ledger saved search. Together the exports hold the month, the two before it and the same month last year. |
+| `netsuite_gl_detail_<range>.xls` | NetSuite Custom General Ledger saved search. Together the exports hold the month, the two before it and the same month last year. |
 | `coupa_po_lines_<year>.csv` | Coupa PO line report with all available columns, for the calendar year |
 | `netsuite_income_statement_by_month_<range>.xls` | NetSuite Income Statement by month, through the month. The ledger is tied to it by account before the review is built. |
 | `serif_rolling_forecast_2026-08.xlsx` | The workbook whose prior cut is the plan, until Serif sets a new one |
