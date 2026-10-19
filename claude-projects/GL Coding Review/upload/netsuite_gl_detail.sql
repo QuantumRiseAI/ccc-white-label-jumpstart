@@ -1,0 +1,1 @@
+../../../src/netsuite_gl_detail.sql

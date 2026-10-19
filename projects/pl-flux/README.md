@@ -3,12 +3,13 @@
 What this Project carries that the other does not: [`PROJECT_INSTRUCTIONS.md`](PROJECT_INSTRUCTIONS.md),
 [`HOW-TO-RUN.md`](HOW-TO-RUN.md) and the files beside them. The scripts are in `../../src/`, the
 docs both Projects carry in `../shared/`, and the feed templates in `../../templates/`.
-`make package` puts them all in one flat folder, `out/dist/pl-flux/`, for the Project.
+`../../claude-projects/P&L Flux/` shows them as the Project takes them, flat.
 
 ## Configure Once
 
-Run `make package` from the repo root. Paste `out/dist/pl-flux/PROJECT_INSTRUCTIONS.md` into the
-Project's Instructions field and upload every other file in `out/dist/pl-flux/`. The header-only
+Follow [`claude-projects/README.md`](../../claude-projects/README.md): paste
+`claude-projects/P&L Flux/PROJECT_INSTRUCTIONS.md` into the Project's Instructions field, and drag in
+every file in `claude-projects/P&L Flux/upload/`. The header-only
 templates look empty on purpose: their presence is how the agent reports a feed Serif has not
 sent.
 

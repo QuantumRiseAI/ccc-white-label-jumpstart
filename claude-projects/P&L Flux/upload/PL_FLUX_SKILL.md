@@ -1,0 +1,1 @@
+../../../projects/pl-flux/PL_FLUX_SKILL.md

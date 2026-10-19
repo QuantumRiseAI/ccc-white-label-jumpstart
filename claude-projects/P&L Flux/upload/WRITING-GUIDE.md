@@ -1,0 +1,1 @@
+../../../projects/shared/WRITING-GUIDE.md

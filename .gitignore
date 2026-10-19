@@ -1,8 +1,9 @@
 # The repo holds the scripts, Project docs, templates, design system and every console
 # version. Serif's exports, the runs built from them and local builds stay in OneDrive.
 
-# Serif's exports for each close, and the older local data store.
-inputs/
+# Serif's exports for each close, and the older local data store. No trailing slash on inputs,
+# so a symlink named inputs is ignored too, as well as a folder.
+/inputs
 data/
 status/
 

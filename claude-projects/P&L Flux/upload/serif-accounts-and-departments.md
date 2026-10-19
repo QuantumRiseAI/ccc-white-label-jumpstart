@@ -1,0 +1,1 @@
+../../../projects/shared/serif-accounts-and-departments.md
