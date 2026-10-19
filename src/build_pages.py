@@ -938,7 +938,6 @@ details.lines td small{display:block;color:var(--color-fg-secondary)}
 .tiebar .pad{display:flex;flex-wrap:wrap;gap:.25em 1em;align-items:baseline}
 .tiebar.bad{box-shadow:inset 3px 0 0 var(--color-red-text)}.tiebar.bad b{color:var(--color-red-text)}
 .tiebar.none{box-shadow:inset 3px 0 0 var(--color-mid-gray)}
-.setcard{display:flex;align-items:center;gap:var(--spacing-xs)}
 #sharedbar{background-color:var(--color-bg-inverse);color:var(--color-warm-gray);font-size:var(--text--1);padding:.45em var(--spacing-md-lg);border-top:1px solid rgba(255,255,255,.1)}
 #toast{position:fixed;left:50%;bottom:var(--spacing-md);transform:translateX(-50%);z-index:40;background-color:var(--color-bg-inverse);color:#fff;
   font-size:var(--text--1);padding:.7em 1.1em;border-radius:var(--radius-xs);max-width:min(36rem,90vw)}
@@ -1130,18 +1129,8 @@ def shell(title, product, sections, pages, data, js):
             '<button id="tosign" class="tosign" data-tosign hidden><span data-tosignn>Sign Off</span><span aria-hidden="true">&darr;</span></button>'
             '<div id="ask" hidden><div class="askbox" role="dialog" aria-modal="true"><h3></h3><div class="askbody"></div><div class="acts">'
             '<button class="pill solid" data-askok>OK</button><button class="pill" data-askno>Cancel</button></div></div></div><main>' + "".join(pages)
-            + page("settings", hero("Settings", "", []) + '<div class="card"><h3>Thresholds</h3>' + "".join(
-                       '<div class="pad setcard"><label for="%s"%s>%s</label><span>$</span><input class="f" id="%s" data-thrin="%s" inputmode="numeric" style="width:9ch">%s</div>'
-                       % (i, ' style="min-width:9.5rem"' if n else "", lab, i, k, n)
-                       for i, k, lab, n in ((("thr", "thr", "Review threshold", ""),) if data.get("kind") != "coding" else (
-                           ("thr", "thr", "Account recode threshold", '<span class="note">Dept &amp; Entity account recodes, and drafted entries</span>'),
-                           ("thrcapex", "thr_capex", "CapEx threshold", '<span class="note">CapEx Flags</span>'),
-                           ("thrprepaid", "thr_prepaid", "Prepaid threshold", '<span class="note">Prepaid Flags</span>'))))
-                   + ('<div class="pad setcard"><span class="note">Department recodes are always reviewed, whatever their size.</span></div>'
-                      if data.get("kind") == "coding" else
-                      '<div class="pad setcard"><label for="thrpct" style="min-width:9.5rem">And percent change</label><input class="f" id="thrpct" data-thrpct inputmode="numeric" style="width:6ch" placeholder="off"><span>%</span>'
-                      '<span class="note">Optional. Set it and a line needs commentary only when it moved by the review threshold and by this percent too.</span></div>') + "</div>"
-                   '<div class="card"><h3>Decision record</h3><div class="pad acts"><button class="pill" data-recsave>Save decision record</button>'
+            + page("settings", hero("Settings", "", [])
+                   + '<div class="card"><h3>Decision record</h3><div class="pad acts"><button class="pill" data-recsave>Save decision record</button>'
                    '<button class="pill" data-recload>Load decision record</button><input type="file" id="recfile" accept=".json,application/json" hidden>'
                    '<button class="pill" data-carry hidden>Bring in the earlier run&rsquo;s decisions</button></div></div>')
             + '<datalist id="accts">' + "".join('<option value="%s">%s</option>' % (e(k), e(v)) for k, v in sorted(ACC.items()) if v) + "</datalist>"
@@ -1486,9 +1475,6 @@ document.addEventListener('input', ev => {
     const bar = $('[data-fbar="' + CSS.escape(t.dataset.note) + '"]'); if (bar){ bar.hidden = !t.value.trim();
       bar.querySelector('.uns').textContent = S.fin[t.dataset.note] ? 'Changed since saved' : 'Not saved'; } t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; save(); return; }
   if (t.dataset.jef || t.dataset.jeh){ editJE(t); return; }
-  if (t.dataset.thrpct !== undefined){ const v = Number(String(t.value).replace(/[^0-9.]/g, ''));
-    if (isFinite(v) && v > 0) S.thr_pct = v; else delete S.thr_pct; save(); refresh(); return; }
-  if (t.dataset.thrin){ const v = Number(String(t.value).replace(/[^0-9.]/g, '')); if (isFinite(v) && v > 0){ S[t.dataset.thrin] = v; save(); refresh(); } }
 });
 /* tabs are announced as tabs, the selected one marked */
 $$('.tabs').forEach(tl => { tl.setAttribute('role', 'tablist');
@@ -1665,6 +1651,7 @@ function shapeThresholds(){
       ? '<span class="thc none" data-tipsm data-tip="' + esc(THR_TXT[k][1]) + '"><span class="tl">' + THR_TXT[k][0] + '</span><span class="tv0">Always reviewed</span></span>'
       : '<span class="thc" data-thc="' + k + '" data-tipsm data-tip=""><span class="tl">' + THR_TXT[k][0] + '</span>'
         + '<button class="tv" data-thedit="' + k + '" aria-label="Change the ' + THR_TXT[k][0] + '"><span data-thrv="' + k + '"></span>' + PENCIL + '</button>'
+        + (k === 'thr' && DATA.kind !== 'coding' ? '<button class="tv pct" data-thpct aria-label="Change the percent change a line also needs"><span data-thrpv></span>' + PENCIL + '</button>' : '')
         + '<span class="def" data-thrdef="' + k + '" hidden></span></span>').join('');
     // beside the page's title: in the hero, or on the title line of a page without one
     const hero = pg.querySelector(':scope > .hero'), t = hero ? hero.querySelector('h1') : pg.querySelector(':scope > h3');
@@ -1672,16 +1659,27 @@ function shapeThresholds(){
     else pg.prepend(box); });
 }
 function paintThresholds(){
-  $$('[data-thrv]').forEach(x => { x.textContent = money(thrOf(x.dataset.thrv)) + (x.dataset.thrv === 'thr' && DATA.kind !== 'coding' && pctThr() ? ' and ' + pctThr() + '%' : ''); });
-  $$('[data-thrpct]').forEach(t => { if (document.activeElement !== t) t.value = pctThr() || ''; });
+  $$('[data-thrv]').forEach(x => { x.textContent = money(thrOf(x.dataset.thrv)); });
+  $$('[data-thrpv]').forEach(x => { x.textContent = pctThr() ? 'and ' + pctThr() + '%' : 'Any % change'; });
   $$('[data-thc]').forEach(c => { const k = c.dataset.thc; c.dataset.tip = esc(THR_TXT[k][1].replace('{v}', money(thrOf(k)) + (k === 'thr' && DATA.kind !== 'coding' && pctThr() ? ' and ' + pctThr() + '%' : ''))); });
   $$('[data-thrdef]').forEach(x => { const k = x.dataset.thrdef, d = Number(DATA[k]) || DATA.thr, v = thrOf(k);
     x.hidden = v === d; x.innerHTML = v === d ? '' : 'Default ' + money(d) + ' <button class="lk" data-threset="' + k + '">Reset</button>';
     x.closest('.thc').classList.toggle('chg', v !== d); });
 }
 // A threshold is changed where it shows: its value becomes a field; Enter or leaving it keeps
-// the new value, Escape leaves it as it was.
+// the new value, Escape leaves it as it was. On the P&L Flux the Review threshold also takes an
+// optional percent: a line then needs commentary only when it moved by both; blank turns it off.
 document.addEventListener('click', ev => {
+  const pc = ev.target.closest('[data-thpct]');
+  if (pc){ if (blocked()) return; const inp = document.createElement('input');
+    inp.className = 'thin'; inp.inputMode = 'numeric'; inp.value = pctThr() || ''; inp.placeholder = 'off'; inp.setAttribute('aria-label', pc.getAttribute('aria-label'));
+    let fin = false;
+    const done = keep => { if (fin) return; fin = true; const v = Number(String(inp.value).replace(/[^0-9.]/g, ''));
+      inp.replaceWith(pc); if (!keep) return; const now = isFinite(v) && v > 0 ? v : 0;
+      if (now !== pctThr()){ if (now) S.thr_pct = now; else delete S.thr_pct; logAdd({id: 'thr_pct', label: 'Percent change', v: now ? now + '%' : 'off', note: ''}); save(); refresh(); } };
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(true); else if (e.key === 'Escape') done(false); });
+    inp.addEventListener('blur', () => done(true));
+    pc.replaceWith(inp); inp.focus(); inp.select(); return; }
   const ed = ev.target.closest('[data-thedit]');
   if (ed){ if (blocked()) return; const k = ed.dataset.thedit, inp = document.createElement('input');
     inp.className = 'thin'; inp.inputMode = 'numeric'; inp.value = thrOf(k).toLocaleString('en-US'); inp.setAttribute('aria-label', ed.getAttribute('aria-label'));
@@ -1938,7 +1936,6 @@ function overThr(tr){ const v = Math.abs(Number(tr.dataset.var) || 0); if (v < (
 function marks(){
   $$('.item[data-thr]').forEach(x => { const k = x.dataset.thr, hi = k.startsWith('all') || Number(x.dataset.tamt || x.dataset.amt) >= thrOf(k);
     x.classList.toggle('hi', hi); const g = x.querySelector(':scope > .ih > [data-rev]'); if (g) g.hidden = !hi; });
-  $$('[data-thrin]').forEach(t => { if (document.activeElement !== t) t.value = thrOf(t.dataset.thrin).toLocaleString('en-US'); });
   if (typeof paintThresholds === 'function') paintThresholds();
   const thr = S.thr || DATA.thr;
   $$('tr[data-var]').forEach(tr => {

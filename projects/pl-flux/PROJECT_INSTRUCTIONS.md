@@ -315,7 +315,7 @@ pages open in a bar under the header.
     GAAP checklist, the source data and the sign-off.
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
   supplied, what each check found, the estimated cost of a run, the inputs and the build
-  record. Settings has the threshold, the decision record (save and load) and **Bring in the
+  record. Settings has the decision record (save and load) and **Bring in the
   earlier run's decisions**.
 
 The threshold is in dollars only and defaults to **$10,000**, the pre-close adjustment
@@ -386,8 +386,8 @@ Read from `out/<period>/run.json`:
 Two kinds, each on its own page. `commentary` explains each P&L account whose move against the
 prior month reaches the threshold; it sits on the account's line on Actual vs. Actual (MoM).
 `budget_commentary` explains each account whose move against plan reaches the threshold; it
-sits beside the account's plan line on Actual vs. Budget. An account can need both. Settings can
-add a percent to the threshold (off unless set; Serif has not chosen one): a line then needs
+sits beside the account's plan line on Actual vs. Budget. An account can need both. The threshold's
+chip can add a percent to it (off unless set; Serif has not chosen one): a line then needs
 commentary only when it moved by both the dollar threshold and that percent of its comparison.
 The chip beside each page title shows both. The same rules apply to both kinds:
 

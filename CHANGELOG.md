@@ -72,6 +72,9 @@ Console 2.2.1, GL engine 0.2.8, flux engine 0.8.2, views 1.7.2. Decisions keep t
 - **Coupa department and account reasons** say what was compared ("Coupa PO FL087032703 line 1
   (DraI, $19,794.80) is on 6501100 Synthesis Costs; 2 of the item's 3 earlier lines were on
   6410000 Lab Supplies/Consumables, its usual account."), in place of counts of field names.
+- **Thresholds are changed on their pages only**: Settings no longer has a Thresholds card. Each
+  page's chip, beside its title, already changes its own threshold, with Reset and an Audit Log
+  entry; the P&L Flux's optional percent change is on the Review threshold's chip too.
 - **F0.OPEX** is titled "Net P&L, every P&L account (the net loss)": it sums every P&L account,
   interest income included. Its id is unchanged.
 - `tests/test_runs.py` checks that every check is listed as run or not run with a reason, that no

@@ -491,8 +491,9 @@ entry's status.
 ### The Threshold
 
 Nothing is graded high, medium and low. An item is either at or over the amount at which
-Serif corrects an exception, or under it. Each review screen has its own, set in Settings and
-kept in this browser with the review:
+Serif corrects an exception, or under it. Each review screen has its own, changed on the chip
+beside the page's title (click the amount; Reset brings back the default), recorded in the Audit
+Log and kept with the review:
 
 | Screen | Default | Why |
 |---|---|---|
