@@ -137,7 +137,7 @@ A failed tie-out stops the run. Report the difference and produce nothing else.
 ## Limits
 
 * Every Serif policy is a draft and unapproved.
-* Receipt accruals are pro-rated from the PO line total; 279 PO lines in 2026 carry no
-  quantity. Billing-pattern accruals are estimates that the budget owner confirms.
+* Receipt accruals are pro-rated from the PO line total; the count of PO lines with no
+  quantity is in F3.RECEIVED_NOT_INVOICED's note. Billing-pattern accruals are estimates that the budget owner confirms.
 * No Coupa invoice data, so a receipt cannot be matched to a later bill.
 * The plan does not cover payroll or depreciation.

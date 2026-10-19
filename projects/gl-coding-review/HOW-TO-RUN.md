@@ -407,8 +407,8 @@ text and in its Journal Entry Memo:
   names one, the entry holds it in Capital in Process and the card says the chart has no fixed
   asset account for it.
 
-The ledger has no in-service date, so the card asks for it, and its note stays open for the
-date. A capital purchase under the $5,000 capitalization threshold is listed, not marked
+The ledger has no in-service date, so the card says the date is not known, and its note field is
+open for it. A capital purchase under the $5,000 capitalization threshold is listed, not marked
 Review, and says it is under the threshold.
 
 On every proposed entry a new balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the
@@ -451,7 +451,7 @@ purchase, and coded as planned. A check with nothing to compare against says so 
 the two months before, no Coupa PO, no plan line) rather than passing. Confirm each vendor, or
 recode it if the coding is wrong, starting with those at $2,500 or more.
 
-A draft from Claude is two or three sentences on one card: what was bought, and whether the
+A draft from Claude is two sentences, never more than three, on one card: what was bought, and whether the
 coding fits or what the lines do not show. A card carries one at most, and most carry none: Claude
 writes one only where the card's check does not settle the item. It sits on its card with
 **Accept**, which copies the note and sets the recommended decision (marked Recommended on its

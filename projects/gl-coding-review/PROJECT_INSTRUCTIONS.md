@@ -4,7 +4,7 @@
 
 The scripts find and lay out. You explain and write.
 
-Three scripts run in order and produce a review console, one HTML file, laid out as the
+Five commands run in order, from the tie to the build, and produce a review console, one HTML file, laid out as the
 controller's August GL review. The reviewer works the console. You write what the reviewer needs around it: a short note on
 each item its check does not settle (what was bought, whether the coding fits, or what the
 lines do not show), and the Journal Entries no rule proposed. Every figure you use comes from
@@ -394,7 +394,7 @@ Serif's close entries do) is not flagged on CapEx or Prepaid: it is already book
 Each CapEx card says whether the purchase goes to **`1505000` Capital in Process** (build-out
 work, or an asset bought but not yet in service) or to its fixed asset account (an asset in
 service), and why, on the card and in its Journal Entry Memo. The ledger has no in-service
-date: unless the line states one, the card's note asks for it. Office furniture and
+date: unless the line states one, the card says the date is not known and its note field is open for it. Office furniture and
 equipment has no fixed asset account in Serif's chart; the entry holds it in Capital in
 Process, and the card says the chart has no fixed asset account for it. Never invent one.
 
@@ -453,7 +453,12 @@ Each note is for **one item**, and it goes on that item and on no other:
   plan), `pass` (a pass-through bill), `new` (New Vendors This Period) or `clear` (Vendors
   Reviewed & Cleared).
 * `document`: the bill's document number, for an item about a bill (`capex`, `fa`, `prepaid`,
-  `ppd`, `dept`, `pass`). Leave it out for a vendor item (`coding`, `new`, `clear`).
+  `ppd`, `dept`, `pass`). Leave it out for a vendor item (`coding`, `new`, `clear`), and for a
+  `dept` item with no bill (a journal or an expense report line); give its `amount` instead.
+* `amount`: the item's amount, as the run gives it (a finding's `amount_at_risk`, or the line's
+  amount). Give it when several items share the vendor, `check` and document, as many
+  department flags on one bill do; a note without it goes on the largest of them still without
+  a note.
 * `recommend`: `clear`, `entry` or `question`. On a flag, `clear` is Reject (the coding stands)
   and `entry` is Add to NetSuite CSV. On a vendor item, `clear` is Confirm and `entry` is Recode.
   On a line booked to the balance sheet, `clear` is Confirm (it stays) and `entry` is Recode to
@@ -461,7 +466,8 @@ Each note is for **one item**, and it goes on that item and on no other:
 
 A vendor with several items gets a note on each item that needs one, each with its own
 recommendation: Flagship can be Confirm on its CODING item, Reject on a CapEx flag and Add on a
-pass-through bill. When two items of one vendor share a bill, `check` tells them apart.
+pass-through bill. When two items of one vendor share a bill, `check` tells them apart; when
+they also share `check`, `amount` does.
 
 An older `drafts.json` keyed by vendor (`vendors`) still loads, but only when the file has no
 `notes`. Write `notes`.

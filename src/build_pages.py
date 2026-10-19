@@ -428,10 +428,12 @@ def vendor_po(iid, lines):
         # NetSuite's Coupa PO field holds one PO: a line that moves several is left for the reviewer
         return hit[0] if len(hit) == 1 else ""
     credit = {round(l["credit"], 2): po(l["account"], l["department"], l["credit"]) for l in lines if l.get("credit")}
-    any_po = next((v for v in credit.values() if v), "")
+    one = {v for v in credit.values()}
     for l in lines:
         l.setdefault("vendor", vendor)
-        l.setdefault("po", credit.get(round(l.get("credit") or l.get("debit") or 0, 2)) or ("" if l.get("credit") else any_po))
+        # a debit matched by amount to its credit takes that credit's PO; otherwise only a PO every credit shares
+        l.setdefault("po", credit.get(round(l.get("credit") or l.get("debit") or 0, 2)) if l.get("credit") or round(l.get("debit") or 0, 2) in credit
+                     else (one.pop() if len(one) == 1 else ""))
 
 
 # ---------- Flagship pass-through bills: the breakdown, item by item ----------
@@ -1002,7 +1004,10 @@ def runlog(run, kind, also=None, read=()):
     out.append('<div class="card"><h3>Build record</h3><div class="tw"><table><tbody>'
                + "".join('<tr><td>%s</td><td class="mono">%s</td></tr>' % (e(a), e(b)) for a, b in rec) + "</tbody></table></div></div>")
     return page("runlog", hero("Run Log", "", [("Inputs read", str(len(files)), "Files the engine and schedules read"),
-                                               *([("Checks run", str(len(m.get("rules_run") or [])), "%d not run" % len(m.get("rules_not_run") or []))]
+                                               *([("Checks run", str(len(m.get("rules_run") or [])), ", ".join(
+                                                   "%d %s" % (sum(1 for r_ in m.get("rules_not_run") or [] if (r_.get("status") or "not_run") == st), word)
+                                                   for st, word in (("not_run", "not run"), ("degraded", "run degraded"))
+                                                   if any((r_.get("status") or "not_run") == st for r_ in m.get("rules_not_run") or [])) or "All ran")]
                                                  if m.get("rules_run") or m.get("rules_not_run") else []),
                                                ("Run", '<span class="mono">%s</span>' % e(m.get("run_id") or ""), e(str(m.get("generated_at") or "")[:16].replace("T", " ")) + " UTC"),
                                                ("Engine", e(m.get("engine_version") or ""), "Console " + VERSION)]) + "".join(out))
@@ -1516,7 +1521,7 @@ function paintItems(){
       + (d.by_uid ? ' · ' + Shared.name(d.by_uid) : '') : rv ? 'Review' : 'Pending';
       st.className = 'stp' + (d ? (d.v === 'reject' || d.v === 'none' ? ' rej' : ' done') : rv ? ' rv' : ''); }
     el.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('on', !!d && d.v === b.dataset.v));
-    const nt = el.querySelector('textarea[data-note]'); if (nt){ nt.hidden = nt.dataset.ask === undefined && !(d && ['modify','recode','netsuite','reject','none'].indexOf(d.v) > -1) && !(S.notes[id]||'').trim();
+    const nt = el.querySelector('textarea[data-note]'); if (nt){ nt.hidden = nt.dataset.ask === undefined && !(d && ['approve','modify','recode','netsuite','reject','none'].indexOf(d.v) > -1) && !(S.notes[id]||'').trim();
       if (document.activeElement !== nt) nt.value = S.notes[id] || ''; } });
   $$('textarea.c[data-note]').forEach(t => { if (!t.closest('[data-item]') && document.activeElement !== t) t.value = S.notes[t.dataset.note] || ''; });
   paintJE();
@@ -2220,6 +2225,8 @@ def flux():
             print("  " + x + ".")
     # ----- Actual vs. Budget
     bud_rows = [(s, r) for s, r in rows if r.get("budget") is not None]
+    # the plan's vintage, when a plan was supplied; without one the page says so and the build goes on
+    PV = next((t.get("vintage") or "" for t in PLR["views"]["tables"] if t["id"] == "dept_plan"), None)
     act_p = sum(r["actual"] or 0 for s, r in bud_rows)
     bud = sum(r["budget"] or 0 for s, r in bud_rows)
     out = []
@@ -2243,13 +2250,14 @@ def flux():
                        '<td><div class="cm">%s</div>%s<textarea class="c" rows="1" data-note="avb:%s" placeholder="Commentary"></textarea></td></tr>'
                        % ('%s" data-base="%s' % (round(v, 2), round(r["budget"] or 0, 2)), e(r["account_code"]), e(leaf_of(r)), money(r["actual"]), money(r["budget"]), fav(v), fav(v, pct(v, r["budget"])) if r["budget"] else "&ndash;",
                           line if round(v) else "On plan.", draft("bud:" + r["account_code"], bn, "avb:" + r["account_code"]) if bn else "", e(r["account_code"])))
-    pages.append(page("avb", hero("Actual vs. Budget, " + PERIOD, "Plan: the " + e(PLR["views"]["tables"][[t["id"] for t in PLR["views"]["tables"]].index("dept_plan")].get("vintage") or "2026-06") + " vintage of the rolling forecast", [
+    pages.append(page("avb", hero("Actual vs. Budget, " + PERIOD, ("Plan: the " + e(PV) + " vintage of the rolling forecast" if PV else "No plan was supplied"), [
         ("Actual OpEx, Planned Accounts", short(act_p), "%s, only accounts the plan covers (of %s total OpEx)" % (PERIOD, short(opex["actual"]))),
-        ("Plan, " + PERIOD, short(bud), "Same accounts, the %s forecast" % e(PLR["views"]["tables"][[t["id"] for t in PLR["views"]["tables"]].index("dept_plan")].get("vintage") or "")),
+        ("Plan, " + PERIOD, short(bud), ("Same accounts, the %s forecast" % e(PV)) if PV else "No plan supplied"),
         (MON + " vs. Plan", fav(bud - act_p, ("&#9660; " if act_p < bud else "&#9650; ") + short(abs(bud - act_p))), fav(bud - act_p, "Under plan" if act_p < bud else "Over plan")),
         ("Operating Expense, YTD", short(ytd), "Jan&ndash;" + MON + " " + PERIOD[-4:] + ", accounts 6xxxxxx and 7xxxxxx")])
         + '<div class="card"><div class="ch">Actual vs. Plan, ' + e(PERIOD) + '</div><div class="tw"><table><thead><tr><th>Account</th><th class="n2">' + e(PERIOD)
-        + ' Actual</th><th class="n2">Plan</th><th class="n2">$ vs. Plan</th><th class="n2">% vs. Plan</th><th style="width:40%">Commentary</th></tr></thead><tbody>' + "".join(out) + "</tbody></table></div></div>"))
+        + ' Actual</th><th class="n2">Plan</th><th class="n2">$ vs. Plan</th><th class="n2">% vs. Plan</th><th style="width:40%">Commentary</th></tr></thead><tbody>'
+        + ("".join(out) or '<tr><td colspan="6" class="note">Not run for %s: no plan was supplied.</td></tr>' % PERIOD) + "</tbody></table></div></div>"))
 
     # ----- By Department (MoM)
     staff = {r["department"]: r for r in (pay.get("rows") or [])}
@@ -2557,7 +2565,7 @@ def flux():
     isv = lambda n: (ISR.get(n) or {}).get(PERIOD) or 0
     gl_ni = -sum(l["amount"] for l in by_period.get(PERIOD, []) if l["account_code"][:1] in "45678")
     if ISR:
-        tie("Operating expenses", gsum("6"), isv("Total - 6000000 - Operating Expenses"), "GL 6xxxxxx", "Income Statement")
+        tie("Expense accounts 6xxxxxx", gsum("6"), isv("Total - 6000000 - Operating Expenses"), "GL 6xxxxxx", "Income Statement")
         tie("Total expense", gsum("6") + gsum("7"), isv("Total - Expense"), "GL 6xxxxxx and 7xxxxxx", "Income Statement")
         tie("Net income", gl_ni, isv("Total - Income") - isv("Total - Expense") + isv("Total - Other Income") - isv("Total - Other Expense"), "GL", "Income Statement")
     if bs["rows"]:
@@ -2811,11 +2819,15 @@ def coding():
     notes_left = [n for n in (RAW_DRAFTS.get("notes") or []) if isinstance(n, dict) and txt(n.get("note"))]
     by_vendor = {} if RAW_DRAFTS.get("notes") else (RAW_DRAFTS.get("vendors") or {})
 
-    def take_note(iid, vendor, docs):
+    def take_note(iid, vendor, docs, amount=None):
+        """The note for this item: same vendor, category and bill, and the same amount when the
+        note gives one. Items of one vendor, category and bill are made largest first, so a note
+        with no amount goes on the largest still without one."""
         cat = REF_SCREENS.get(iid.split("-")[0], "").lower()
         for k, n in enumerate(notes_left):
-            d = txt(n.get("document"))
-            if txt(n.get("vendor")) == vendor and txt(n.get("check")).lower() in ("", cat) and (not d or d in docs):
+            d, a_ = txt(n.get("document")), n.get("amount")
+            if txt(n.get("vendor")) == vendor and txt(n.get("check")).lower() in ("", cat) and (not d or d in docs) \
+                    and (a_ in (None, "") or amount is None or abs(abs(float(str(a_).replace("$", "").replace(",", ""))) - abs(amount)) < 0.01):
                 return notes_left.pop(k)
         return None
     nsdoc = {}   # item -> the document the fix changes, recorded with an Edited in NetSuite decision
@@ -2829,7 +2841,7 @@ def coding():
         note_item(iid, vendor, [doc["document"]] if doc else [])
         if doc:
             nsdoc.setdefault(iid, doc["type"] + " " + doc["document"])
-        n_ = take_note(iid, vendor, ITEM_DOCS.get(iid) or set()) if flag or counted else None
+        n_ = take_note(iid, vendor, ITEM_DOCS.get(iid) or set(), amount) if flag or counted else None
         dv = n_ or by_vendor.get(vendor) or {}
         if (n_ or flag) and dv.get("recommend") in ("clear", "question", "entry") and (n_ or note_fits(vendor, dv, doc)):
             if not n_:
@@ -3028,8 +3040,9 @@ def coding():
         x = ents.get(f["finding_id"])
         vname = sc["supplier"] if isdrift else (f.get("transaction") or {}).get("vendor_or_name") or f["title"].split(":")[0].split(" coded to ")[0]
         if x:
-            crl = [l for l in x["lines"] if l.get("credit")]
-            drl = [l for l in x["lines"] if l.get("debit")]
+            rev_ = [l for l in x["lines"] if l.get("reverses_line")]
+            crl = rev_ or [l for l in x["lines"] if l.get("credit")]
+            drl = [l for l in x["lines"] if not l.get("reverses_line")] if rev_ else [l for l in x["lines"] if l.get("debit")]
             cur = "<br>".join(sorted({coding_(l["account"], l.get("department")) for l in crl}))
             rec = '<span class="arrow">&rarr;</span> ' + "<br>".join(sorted({coding_(l["account"], l.get("department")) for l in drl}))
             je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"]), "reverses": x.get("reverses")}
@@ -3051,7 +3064,8 @@ def coding():
         items.append(("dept", iid, typ, vname, (doc or {}).get("text") or "", f.get("amount_at_risk") or 0, "", ""))
         dcards.append(card(iid, vname, f.get("amount_at_risk") or 0, (f.get("amount_at_risk") or 0) >= thr, cur, rec, doc,
                            '<div><div class="l">Type</div><div class="x">' + e(typ) + "</div></div>", finding_fact(f), "", FLAG_ACTS,
-                           lines_html(vname, docs=set(d for l in (x or {}).get("lines", []) for d in (l.get("documents") or [])) or None),
+                           lines_html(vname, docs=set(d for l in (x or {}).get("lines", []) for d in (l.get("documents") or [])) or None,
+                                      codings={(l["account"], l.get("department") or "") for l in (x or {}).get("lines", []) if l.get("reverses_line")} or None),
                            (je_editor(iid, je[iid]["lines"]) if iid in je else "") + history(vname), thr="all" if typ == "Department" else "thr"))
 
     # Same item, two accounts: an item a vendor billed this month to Lab Supplies/Consumables or
@@ -3285,8 +3299,17 @@ def coding():
         if not lines:
             # Nothing to move: every flagged coding is one the vendor used before, so only the plan
             # differs. The entry starts as booked, for the reviewer to fill in if they recode.
-            lines = [x for k in keys for x in ({"account": k[0], "department": k[1] or "Non-Specific", "debit": abs(cods[k]["current"])},
-                                               {"account": k[0], "department": k[1] or "Non-Specific", "credit": abs(cods[k]["current"]), "reverses_line": True})]
+            lines = []
+            for k in keys:
+                pp = defaultdict(float)
+                for i in its:
+                    if i["account"] == k[0] and (i.get("department") or "") == k[1]:
+                        pp[(i.get("project") or "", i.get("program") or "")] += i.get("amount") or 0
+                for p_, a_ in (sorted(pp.items()) if pp else [(("", ""), cods[k]["current"])]):
+                    if round(a_, 2):
+                        src = dict(zip(("project", "program"), p_)) if any(p_) else {}
+                        lines += [dict(src, account=k[0], department=k[1] or "Non-Specific", debit=abs(round(a_, 2))),
+                                  dict(src, account=k[0], department=k[1] or "Non-Specific", credit=abs(round(a_, 2)), reverses_line=True)]
         on = [i for i in its if (i["account"], i.get("department") or "") in keys]
         top = max(on, key=lambda i: abs(i.get("amount") or 0), default=None)
         doc = {"type": top.get("type") or "Bill", "document": str(top["document"]), "text": top.get("text") or "", "date": top.get("date") or ""} if top else None

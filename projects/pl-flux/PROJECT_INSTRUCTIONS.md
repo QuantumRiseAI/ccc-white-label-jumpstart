@@ -86,7 +86,8 @@ python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite
 ```
 
 Leave out `--balance-sheet`, `--netsuite-ids` or `--netsuite-ref` when its file is absent, and say
-so in the chat. A pattern that matches no file can stop the command. Without the Balance Sheet,
+so in the chat. A pattern that matches no file stops the command before it runs in zsh, and
+in bash `build_pages.py` ignores an unmatched `--netsuite-ref` without a word; leave the flag out. Without the Balance Sheet,
 Balance Sheet Flux and the tie-outs to it do not run; name them.
 
 When the reviewer attaches the GL Coding Review's run (`run.json`, from that Project) and its decision
@@ -288,7 +289,8 @@ pages open in a bar under the header.
     against the UKG roster, the roster itself, and the month's bonus accrual against the pool
     at target, in total only (the roster's departments are not the ledger's).
 * **Close Workflow**:
-  * **Balance Sheet Flux**, against the prior month, year end and the prior year, with
+  * **Balance Sheet Flux** (absent when no Balance Sheet report is supplied), against the prior
+    month, year end and the prior year, with
     commentary on each line;
   * **Adjustments**: Section A holds the proposed Journal Entries, each filled in and
     editable, with **Add to NetSuite CSV** and **Reject** under the card's folds (no Modify
@@ -534,9 +536,12 @@ hand-off is written in the chat, on request; see Requests.
 * Plain words, short sentences, active voice. One fact to a sentence where you can.
 * Write "Journal Entry" in full.
 * An account is its code and name: `6410000 Lab Supplies/Consumables`. A department is its name.
-* Name a person only where the reviewer needs it, such as on payroll. Never write an email
-  address.
-* Figures exactly as the run has them, with the dollar sign and commas.
+* Name a person only where the reviewer needs it, such as in payroll commentary. Never write an
+  email address. Never name a person or give anyone's pay in an adjustment note or a Journal
+  Entry: an accepted note goes into the entry's Memo, and the Memo goes to NetSuite.
+* Figures exactly as the run has them, with the dollar sign and commas. Operating expense, which
+  the run gives only as the Total OpEx tile shows it, is the sum of accounts 6xxxxxx and 7xxxxxx
+  in the GL for the month; give it to the cent.
 * Say what the data shows, then what you recommend. Keep the two apart.
 * No filler: not "no significant change", not "due to business activity", never a restated
   number without a reason.
