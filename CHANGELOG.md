@@ -44,15 +44,45 @@ before.
 
 - **One note per item** (SERIF-162): the GL Coding Review's `drafts.json` has `notes`, a list.
   Each note names its `vendor`, its `check` (the item's reference ID prefix: `capex`, `fa`,
-  `prepaid`, `ppd`, `dept`, `coding`, `pass`, `new` or `clear`), the bill's `document` for an
+  `prepaid`, `ppd`, `coding`, `pass`, `new` or `clear`; `dept` for a department flag with no bill), the bill's `document` for an
   item about a bill, `recommend` and `note`, and goes on exactly one item: the first it fits. A
   vendor with several items gets a note on each that needs one, each with its own
   recommendation. A note no item fits is printed and listed in the Run log under **Drafts Left
   Out**. On a line booked to the balance sheet, `entry` is Recode to Expense. The instructions
-  ask for a note only where the item's check does not settle it, two sentences (about 40 words,
-  never more than three), about that item only. An older `drafts.json` keyed by vendor
+  ask for a note only where the item's check does not settle it, one or two sentences (rarely
+  three), about that item only. An older `drafts.json` keyed by vendor
   (`vendors`) still loads, but only when the file has no `notes`; citing a document no longer
   limits a vendor note to some cards.
+- **One layout for every card**, in both consoles: Current coding, Proposed recode and Document
+  / item (Placed in service on a capital item; Account, Amount, P&L impact and Vendor on a flux
+  adjustment), then one write-up box, "Why it was flagged" with Claude's note beneath it under
+  "Claude" and the decision it recommends ("Recommendation: Reject", or "No recommendation: the
+  lines do not settle it"), then the item's Lines (open on a flag), its Journal Entry and Last
+  three months, and the decisions. No "Recommended" tag on a button and no chip or "what" pill in
+  a card's title. Department, Project / Program, Type, Breakdown, BS impact and Dept fields are
+  gone: the Lines and the entry show them.
+- **A card shows only its own lines**: a CapEx or Prepaid flag lists its bill's lines, and a
+  Coding changed or off plan card lists, and gives as Current coding, only the codings its entry
+  moves. Its Proposed recode names where the entry moves them, or "None proposed".
+- **The check's reason says what triggered the flag**: it no longer restates the bill, its
+  amount and description, the account it is on, the in-service date or the move the card's
+  fields show. A pass-through bill's line on another card says only whether its breakdown is in.
+  A line booked to fixed assets or prepaid says why it is listed.
+- **The Journal Entry a card books only on Recode** stays folded away until the reviewer
+  recodes, or shows from the start where Claude recommends the recode. An entry that balances
+  shows no status; one out of balance still says so.
+- **No note box open on load**: the CapEx in-service prompt and the pass-through prompt are gone;
+  every note box opens with a decision.
+- **Reference IDs run in the order each page lists its cards**, across its tabs, so CODING-63
+  sits between CODING-62 and CODING-64. Every item on Organization & Account is CODING-NN (the
+  DEPT prefix is gone); a department item still takes a note with `check` `dept`, or `coding`
+  with its document. A Journal Entry Claude drafts later takes its place in the page's order.
+- **Writing guide** (`WRITING-GUIDE.md`, in both Projects): the style for every note,
+  commentary, summary and Memo, a technical register with sentences that carry the reasoning and
+  claims calibrated to the evidence, with before-and-after examples. Both instructions point to
+  it, and their notes examples follow it.
+- **Engine 0.8.1, views 1.7.1**: the capital placement and the CapEx and Prepaid reasons are
+  worded as above; no rule or threshold changed.
 - **Drafts Left Out** in the Run log, in both consoles: every draft the build left out, as the
   build prints them.
 - **CODING entries keep each Project and Program**: when a coding's lines mix Projects or

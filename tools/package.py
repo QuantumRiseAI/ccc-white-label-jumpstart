@@ -19,7 +19,7 @@ SCRIPTS = ["serif_uc2_flux.py", "serif_views.py", "serif_sources.py", "serif_des
            "serif_fonts.py", "build_pages.py", "netsuite_link_ids.sql",
            "netsuite_income_statement.sql", "netsuite_gl_detail.sql"]
 SHARED = ["WHEN-DATA-BREAKS.md", "CONNECT-NETSUITE.md", "serif-accounts-and-departments.md",
-          "serif-policy-rules.md"]
+          "serif-policy-rules.md", "WRITING-GUIDE.md"]
 TEMPLATES = ["accruals_log.csv", "coupa_dept_code_mapping.csv", "fixed_asset_register.csv",
              "hris_headcount.csv", "open_purchase_commitments.csv", "payroll_register.csv",
              "prepaid_amortization_schedule.csv"]

@@ -168,7 +168,7 @@ decision record each time you ask for a rerun or a hand-off.
 |---|---|
 | `Run the GL coding review for Sep 2026.` | The first run of the close: lists the exports, runs the scripts, drafts, publishes the console |
 | `Run it again. Reviewed as of 20 Sep.` | Runs on the newest exports and says what is new since that review |
-| `Redraft the note on DEPT-04.` | Rewrites Claude's draft on that one item, builds the console again and publishes it |
+| `Redraft the note on CODING-04.` | Rewrites Claude's draft on that one item, builds the console again and publishes it |
 | `Draft the questions email.` | One email per owner department, from the questions in your notes in the decision record (the cards carry none), for you to send |
 | `Build the NetSuite import.` | Drafts any entry the console lacks, then checks the **Export to NetSuite, CSV** you download. A person imports it. |
 | `Summarize the session.` | The hand-off: runs, decisions, what is left, checks not run, where the record is |
@@ -368,11 +368,12 @@ department with the line descriptions, and its lines, each with its Project and 
 GL's `ProjectID: Name` and `Program: Name`). Every account number shows its name. An item at or
 over its screen's threshold is marked Review; a Department flag always is.
 
-Each card's header starts with its reference ID, numbered by screen within the close, largest
-amount first: CAPEX-01, FA-01 (booked to fixed assets), PREPAID-01, PPD-01 (booked to prepaid),
-DEPT-01, CODING-01 (coding changed or off plan), PASS-01, CLEAR-01 and NEW-01. A rebuild of the same
+Each card's header starts with its reference ID, numbered in the order its page lists the
+cards, across the page's tabs, so each ID sits between the one before it and the one after:
+CAPEX-01, FA-01 (booked to fixed assets), PREPAID-01, PPD-01 (booked to prepaid), CODING-01
+(every item on Organization & Account), PASS-01, CLEAR-01 and NEW-01. A rebuild of the same
 data gives the same IDs; they are not kept from one close to the next. The card's Journal Entry
-Memo follows the Data Entry Policy with the ID in front, `DEPT-01 | Reclass ... | Aug'26`, so the
+Memo follows the Data Entry Policy with the ID in front, `CODING-01 | Reclass ... | Aug'26`, so the
 entry in the CSV and in NetSuite ties back to the card. Every proposed entry's Memo ends with the
 close month, `| Mon'YY`; the build adds it where a Memo lacks it. NetSuite takes up to 999
 characters in a Memo; the build keeps every Memo and Line Memo within it.
@@ -382,9 +383,9 @@ coding, Proposed recode, Document / item, Lines (only the lines its entry moves)
 months, with no Draft marker. It
 goes to the page its change belongs to and takes that category's ID: a debit to a fixed asset
 account (15xxxxx) is CAPEX-NN on CapEx Flags, a debit to a prepaid account (13xxxxx) is
-PREPAID-NN on Prepaid Flags, and any other is DEPT-NN on Organization & Account, under vs. Vendor
-History. It is numbered after the run's own items in that category, so a draft added later
-moves no ID already cited. Its External ID stays `SERIF-DRAFT-N`, and the work paper's decision
+PREPAID-NN on Prepaid Flags, and any other is CODING-NN on Organization & Account, under vs. Vendor
+History. It is numbered where its page lists it, so a draft added later in the close can move
+the IDs after it. Its External ID stays `SERIF-DRAFT-N`, and the work paper's decision
 Path says ", drafted by Claude".
 
 ### CapEx and Prepaid, Both Directions
@@ -407,8 +408,8 @@ text and in its Journal Entry Memo:
   names one, the entry holds it in Capital in Process and the card says the chart has no fixed
   asset account for it.
 
-The ledger has no in-service date, so the card says the date is not known, and its note field is
-open for it. A capital purchase under the $5,000 capitalization threshold is listed, not marked
+The ledger has no in-service date, so the card's Placed in service says the date is not known;
+give the date in the note when you decide. A capital purchase under the $5,000 capitalization threshold is listed, not marked
 Review, and says it is under the threshold.
 
 On every proposed entry a new balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the
@@ -451,14 +452,16 @@ purchase, and coded as planned. A check with nothing to compare against says so 
 the two months before, no Coupa PO, no plan line) rather than passing. Confirm each vendor, or
 recode it if the coding is wrong, starting with those at $2,500 or more.
 
-A draft from Claude is two sentences, never more than three, on one card: what was bought, and whether the
-coding fits or what the lines do not show. A card carries one at most, and most carry none: Claude
-writes one only where the card's check does not settle the item. It sits on its card with
-**Accept**, which copies the note and sets the recommended decision (marked Recommended on its
-button), and **Edit**, which copies the note to change.
-A card states what was found and why, never what to do. It leads with its facts and the draft;
-why it was flagged, the Journal Entry, the last three months and the lines fold beneath them,
-and the decision buttons sit under the folds. Every page opens with its cards folded to one
+A draft from Claude is one or two sentences, rarely three, on one card: what the item is, and
+whether the coding fits or what the lines do not show. A card carries one at most, and most carry
+none: Claude writes one only where the card's check does not settle the item. It sits in the
+card's write-up under "Why it was flagged", with the decision Claude recommends
+("Recommendation: Reject", or "No recommendation: the lines do not settle it"), **Accept**, which
+copies the note and sets that decision, and **Edit**, which copies the note to change.
+A card states what was found and why, never what to do. Every card is laid out alike: Current
+coding, Proposed recode and Document / item (and Placed in service on a capital item), the
+write-up, then the item's Lines (open on a flag), its Journal Entry and its last three months,
+with the decision buttons under them. Every page opens with its cards folded to one
 line each; a card opens on its own. Each review and vendor page has one **Decided** counter
 (0 of 5, say) with a line saying what its items are. A page that applies a threshold shows it beside its title; click its
 value to change it, and Reset returns the default. A note

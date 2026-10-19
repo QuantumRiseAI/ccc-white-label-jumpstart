@@ -350,17 +350,21 @@ section's pages open in a bar under the header.
 Every review and vendor page opens with one **Decided** counter (0 of 5, say) and a line
 saying what its items are, and with every card folded to its header; a card opens on its own.
 
-Every flag and vendor card starts with its reference ID, numbered by screen within the close
-(CAPEX-01, FA-01, PREPAID-01, PPD-01, DEPT-01, CODING-01, PASS-01, CLEAR-01, NEW-01; a Journal
-Entry you drafted takes the ID of its category), and the Memo of its
+Every flag and vendor card starts with its reference ID, numbered in the order its page lists
+the cards, across the page's tabs, so CODING-63 sits between CODING-62 and CODING-64 (CAPEX-01,
+FA-01, PREPAID-01, PPD-01, CODING-01 for every item on Organization & Account, PASS-01,
+CLEAR-01, NEW-01; a Journal Entry you drafted takes the ID of its category), and the Memo of its
 Journal Entry starts with the same ID, so the entry in NetSuite ties back to the card. Every
 proposed entry's Memo ends with the close month, `| Mon'YY`, as the Data Entry Policy requires;
 the build adds it where a Memo lacks it. Use the ID
 when you name a card to the reviewer. Each card shows its document with NetSuite and Coupa links, the vendor's last
 three months by account and department with the line descriptions, and its lines, each with its
-Project and Program. A card states what was found and why; it never says what to do. The
-decision buttons sit under the card's folds (Why it was flagged, Journal Entry, Last three
-months, Lines). A flag's Journal Entry is filled in and editable, and offers **Add to NetSuite
+Project and Program. A card states what was found and why; it never says what to do. Every
+card is laid out alike: Current coding, Proposed recode and Document / item (and Placed in
+service on a capital item), then one write-up, "Why it was flagged" with your note and its
+recommendation beneath it, then the item's Lines (open on a flag), its Journal Entry and Last
+three months, and the decision buttons under them. A Journal Entry that books only on Recode
+shows once the reviewer recodes, or from the start when you recommend the recode. A flag's Journal Entry is filled in and editable, and offers **Add to NetSuite
 CSV**, **Edited Manually in NetSuite** and **Reject**. There is no Modify button: editing the
 entry's lines marks it Added to NetSuite CSV, edited; it still goes to the CSV and needs a note.
 Each entry line carries the Vendor (the CSV's Name, NetSuite's entity) and the Coupa PO, both
@@ -394,15 +398,17 @@ Serif's close entries do) is not flagged on CapEx or Prepaid: it is already book
 Each CapEx card says whether the purchase goes to **`1505000` Capital in Process** (build-out
 work, or an asset bought but not yet in service) or to its fixed asset account (an asset in
 service), and why, on the card and in its Journal Entry Memo. The ledger has no in-service
-date: unless the line states one, the card says the date is not known and its note field is open for it. Office furniture and
+date: unless the line states one, the card's Placed in service says the date is not known, and the reviewer gives it in the note. Office furniture and
 equipment has no fixed asset account in Serif's chart; the entry holds it in Capital in
 Process, and the card says the chart has no fixed asset account for it. Never invent one.
 
 ## What You Write
 
 Your drafts go into the console, each beside the one item it belongs to, marked "Draft" with a
-sparkle with **Accept** and **Edit**. Accept copies the note onto the item and sets the
-recommended decision, which the item marks Recommended; Edit copies the note to change it.
+sparkle and the name Claude, with **Accept** and **Edit**. It sits in the item's write-up, under
+"Why it was flagged", and the item states the decision it recommends ("Recommendation: Reject",
+or "No recommendation: the lines do not settle it" for a `question`). Accept copies the note
+onto the item and sets that decision; Edit copies the note to change it.
 Nothing you write counts as reviewed until the reviewer accepts or edits it. The reviewer reads
 these between decisions: write for a quick call, not a report.
 
@@ -425,10 +431,10 @@ drafted.
   "notes": [
     {"vendor": "Global Life Sciences Solutions USA LLC", "check": "capex", "document": "13229299",
      "recommend": "clear",
-     "note": "AKTA Pure service agreement: a service, not an asset. It stays expense on 6435000 Lab Equipment Repairs & Maintenance."},
-    {"vendor": "Global Life Sciences Solutions USA LLC", "check": "dept", "document": "13158197",
+     "note": "The AKTA Pure service agreement covers maintenance and repair of an existing chromatography system rather than the purchase of new equipment; because a service agreement creates no asset, the cost remains an expense on its current account."},
+    {"vendor": "Global Life Sciences Solutions USA LLC", "check": "coding", "document": "13158197",
      "recommend": "question",
-     "note": "NanoAssemblr cartridges, LNP formulation consumables. Chemistry carried this vendor in August; the lines do not show which team used them."}
+     "note": "NanoAssemblr Ignite cartridges are single-use consumables for formulating lipid nanoparticles, so the account fits the purchase; however, the lines do not show whether Chemistry, which has carried this vendor in earlier months, or General R&D used them."}
   ],
   "entries": [
     {"memo": "Long column holder recoded to lab supplies | Aug'26",
@@ -448,13 +454,14 @@ Each note is for **one item**, and it goes on that item and on no other:
 
 * `vendor`: exactly as in the run.
 * `check`: the item's category, its reference ID's prefix in lower case: `capex` (CapEx flag),
-  `fa` (booked to fixed assets), `prepaid`, `ppd` (booked to prepaid), `dept` (a department,
-  Coupa-account or same-item flag on Organization & Account), `coding` (Coding changed or off
-  plan), `pass` (a pass-through bill), `new` (New Vendors This Period) or `clear` (Vendors
-  Reviewed & Cleared).
+  `fa` (booked to fixed assets), `prepaid`, `ppd` (booked to prepaid), `coding` (any item on
+  Organization & Account), `pass` (a pass-through bill), `new` (New Vendors This Period) or
+  `clear` (Vendors Reviewed & Cleared).
 * `document`: the bill's document number, for an item about a bill (`capex`, `fa`, `prepaid`,
-  `ppd`, `dept`, `pass`). Leave it out for a vendor item (`coding`, `new`, `clear`), and for a
-  `dept` item with no bill (a journal or an expense report line); give its `amount` instead.
+  `ppd`, `pass`, and a `coding` item about one bill: a department, Coupa-account or same-item
+  flag). Leave it out for a vendor item (a Coding changed or off plan card, `new`, `clear`): a
+  `coding` note with no document goes on the vendor's card. For a department flag with no bill
+  (a journal or an expense report line), use `"check": "dept"` and give its `amount` instead.
 * `amount`: the item's amount, as the run gives it (a finding's `amount_at_risk`, or the line's
   amount). Give it when several items share the vendor, `check` and document, as many
   department flags on one bill do; a note without it goes on the largest of them still without
@@ -489,31 +496,42 @@ from what the item proposes, or where the lines leave the call open. An item who
 flagged" already says everything needs no note. Work largest first, and stop when the rest are
 small and settled.
 
-A note answers that item's flag, the way its "Why it was flagged" line reads:
+A note follows the item's "Why it was flagged" and adds what the check cannot know, in the
+style of [`WRITING-GUIDE.md`](WRITING-GUIDE.md):
 
-1. What was bought, in plain words, from the line description. If an item is unfamiliar, say
-   what it is. If you are not sure, say so. Do not guess.
-2. Whether this item's coding fits it, and the recommendation: `clear`, `entry`, or `question`
-   where the lines do not show enough.
+1. What the item is and what it is for, from the line description, the breakdown or the
+   vendor's business. Explain an unfamiliar item once, briefly. If the lines do not say, write
+   that they do not; never guess.
+2. Whether its coding fits, and why; or, where the lines do not settle it, which fact is
+   missing and which way it would decide the coding. Set the recommendation in `recommend`
+   (`clear`, `entry`, or `question` where the lines do not show enough), not in the note: the
+   item states it beside the note.
 
-Two sentences, about 40 words, never more than three sentences. Only this item: no other bills,
-no other flags of the vendor, no history the item already shows.
+One or two sentences, and rarely three. Only this item: no other bills, no other flags of the
+vendor, and nothing the item already shows (its vendor, bill, amount, description, current
+coding, proposed recode and placed-in-service date).
 
-> NanoAssemblr cartridges, LNP formulation consumables. Chemistry carried this vendor in August;
-> the lines do not show which team used them.
+> NanoAssemblr Ignite cartridges are single-use consumables for formulating lipid
+> nanoparticles, so the account fits the purchase; however, the lines do not show whether
+> Chemistry, which has carried this vendor in earlier months, or General R&D used them.
 
 ### 2. A Confirm Note Is the Reason
 
 For a `clear` note, the note is the reason for the close file: what the item is, and why the
-coding stands, in one sentence.
+coding stands.
 
-> Consumable chromatography column, not equipment. Lab Supplies is correct.
+> The AKTA Pure service agreement covers maintenance and repair of an existing chromatography
+> system rather than the purchase of new equipment; because a service agreement creates no
+> asset, the cost remains an expense on its current account.
 
 ### 3. What the Lines Do Not Show
 
-For a `question` note, say what the lines do not show, as a statement, not a question to the
-owner: the description and amount, the row's `owner` department, and which answer would change
-the coding.
+For a `question` note, say what the lines do not show, as a statement rather than a question
+to the owner, and which answer would change the coding.
+
+> Flagship billed this amount as a single lump-sum line of non-capital equipment without a cost
+> breakdown, so it is not possible to tell whether the line holds one item above the $5,000
+> capitalization threshold or several smaller items that would remain expense.
 
 ### 4. Journal Entries
 
@@ -537,7 +555,7 @@ Draft an entry where the coding is wrong and no proposed entry in `views.entries
   document numbers.
 * Memo, per the Data Entry Policy: `Specific description | Mon'YY`, for example
   `Long column holder recoded to lab supplies | Aug'26`. Leave out the reference ID: the build
-  puts the card's in front, `DEPT-07 | Long column holder recoded to lab supplies | Aug'26`.
+  puts the card's in front, `CODING-07 | Long column holder recoded to lab supplies | Aug'26`.
 * Prepaid and capital flags move the bill to the balance sheet. The accounts are in
   [`GL_CODING_REVIEW_SKILL.md`](GL_CODING_REVIEW_SKILL.md). A capital entry says in its Memo
   and reason whether it goes to Capital in Process or the fixed asset account, and why, and
@@ -550,8 +568,9 @@ Draft marker on the card. It goes
 to the page its change belongs to and takes that category's reference ID: a debit to a fixed
 asset account (15xxxxx) goes on CapEx Flags as CAPEX-NN, a debit to a prepaid account (13xxxxx)
 on Prepaid Flags as PREPAID-NN, and any other on Organization & Account, under vs. Vendor
-History, as DEPT-NN. It is numbered after the run's own items in that category, so an entry
-drafted later moves no reference ID already cited. Its External ID is `SERIF-DRAFT-1` and on;
+History, as CODING-NN. It is numbered where its page lists it, like every other card, so an
+entry drafted later in the close can move the IDs after it; name cards by vendor as well as ID
+in a later chat. Its External ID is `SERIF-DRAFT-1` and on;
 its item id keeps `DR-`. The work paper's decision Path adds ", drafted by Claude". It offers
 Add to NetSuite CSV, Edited Manually in NetSuite and Reject; once added, it is in the NetSuite
 CSV on Export.
@@ -564,12 +583,16 @@ run and why. The hand-off at the end of a session is written in the chat; see Re
 
 ### How to Write
 
-* Plain words, short sentences, active voice. One fact to a sentence where you can.
+Write everything in the style [`WRITING-GUIDE.md`](WRITING-GUIDE.md) sets out: a technical
+register, sentences that carry the reasoning, claims calibrated to the evidence, and in a note
+only what the item does not already show. Read it before you write the drafts. The points below
+are the ones most often missed.
+
 * Write "Journal Entry" in full.
 * An account is its code and name: `6410000 Lab Supplies/Consumables`. A department is its name.
 * Name a person only where the reviewer needs it. Never write an email address.
 * Figures exactly as the run has them, with the dollar sign and commas.
-* Say what the data shows, then what you recommend. Keep the two apart.
+* Say what the data shows. The recommendation goes in `recommend`, not in the note.
 * State what was found and why. Never write an instruction to the reviewer or a question to an
   owner. In a note, the build drops instructions such as "Read the…", "Ask the…",
   "Check that…", "Recode to…" or "If …, reclass it", and a question to an owner with the
@@ -663,11 +686,11 @@ order, and nothing the reviewer did not ask for. Match the request, not the exac
 Month, Run It, then What You Write: a note only on an item its check does not settle, one
 note to an item, then any Journal Entry no rule proposed. Build with `--drafts` and publish.
 
-**Redraft a note.** "Redraft the note on DEPT-04." "Recommend Reject on CAPEX-02."
+**Redraft a note.** "Redraft the note on CODING-04." "Recommend Reject on CAPEX-02."
 
 1. Find the item by its reference ID and change its note in `notes`, keeping the vendor,
    `check` and `document` that place it. Keep every other draft as it is.
-2. Write it as What You Write, 1 to 3, says: two sentences, only that item.
+2. Write it as What You Write, 1 to 3, and the writing guide say: one or two sentences, only that item.
 3. Build the console again with `--drafts` and publish it. If the build lists the note under
    Drafts Left Out, fix what it names and build again.
 

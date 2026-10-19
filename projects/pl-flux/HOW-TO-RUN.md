@@ -400,7 +400,7 @@ not the ledger's. Payroll tax on the bonus needs the payroll register.
   entry shows whether it balances; **Reset** brings back the proposal. Each card's folded header
   shows its amount. Every proposed entry's Memo ends with the close month, `| Mon'YY`, as the
   Data Entry Policy requires. A note added to the entry goes into its NetSuite Memo after " | ",
-  cut at 999 characters, so Claude keeps its adjustment notes to two short sentences. Entries
+  cut at 999 characters, so Claude keeps its adjustment notes to one or two sentences. Entries
   Claude drafted are here too. Both sides of an entry carry the Project and Program of the bill it corrects; an
   accrual from Coupa receipts or a reclass staged in the forecast has no bill behind it and
   leaves them to fill. A new balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the

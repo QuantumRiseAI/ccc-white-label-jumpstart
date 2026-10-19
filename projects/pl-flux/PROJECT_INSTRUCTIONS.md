@@ -326,8 +326,9 @@ threshold. A line needs commentary when its move reaches it.
 Your drafts go into the console, beside the items they belong to, marked "Draft" with a sparkle
 with **Accept** and **Edit**. Drafted commentary sits on the account's line on Actual vs. Actual
 (MoM), drafted budget commentary beside the account's plan line on Actual vs. Budget, and a
-drafted note on an adjustment carries your recommendation. Accept copies it into the
-commentary or the note, and sets the recommended decision; Edit copies it to change. Nothing you
+drafted note on an adjustment sits in its write-up under "Why it was flagged", marked Claude,
+with the decision it recommends ("Recommendation: Reject"). Accept copies it into the
+commentary or the note, and sets that decision; Edit copies it to change. Nothing you
 write counts as reviewed until the reviewer accepts or edits it.
 
 After the three scripts run, write `drafts.json` and build the console again with it:
@@ -442,8 +443,13 @@ changed, not Serif's activity. Say so.
 For each adjustment over the threshold, recommend **Add to NetSuite CSV** (`book`) or **Reject**
 (`no_entry`) in `adjustments`, with one reason, and say what would change the answer. Accepting
 the note writes it into the entry's NetSuite Memo: the CSV's Memo is the entry's Memo, " | ",
-then the note, cut at 999 characters. Keep each note to two short sentences: the facts, and the
-recommendation.
+then the note, cut at 999 characters. Keep each note to one or two sentences, in the style of
+[`WRITING-GUIDE.md`](WRITING-GUIDE.md): what the vendor or entry is, and why the evidence supports
+or undercuts the entry. The recommendation goes in `recommend`, not in the note.
+
+> Triumvirate removes lab waste every month but bills on quarterly blanket purchase orders, and
+> September carries only $3,133.25 against a three-month average of $15,454.07, which suggests
+> the month's service has not yet been billed.
 
 * **Forecast vs. Actual**: name what the forecast line is staged as, quoting its note and
   cell. Say whether the ledger needs the entry or FP&A needs to correct the forecast.
@@ -533,7 +539,11 @@ hand-off is written in the chat, on request; see Requests.
 
 ### How to Write
 
-* Plain words, short sentences, active voice. One fact to a sentence where you can.
+Write everything in the style [`WRITING-GUIDE.md`](WRITING-GUIDE.md) sets out: a technical
+register, sentences that carry the reasoning, claims calibrated to the evidence, and in a note
+only what the item does not already show. Read it before you write the drafts. The points below
+are the ones most often missed.
+
 * Write "Journal Entry" in full.
 * An account is its code and name: `6410000 Lab Supplies/Consumables`. A department is its name.
 * Name a person only where the reviewer needs it, such as in payroll commentary. Never write an
@@ -542,7 +552,8 @@ hand-off is written in the chat, on request; see Requests.
 * Figures exactly as the run has them, with the dollar sign and commas. Operating expense, which
   the run gives only as the Total OpEx tile shows it, is the sum of accounts 6xxxxxx and 7xxxxxx
   in the GL for the month; give it to the cent.
-* Say what the data shows, then what you recommend. Keep the two apart.
+* Say what the data shows. On an adjustment the recommendation goes in `recommend`, not in the
+  note; in commentary, keep the facts and any recommendation apart.
 * No filler: not "no significant change", not "due to business activity", never a restated
   number without a reason.
 * Do not classify a movement as timing, structural or coding. Name the driver and say

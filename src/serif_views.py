@@ -56,7 +56,7 @@ from collections import defaultdict
 
 import serif_sources as sources
 
-VIEWS_VERSION = "1.7.0"
+VIEWS_VERSION = "1.7.1"
 
 # The flux engine's definition, so the two agree on what counts as P&L.
 PL_PREFIXES = ("6", "7", "8")
@@ -1778,10 +1778,7 @@ def explain(f, accounts, period):
               "If the journal needs no name, choose Cleared."]
     elif rule == "F9.PREPAID":
         c = f.get("correction") or {}
-        why = ["The bill is %s on %s." % (_m(amt), c.get("subject", "").split(" / ")[-1])]
-        text = ev.get("observed", "").split(": ", 1)
-        if len(text) == 2:
-            why.append('The description is "%s".' % text[1])
+        why = []
         mm = re.search(r"in (\d+) of the last (\d+) months", ev.get("basis", ""))
         if mm:
             why.append("The vendor did not bill this account in the last %s months." % mm.group(2)
@@ -1796,15 +1793,13 @@ def explain(f, accounts, period):
               "If it does not, choose Cleared."]
     elif rule == "F10.CAPITALIZE":
         c = f.get("correction") or {}
-        mm = re.match(r"bill (\S+) for (\$[\d,.]+)(?:: (.+))?", ev.get("observed", ""))
-        why = [('Bill %s is %s for "%s".' % (mm.group(1), mm.group(2), mm.group(3)) if mm and mm.group(3)
-                else "Bill %s is %s." % (mm.group(1), mm.group(2)) if mm else ""),
-               "It is on %s, an account the asset policy reviews for capital purchases." % c.get("current", "")]
+        why = ["%s is an account the asset policy reviews for capital purchases." % c.get("current", "")]
         place = c.get("placement") or {}
         if amt < CAPITALIZATION:
             why.append("It is under the %s capitalization threshold, so it stays expense "
                        "unless it is part of a larger asset." % "${:,.0f}".format(CAPITALIZATION))
-        why.append(place.get("why", ""))
+        if place.get("kind") != "in_service":
+            why.append(place.get("why", ""))
         do = ["Read the bill.",
               "If it buys an item that lasts more than one year, capitalize it to %s." % c.get("proposed", ""),
               "If it does not, choose Cleared.",
