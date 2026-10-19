@@ -3,12 +3,13 @@
 What this Project carries that the other does not: [`PROJECT_INSTRUCTIONS.md`](PROJECT_INSTRUCTIONS.md),
 [`HOW-TO-RUN.md`](HOW-TO-RUN.md) and the files beside them. The scripts are in `../../src/`, the
 docs both Projects carry in `../shared/`, and the feed templates in `../../templates/`.
-`make package` puts them all in one flat folder, `out/dist/gl-coding-review/`, for the Project.
+`../../claude-projects/GL Coding Review/` shows them as the Project takes them, flat.
 
 ## Configure Once
 
-Run `make package` from the repo root. Paste `out/dist/gl-coding-review/PROJECT_INSTRUCTIONS.md` into the
-Project's Instructions field and upload every other file in `out/dist/gl-coding-review/`. The header-only
+Follow [`claude-projects/README.md`](../../claude-projects/README.md): paste
+`claude-projects/GL Coding Review/PROJECT_INSTRUCTIONS.md` into the Project's Instructions field, and
+drag in every file in `claude-projects/GL Coding Review/upload/`. The header-only
 templates look empty on purpose: their presence is how the agent reports a feed Serif has not
 sent.
 

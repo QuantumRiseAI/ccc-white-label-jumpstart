@@ -86,9 +86,9 @@ repo's first commit). The month a console shows is only the input data it was bu
 Python 3.9 or newer, standard library only. The tests need Node and Playwright.
 
 ```sh
-make package                  # out/dist/gl-coding-review/ and out/dist/pl-flux/, with .zip
+make package                  # claude-projects/ (links), and out/dist/<project>/ (copies) with .zip
 make build PERIOD=aug2026     # both Projects' commands on inputs/aug2026/, from out/dist/
-make test                     # the console tests, on consoles/
+make test                     # claude-projects/ up to date, then the console and engine tests
 ```
 
 `make build` writes `out/<period>/<project>/run.json` and the month's console, and copies the
@@ -103,9 +103,17 @@ local builds), the local `data/` and `status/` folders, and everything in `refer
 its README. Chris's two August reports are kept in `docs/spec/`. The consoles in `consoles/`
 are committed, every version: they carry the ledger, names and pay, for the accounting team. To rebuild a
 month from a clone, put its exports in `inputs/<period>/` and run `make build`. The simplest
-way is to link `inputs/` to the engagement's OneDrive data, whose folders are `2026-08 exports`,
-`2026-09 exports` and `netsuite reference` under `7-technical-documentation/3-data/`: make a
-folder of links named `aug2026`, `sep2026` and `reference` to them, and link `inputs` to it.
+way is to link into the engagement's OneDrive data, `7-technical-documentation/3-data/`, from
+the repo root (`.gitignore` leaves out `inputs` whether it is a folder or a link):
+
+```sh
+D="$HOME/Library/CloudStorage/OneDrive-QuantumRise/Clients - Active - Documents/Serif Biomedicines (CCC)/1-Serif-FDE-Support/7-technical-documentation/3-data"
+mkdir -p inputs
+ln -s "$D/2026-08 exports" inputs/aug2026
+ln -s "$D/2026-09 exports" inputs/sep2026
+ln -s "$D/netsuite reference" inputs/reference
+```
+
 `inputs/reference/` is also where `claude-projects/*/upload/` finds NetSuite's lists.
 
 ## Setup
@@ -114,6 +122,8 @@ Two Projects, one per use case. They are not combined, because the two have diff
 instructions, different reference material and different run orders.
 
 Configure once:
+
+Step by step, including updating a Project that is already set up, in [`claude-projects/README.md`](claude-projects/README.md).
 
 1. Create a Claude Project named `Serif Biomedicines, GL Coding Review` or
    `Serif Biomedicines, P&L Flux`.

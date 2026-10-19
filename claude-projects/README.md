@@ -10,13 +10,13 @@ One folder per Claude Project:
 Each holds two things:
 
 * `PROJECT_INSTRUCTIONS.md`, to paste into the Project's instructions field. It is not an upload.
-* `upload/`, every file the Project needs and nothing else (31 for GL Coding Review, 27 for P&L
-  Flux). Select all, and drag them into the Project's files.
+* `upload/`, every file the Project needs and nothing else. Select all, and drag them into the
+  Project's files.
 
 ## Loading a Project
 
 1. Paste `PROJECT_INSTRUCTIONS.md` into the Project's instructions field.
-2. Delete the Project's old files.
+2. On a Project set up before, delete its old files.
 3. Open `upload/`, select every file, and drag them into the Project.
 4. Start a new chat for the close and attach the month's exports.
 
@@ -33,6 +33,9 @@ NetSuite's three lists in `upload/` (`netsuite_ref_accounts.csv`, `netsuite_ref_
 `7-technical-documentation/3-data/netsuite reference/`. Without that link set up, those three show
 as broken: point `inputs/` at the OneDrive data first (the repo README, In Git, says how).
 
-On Windows, clone with `git clone -c core.symlinks=true`. GitHub's web view shows each link as
-the path it points to; use a clone, or `out/dist/<project>.zip` from `make package`, which holds
-real copies of every file.
+On Windows, links need `git clone -c core.symlinks=true` and Developer Mode (or an administrator
+shell). Without them, Git writes each link as a small text file holding its target's path, and
+dragging `upload/` would upload those paths; `make test` fails on it. GitHub's web view and its
+Download ZIP show links the same way. In those cases use `out/dist/<project>/` or its `.zip`
+from `make package`, which hold real copies of every file, or the Project folders in the
+engagement's OneDrive, `7-technical-documentation/1-claude-projects/`.

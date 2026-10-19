@@ -93,10 +93,10 @@ def package(name, spec, dist):
     files = sources(name, spec)
     link(name, spec)
     ref = [os.path.join(ROOT, "inputs", "reference", f) for f in NSREF]
-    if all(os.path.isfile(f) for f in ref):
-        files += ref
-    else:
-        print("%s: NetSuite's lists not in inputs/reference/; add them to the Project by hand" % name)
+    files += [f for f in ref if os.path.isfile(f)]   # as many as are there, as upload/ links them
+    gone = [os.path.basename(f) for f in ref if not os.path.isfile(f)]
+    if gone:
+        print("%s: not in inputs/reference/, so add by hand: %s" % (name, ", ".join(gone)))
     copy(files, out)
     with zipfile.ZipFile(out + ".zip", "w", zipfile.ZIP_DEFLATED) as z:
         for f in sorted(os.listdir(out)):
@@ -106,11 +106,15 @@ def package(name, spec, dist):
 
 def check():
     """claude-projects/ against the source: one link per file, each to the file it names."""
-    stale = []
+    stale, here = [], os.path.join(ROOT, "claude-projects")
+    # nothing in claude-projects/ but README.md and one folder per Project, so an old folder
+    # (a Project renamed, say) is not left committed beside the current one
+    stale += ["%s not a Project folder" % x for x in sorted(set(os.listdir(here) if os.path.isdir(here) else [])
+                                                           - set(NAMES.values()) - {"README.md", ".DS_Store"})]
     for name, spec in PROJECTS.items():
         want, top = placed(name, spec), os.path.join(ROOT, "claude-projects", NAMES[name])
         got = {os.path.join(d, f) for d, _, fs in os.walk(top) for f in fs if f != ".DS_Store"}
-        got |= {os.path.join(d, x) for d, ds, _ in os.walk(top) for x in ds if os.path.islink(os.path.join(d, x))}
+        got |= {os.path.join(d, x) for d, ds, _ in os.walk(top) for x in ds if os.path.join(d, x) != os.path.join(top, "upload")}
         rel = lambda p: os.path.relpath(p, os.path.join(ROOT, "claude-projects"))
         stale += ["%s missing" % rel(p) for p in sorted(set(want) - got)]
         stale += ["%s not in the source" % rel(p) for p in sorted(got - set(want))]
@@ -125,6 +129,8 @@ if __name__ == "__main__":
     if sys.argv[1:] == ["--check"]:
         check()
         sys.exit()
+    if sys.argv[1:]:
+        sys.exit("Usage: python3 tools/package.py [--check]")
     dist = os.path.join(ROOT, "out", "dist")
     for name, spec in PROJECTS.items():
         package(name, spec, dist)
