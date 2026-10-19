@@ -153,7 +153,7 @@ MONTHLY_EXPORTS = [
     ("plan", "Rolling forecast, the plan", "Actual vs. plan and planned coding"),
     ("hris_roster", "UKG roster", "Requester departments, names and pay"),
     ("netsuite_link_ids", "NetSuite link IDs, from the connector", "Links to NetSuite records"),
-    ("netsuite_income_statement", "NetSuite Income Statement by month", "The tie to NetSuite, account by account"),
+    ("netsuite_income_statement", "NetSuite Income Statement", "The tie to NetSuite, account by account"),
     ("netsuite_balance_sheet", "NetSuite Balance Sheet", "Balance Sheet Flux and its tie-outs"),
     ("netsuite_ref", "NetSuite lists: accounts, departments, programs", "NetSuite internal IDs in the import CSV"),
 ]
@@ -184,9 +184,9 @@ def exports_card(m, views, extra=None):
     cc = m.get("coupa_coverage") or {}
     limits = []
     if cc.get("row_limit"):
-        limits.append("It stops at the %s-row limit, so it holds only part of the year." % format(cc["row_limit"], ","))
+        limits.append("It stops at the %s-row limit, so it may not hold every line for the months it covers." % format(cc["row_limit"], ","))
     if cc.get("columns_absent"):
-        limits.append("It lacks or leaves empty: %s. What each check found, below, names the checks that did not run for it." % ", ".join(cc["columns_absent"]))
+        limits.append("It lacks or leaves empty: %s. What each check found, below, says which checks did not run or ran degraded." % ", ".join(cc["columns_absent"]))
     rows = []
     for role, label, feeds in MONTHLY_EXPORTS:
         if role in FLUX_ONLY and not flux:

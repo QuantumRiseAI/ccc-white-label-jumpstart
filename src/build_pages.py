@@ -2520,7 +2520,9 @@ def flux():
         bills = {d for l in x["lines"] for d in (l.get("documents") or [])} or \
             {t.get("document_number") for t in f.get("transactions") or [] if t.get("document_number")} or \
             {x.get("support") or ""}   # a receipt accrual has no bill; its Coupa POs tell it apart
-        aid = sid("ADJ", x.get("kind"), x["memo"], *(sorted(bills) if twins[(x.get("kind"), x["memo"])] > 1 else []))
+        # and the P&L accounts, for two checks of one bill on two accounts
+        aid = sid("ADJ", x.get("kind"), x["memo"], *(sorted(bills) + sorted({l["account"] for l in x["lines"] if PNL(l["account"])})
+                                                       if twins[(x.get("kind"), x["memo"])] > 1 else []))
         pl = [l for l in x["lines"] if PNL(l["account"])]
         imp = sum((l.get("credit") or 0) - (l.get("debit") or 0) for l in pl)
         impact += imp
@@ -2989,12 +2991,16 @@ def coding():
         key = lambda r: (r["vendor"], r["from_account"], r["to_account"], r.get("what"), r.get("department"))
         twins = Counter(key(r) for r in screen[sec_id])
         for r in screen[sec_id]:
-            # A capital flag on a pass-through bill whose cost breakdown is in is settled by
-            # the breakdown: with no item at or over the threshold, nothing on it is capital,
-            # and Pass-Through Bills reviews it item by item.
+            # A capital flag on a pass-through bill is settled by its cost breakdown when the
+            # breakdown ties to the bill and every item it puts on the flagged account is under
+            # the threshold: nothing there is capital, and Pass-Through Bills reviews the bill
+            # item by item. A breakdown that does not tie, or puts nothing on the account,
+            # leaves the flag.
             rv_ = PT_REV.get(str((r["doc"] or {}).get("document") or ""))
-            if sec_id == "capital" and rv_ and not any(f[0] == "capital" for i in rv_["items"] for f in i["flags"]):
-                pt_settled.append((r["vendor"], r["doc"]["document"], r["amount"]))
+            on_ = [i for i in (rv_ or {}).get("items") or [] if i.get("serif") == r["from_account"]]
+            if sec_id == "capital" and rv_ and rv_.get("ties") and on_ and all(abs(i["amount"]) < THR["thr_capex"] for i in on_):
+                pt_settled.append((r["vendor"], r["doc"]["document"], r["amount"], r["from_account"],
+                                   max(abs(i["amount"]) for i in on_)))
                 continue
             # Two bills alike in all of these (two Flagship bills on one account) also take their
             # document, so each keeps its id whatever order a later run lists them in.
@@ -3055,17 +3061,19 @@ def coding():
         raw = ev.get("supporting_counts") or {}
         sc = {k: v for k, v in raw.items() if isinstance(v, (int, float))}
         seen = en(ev.get("observed") or "")
-        A_ = lambda c: ("%s %s" % (c, acct_name(c))).strip()
+        A_ = lambda c: e(("%s %s" % (c, acct_name(c))).strip())
         # The Coupa checks count lines and dollars, not codings: each says what it compared.
         if f.get("rule_id") == "T4.PO_ACCOUNT_MISMATCH":
             m_ = re.search(r"has ([\d,]+) Coupa PO line\(s\), (\d+)% approved against account (\d{7})", ev.get("basis") or "")
             return "%s%s.%s" % (stop_(seen.replace("line(s)", "lines" if raw.get("gl_lines") != 1 else "line")).rstrip("."),
                                 (", %s" % money(raw["gl_exposure"], True)) if raw.get("gl_exposure") else "",
-                                (" The vendor's %s Coupa PO lines were %s%% approved against %s." % (m_.group(1), m_.group(2), A_(m_.group(3)))) if m_ else "")
+                                (" The vendor's %s Coupa PO lines were %s%% approved against %s." % (format(int(m_.group(1).replace(",", "")), ","), m_.group(2), A_(m_.group(3)))) if m_ else "")
         if f.get("rule_id") == "T4.ITEM_ACCOUNT_DRIFT" and raw.get("usual_account"):
-            return "Coupa PO %s line %s (%s, %s) is on %s; %s of the item's %s earlier lines were on %s, its usual account." % (
+            n_, k_ = raw.get("earlier_lines", 0), raw.get("earlier_lines_on_usual", 0)
+            return "Coupa PO %s line %s (%s, %s) is on %s; %s, its usual account." % (
                 e(raw.get("po_number") or ""), e(str(raw.get("po_line") or "")), e(raw.get("item") or ""), money(raw.get("po_amount") or 0, True),
-                A_(raw.get("account") or ""), raw.get("earlier_lines_on_usual", 0), raw.get("earlier_lines", 0), A_(raw["usual_account"]))
+                A_(raw.get("account") or ""), ("the item's one earlier line was on %s" if n_ == 1 and k_ == 1 else
+                                               "%s of the item's %s earlier lines %s on %%s" % (k_, n_, "was" if k_ == 1 else "were")) % A_(raw["usual_account"]))
         if sc and f.get("rule_id") == "T1.DEPT_INCONSISTENCY":
             n_ = sum(sc.values())
             return "Coded to %s. Of the vendor's %d earlier lines, %s." % (
@@ -3121,13 +3129,20 @@ def coding():
     small = [f for f in drift if (f.get("amount_at_risk") or 0) < thr and f not in excepted]
     dfind = sorted([f for f in GLR["findings"] if f["rule_id"] in ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")]
                    + [f for f in drift if f not in small], key=lambda f: -(f.get("amount_at_risk") or 0))
+    # A department or account flag's id is its rule and title. Many share both (one vendor's
+    # lines moved alike), so those also take their line: its document, account, description and
+    # amount. Each then keeps its id, and its decision, note and entry, whatever order a later
+    # run lists them in; a flag whose title is its own keeps the id it had.
+    line_of = lambda f: (lambda t: (t.get("document_number"), t.get("account_code"), t.get("description") or t.get("memo"), round(t.get("amount") or 0, 2)))(
+        f.get("transaction") or (f.get("transactions") or [{}])[0])
+    twins_d = Counter((f["rule_id"], f.get("title")) for f in dfind if f["rule_id"] != "T4.ITEM_ACCOUNT_DRIFT")
     for f in dfind:
         if f in excepted:
             continue
         sc = (f.get("evidence") or {}).get("supporting_counts") or {}
         isdrift = f["rule_id"] == "T4.ITEM_ACCOUNT_DRIFT"
         iid = (sid("D", f["rule_id"], " ".join(sc["item"].split()).casefold(), sc["po_number"], sc["po_line"]) if isdrift
-               else sid("D", f["rule_id"], f.get("title")))
+               else sid("D", f["rule_id"], f.get("title"), *(line_of(f) if twins_d[(f["rule_id"], f.get("title"))] > 1 else ())))
         x = ents.get(f["finding_id"])
         vname = sc["supplier"] if isdrift else (f.get("transaction") or {}).get("vendor_or_name") or f["title"].split(":")[0].split(" coded to ")[0]
         if x:
@@ -3510,8 +3525,10 @@ def coding():
         if booked_:
             what.append("%d booked to a %s account (%s): %s" % (len(booked_), acct, prefix, money(booked_amt(booked_), True)))
         return hero(title + ", " + PERIOD, "", [("Decided", live("done", pid), ". ".join(what) or "Nothing flagged in " + PERIOD)])
-    pt_note = ('<p class="note">Left to Pass-Through Bills, whose cost breakdown has no item at or over %s, so none is a capital asset: %s.</p>'
-               % (money(THR["thr_capex"]), "; ".join("%s %s, %s" % (e(v), e(d), money(a, True)) for v, d, a in pt_settled))) if pt_settled else ""
+    pt_note = ('<p class="note">Left to Pass-Through Bills, whose cost breakdown ties to the bill and puts no item on the flagged account at or '
+               'over the %s CapEx threshold, so none is a capital asset: %s.</p>'
+               % (money(THR["thr_capex"]), "; ".join("%s %s, %s on %s, its largest item %s" % (e(v), e(d), money(a, True), e(acct), money(top, True))
+                                                     for v, d, a, acct, top in pt_settled))) if pt_settled else ""
     pages.append(page("capex", screen_hero("CapEx Flags", "capex", "capex", cap_cards, cap_booked, "Fixed Assets") + pt_note + two_way("Capital", cap_cards, cap_booked, "capex", "Fixed Assets")))
     pages.append(page("prepaid", screen_hero("Prepaid Flags", "prepaid", "prepaid", pre_cards, pre_booked, "Prepaid") + two_way("Prepaid", pre_cards, pre_booked, "prepaid", "Prepaid")))
     exc_html = ""

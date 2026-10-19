@@ -116,7 +116,7 @@ bonus accrual, interest) and none at this one. That says the GL was pulled befor
 closed. Say so with the tie's result, name the accounts, and ask for the GL again after close.
 The list leads the first page of the console too.
 
-The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.2.0.html`. Publish it as
+The last command writes `out/sep2026/serif-pl-flux-sep2026-v<version>.html` (the console version, 2.2.1 now). Publish it as
 [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML yourself:
 if it needs a change, change the script and build again.
 

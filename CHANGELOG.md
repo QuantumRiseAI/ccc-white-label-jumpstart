@@ -43,29 +43,39 @@ Console 2.2.1, GL engine 0.2.8, flux engine 0.8.2, views 1.7.2. Decisions keep t
 
 - **A check without its input is listed as not run, with the reason**, never as run with nothing
   found (design Rule 10). In the GL Coding Review, Spend with no PO needs Coupa's Supplier column
-  and Open PO commitments its Received column. The P&L Flux engine now writes `rules_run` and
-  `rules_not_run`: Forecast vs. Actual needs the month's forecast cut, Actual vs. Budget the plan,
-  Received, not invoiced Coupa's Received and Supplier columns, and the billing-pattern and
-  dropped-vendor checks earlier months of the ledger.
+  and Open PO commitments its Order Status (Header); without Received, Open PO commitments runs
+  degraded, every issued line counted as open. The P&L Flux engine now writes `rules_run` and
+  `rules_not_run`, from what each check was given: Forecast vs. Actual needs a forecast cut that
+  holds the month, Actual vs. Budget a plan that does, Received, not invoiced Coupa's Received
+  column and lines for the month (without Supplier or Approved Invoiced, or on a report at its
+  row limit, it runs degraded), and the billing-pattern, dropped-vendor and prepaid checks
+  earlier months of the ledger.
 - **Exports this month** lists the Income Statement, the Balance Sheet (P&L Flux) and NetSuite's
   lists as well, and the Coupa row says when the report stops at its row limit and which columns
   it lacks. The P&L Flux's SOX tie-outs show a Not run row for the Balance Sheet tie-outs when the
   Balance Sheet is not supplied.
-- **A pass-through bill's CapEx flag is settled by its cost breakdown**: when no item on it is at
-  or over the capitalization threshold, the bill is left to Pass-Through Bills and the CapEx page
-  says so (Sep 2026: Flagship INV19269, a MacBook Pro and AppleCare, each under $5,000).
+- **A pass-through bill's CapEx flag is settled by its cost breakdown** when the breakdown ties to
+  the bill and puts no item on the flagged account at or over the CapEx threshold: the bill is
+  left to Pass-Through Bills, and the CapEx page says so, with the bill's largest item there
+  (Sep 2026: Flagship INV19269, a MacBook Pro at $4,828.46 and AppleCare). The threshold is the
+  one the console was built with; lowering it in Settings does not bring the card back. The P&L
+  Flux does not read the breakdown and still proposes capitalizing the bill.
 - **Each capital bill gives its own reason**, from its own finding, not its vendor's first bill's.
-- **Ids that hold across runs**: two adjustments with the same kind and memo, or two CapEx or
-  Prepaid flags alike in vendor, accounts, item and department, also take their bills' documents
-  (or, for a receipt accrual, its Coupa POs), so each keeps its id and its decision whatever order
-  a later run lists them in. Every other id is unchanged.
+- **Ids that hold across runs**: items whose id would repeat another's also take what tells them
+  apart, so each keeps its id, its decision, note and edited entry whatever order a later run lists
+  them in. A department or Coupa account flag sharing its rule and title takes its line (document,
+  account, description, amount); two adjustments sharing kind and memo take their bills'
+  documents (a receipt accrual its Coupa POs) and P&L accounts; two CapEx or Prepaid flags alike
+  in vendor, accounts, item and department take their bill. Sep 2026 had 150 such department ids
+  of 250; none is left in either month. An item whose id had no repeat keeps it. A decision record
+  saved on 2.2.0 does not carry over to the items whose ids changed: they show as not in this run.
 - **Coupa department and account reasons** say what was compared ("Coupa PO FL087032703 line 1
   (DraI, $19,794.80) is on 6501100 Synthesis Costs; 2 of the item's 3 earlier lines were on
   6410000 Lab Supplies/Consumables, its usual account."), in place of counts of field names.
 - **F0.OPEX** is titled "Net P&L, every P&L account (the net loss)": it sums every P&L account,
   interest income included. Its id is unchanged.
-- `tests/test_runs.py` checks every check is listed as run or not run, and that no adjustment,
-  CapEx or Prepaid id depends on its order.
+- `tests/test_runs.py` checks that every check is listed as run or not run with a reason, that no
+  check listed as not run has findings, and that no item's id depends on its order.
 
 ## 2.2.0: one short draft per item, and the Project run fixes
 
