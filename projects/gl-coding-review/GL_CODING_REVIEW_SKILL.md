@@ -111,8 +111,8 @@ Capital in Process or a fixed asset account. Every capital recommendation says w
   placed in service; for a build-out, when employees begin using the space.
 * **An asset in service** goes to its fixed asset account, below. The policy places it in
   service at the invoice date.
-* The ledger has no in-service date. Unless the line states one, the card asks the
-  reviewer for it, and the note holds it.
+* The ledger has no in-service date. Unless the line states one, the card's Placed in
+  service says it is not known, and the reviewer gives the date in the note.
 
 | Expense account | Fixed asset account, in service |
 |---|---|
@@ -142,7 +142,8 @@ will begin, using the space.
 
 ## Load Summary
 
-Print this before anything else:
+Print this after the month, the tie's result and any missing Coupa columns (the order in
+[`PROJECT_INSTRUCTIONS.md`](PROJECT_INSTRUCTIONS.md), Each Month), before any finding:
 
 ```
 GL CODING REVIEW, DATA LOAD

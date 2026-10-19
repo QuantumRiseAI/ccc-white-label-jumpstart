@@ -65,8 +65,9 @@ ok(p["to"] == "1510000" and p["in_service"] == "8/20/2026" and not p["ask"], "a 
 p = F.capex_placement("6815000", "Lenovo ThinkStation P3 Tower", "2026-08-25")
 ok(p["to"] == "1530000" and p["kind"] == "in_service", "a computer on office equipment goes to 1530000 Computers & Software")
 p = F.capex_placement("6815000", "Conference room chairs", "2026-08-25")
-ok(p["to"] == "1505000" and p["kind"] == "no_account" and "Controller" in p["ask"] and "chart has none" in p["why"],
+ok(p["to"] == "1505000" and p["kind"] == "no_account" and "Controller" in p["ask"] and "no fixed asset account for office furniture" in p["why"],
    "office furniture in service: the chart has no account for it, so the entry holds it in Capital in Process and asks")
+ok("2026-08-25" in p.get("basis", ""), "office furniture's placement keeps its in-service basis, for the P&L Flux, which has no Placed in service field")
 chart = open(os.path.join(B, "projects", "shared", "serif-accounts-and-departments.md"), encoding="utf-8").read()
 targets = {F.CAPITAL_IN_PROCESS} | {a for a in F.CAPEX_REVIEW.values() if a} | {("1530000", "Computers & Software")}
 ok(all("%s - %s" % t in chart for t in targets), "every target is an account in Serif's chart, by its name")

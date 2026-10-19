@@ -47,7 +47,7 @@ from collections import defaultdict
 
 import serif_sources as sources
 
-ENGINE_VERSION = "0.8.0"
+ENGINE_VERSION = "0.8.1"
 RULESET_VERSION = "2026.10-uc2-flux-serif-thresholds+journal-moved"
 ENTITY = "FL87 Serif Biomedicines, Inc."
 
@@ -231,17 +231,14 @@ def capex_placement(code, text, invoice_date=""):
     if not asset:
         return {"to": CAPITAL_IN_PROCESS[0], "to_name": CAPITAL_IN_PROCESS[1], "kind": "no_account",
                 "asset": "", "in_service": in_service,
-                "why": ("Nothing on the line says it is build-out work or not yet in service, so the "
-                        "policy places it in service {}. An asset in service goes to its fixed asset "
-                        "account, and the chart has none for office furniture and equipment, so the "
-                        "entry holds it in {}.".format(placed, cip)),
+                "why": ("Serif's chart has no fixed asset account for office furniture and equipment, "
+                        "so the entry holds it in {}.".format(cip)),
+                "basis": "The policy places it in service {}.".format(placed),
                 "ask": ("Ask the Controller which fixed asset account to use, and edit the entry. "
                         + ask).strip()}
     return {"to": asset[0], "to_name": asset[1], "kind": "in_service", "asset": asset_s,
             "in_service": in_service,
-            "why": ("Nothing on the line says it is build-out work or not yet in service, so the "
-                    "policy places it in service {}. An asset in service goes to its fixed asset "
-                    "account, {}.".format(placed, asset_s)),
+            "why": "The policy places it in service {}, so it goes to {}.".format(placed, asset_s),
             "ask": ask}
 
 # Documents a customer receives. Posted to an expense account, they net income
@@ -1150,7 +1147,7 @@ def capex_findings(gl_lines, leaves, period, seq):
             ("Read bill {}. If it buys equipment or furniture with a useful life past a "
              "year, capitalize it to {} {} and depreciate from the date it is placed in service "
              "(office furniture and equipment: five years). {} {}".format(
-                 doc, asset, asset_name, place["why"], place["ask"]).strip()),
+                 doc, asset, asset_name, " ".join(x for x in (place.get("basis"), place["why"]) if x), place["ask"]).strip()),
             {"observed": "bill {} for {}{}".format(doc, money(total), (": " + text) if text else ""),
              "expected": "a capitalization decision recorded for each purchase on this account",
              "basis": "The account name asserts non-capital treatment; the policy asks whether that holds"},

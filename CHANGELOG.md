@@ -37,6 +37,84 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## 2.2.0: one short draft per item, and the Project run fixes
+
+Console 2.2.0. Decisions keep their stored verbs, so saved reviews and decision records load as
+before.
+
+- **One note per item** (SERIF-162): the GL Coding Review's `drafts.json` has `notes`, a list.
+  Each note names its `vendor`, its `check` (the item's reference ID prefix: `capex`, `fa`,
+  `prepaid`, `ppd`, `coding`, `pass`, `new` or `clear`; `dept` for a department flag with no bill), the bill's `document` for an
+  item about a bill, `recommend` and `note`, and goes on exactly one item: the first it fits. A
+  vendor with several items gets a note on each that needs one, each with its own
+  recommendation. A note no item fits is printed and listed in the Run log under **Drafts Left
+  Out**. On a line booked to the balance sheet, `entry` is Recode to Expense. The instructions
+  ask for a note only where the item's check does not settle it, one or two sentences (rarely
+  three), about that item only. An older `drafts.json` keyed by vendor
+  (`vendors`) still loads, but only when the file has no `notes`; citing a document no longer
+  limits a vendor note to some cards.
+- **One layout for every card**, in both consoles: Current coding, Proposed recode and Document
+  / item (Placed in service on a capital item; Account, Amount, P&L impact and Vendor on a flux
+  adjustment), then one write-up box, "Why it was flagged" with Claude's note beneath it under
+  "Claude" and the decision it recommends ("Recommendation: Reject", or "No recommendation: the
+  lines do not settle it"), then the item's Lines (open on a flag), its Journal Entry and Last
+  three months, and the decisions. No "Recommended" tag on a button and no chip or "what" pill in
+  a card's title. Department, Project / Program, Type, Breakdown, BS impact and Dept fields are
+  gone: the Lines and the entry show them.
+- **A card shows only its own lines**: a CapEx or Prepaid flag lists its bill's lines, and a
+  Coding changed or off plan card lists, and gives as Current coding, only the codings its entry
+  moves. Its Proposed recode names where the entry moves them, or "None proposed".
+- **The check's reason says what triggered the flag**: it no longer restates the bill, its
+  amount and description, the account it is on, the in-service date or the move the card's
+  fields show. A pass-through bill's line on another card says only whether its breakdown is in.
+  A line booked to fixed assets or prepaid says why it is listed. A P&L Flux adjustment's reason
+  is what its check found, from the finding's evidence ("Triumvirate Environmental Inc billed
+  $3,133.25 in Sep 2026, against a trailing three-month average of $15,454.07 ..."), in place of
+  the finding's recommendation, whose instructions left only "If the work stopped, no entry."
+- **The Journal Entry a card books only on Recode** stays folded away until the reviewer
+  recodes, or shows from the start where Claude recommends the recode. An entry that balances
+  shows no status; one out of balance still says so.
+- **No note box open on load**: the CapEx in-service prompt and the pass-through prompt are gone;
+  every note box opens with a decision.
+- **Reference IDs run in the order each page lists its cards**, across its tabs, so CODING-63
+  sits between CODING-62 and CODING-64. Every item on Organization & Account is CODING-NN (the
+  DEPT prefix is gone); a department item still takes a note with `check` `dept`, or `coding`
+  with its document. A Journal Entry Claude drafts later takes its place in the page's order.
+- **Writing guide** (`WRITING-GUIDE.md`, in both Projects): the style for every note,
+  commentary, summary and Memo, a technical register with sentences that carry the reasoning and
+  claims calibrated to the evidence, with before-and-after examples. Both instructions point to
+  it, and their notes examples follow it.
+- **Engine 0.8.1, views 1.7.1**: the capital placement and the CapEx and Prepaid reasons are
+  worded as above; no rule or threshold changed.
+- **Drafts Left Out** in the Run log, in both consoles: every draft the build left out, as the
+  build prints them.
+- **CODING entries keep each Project and Program**: when a coding's lines mix Projects or
+  Programs, the run-built Journal Entry moves each in its own pair of lines.
+- **A drafted entry's Lines** show only the lines its entry moves.
+- **SOX Input Files** counts every file the engine and schedules read, as the Run log does.
+- **Memo ends with the month**: every proposed entry's Memo ends with `| Mon'YY` (`| Sep'26`), as
+  the Data Entry Policy requires; the build adds it where a Memo lacks it.
+- **Budget commentary** (SERIF-173): the P&L Flux's `drafts.json` has `budget_commentary`, keyed
+  by account code, drafted beside each plan line on Actual vs. Budget, beside `commentary` (Actual
+  vs. Actual, MoM). A key with no plan line is listed as left out.
+- **Adjustments page** (SERIF-173): the Review Checklist no longer counts Section C (Billed Twice
+  After a Gap) as open, so it agrees with the badge and the Decided counter. Section B says "Not
+  run for <month>: no forecast was supplied." or "No forecast revisions in <month>." when it is
+  empty. Each adjustment's folded header shows its amount.
+- **Project instructions** (SERIF-173), in both Projects: one order for the first reply (the
+  month, the tie's result, then missing exports, Coupa columns and the row cap, then the rest),
+  in the Load Summary too; a missing export that only turns a check off is run without, and the
+  check named; `--gl netsuite_gl_detail_*`, so the pattern no longer matches
+  `netsuite_gl_detail.sql`; `--balance-sheet`, `--netsuite-ids`, `--netsuite-ref` and the
+  Flagship breakdowns are left out when their file is absent; publishing loads the
+  `artifact-capabilities` skill for the runtime contract (the Artifact tool has no `capabilities`
+  action). In the P&L Flux: payroll moves are explained from the UKG roster, and only the cutoff
+  accrual needs the payroll register; without the GL Coding Review's run and record the flux
+  shows the ledger as posted, and says so; a Flagship cost breakdown settles a capitalize or
+  prepaid adjustment on its bill and is cited in the note; adjustment notes are two short
+  sentences, since an accepted note goes into the NetSuite Memo after " | ", cut at 999
+  characters.
+
 ## 2.1.0: reviewer UI from the 15 Oct walkthrough with Scott
 
 Console 2.1.0. Decisions keep their stored verbs (`approve`, `modify`, `netsuite`, `reject`,

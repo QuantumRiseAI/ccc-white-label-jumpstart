@@ -3,14 +3,14 @@
 // record and the work paper), then shared mode on a mocked Artifact db:
 // two reviewers, attribution, a conflict, a read-only viewer, downloads, and a rerun
 // bringing in the earlier run's decisions. Needs Playwright with Chromium.
-//   node tests/test_console.js [folder holding the two aug2026 v2.1.0 consoles]   (or: make test)
+//   node tests/test_console.js [folder holding the two aug2026 v2.2.0 consoles]   (or: make test)
 // With no folder, it tests consoles/.
 let chromium; try { ({ chromium } = require('playwright')); }
 catch (e) { ({ chromium } = require(process.env.PLAYWRIGHT || '/Users/anniebritton/.npm/_npx/520e866687cefe78/node_modules/playwright')); }
 const fs = require('fs'), path = require('path'), os = require('os');
 const B = path.resolve(__dirname, '..') + '/';
 const DIR = process.argv[2];
-const FILES = DIR ? {gl: path.join(DIR, 'serif-gl-coding-review-aug2026-v2.1.0.html'), pl: path.join(DIR, 'serif-pl-flux-aug2026-v2.1.0.html')}
+const FILES = DIR ? {gl: path.join(DIR, 'serif-gl-coding-review-aug2026-v2.2.0.html'), pl: path.join(DIR, 'serif-pl-flux-aug2026-v2.2.0.html')}
   : {gl: B + 'consoles/serif-gl-coding-review.html', pl: B + 'consoles/serif-pl-flux.html'};
 let fails = 0;
 const ok = (c, m) => { console.log((c ? '  PASS ' : '  FAIL ') + m); if (!c) fails++; };
@@ -213,7 +213,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
           x.querySelectorAll('.kv > div').forEach(d => { kv[d.querySelector('.l').textContent] = d.querySelector('.x').textContent; });
           const cr = DATA.je[i].lines.filter(l => Number(l.credit));
           seen.push(cr[0].department);
-          return cr.length === 1 && /^1/.test(cr[0].account) && kv['Current coding'].startsWith(cr[0].account) && cr[0].department === kv['Department']
+          return cr.length === 1 && /^1/.test(cr[0].account) && kv['Current coding'].startsWith(cr[0].account) && kv['Current coding'].endsWith(' / ' + cr[0].department)
             && Math.abs(Number(cr[0].credit) - Number(x.dataset.amt)) < 0.005; });
         return ok_ && seen.some(d => d !== 'Non-Specific'); }),
          'gl: a bill booked to prepaid or fixed assets is reversed on its own account and department, netting the original');
@@ -253,14 +253,15 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(/under \$2,500/.test(await p.locator('#p-dept > .note, #p-dept p.note').first().innerText()), 'gl: item drift under the threshold is a count and a total');
       ok(await p.evaluate(() => { const back = Object.values(DATA.je).filter(j => j.lines.some(l => / \| Original date \d{4}-\d{2}-\d{2}$/.test(l.memo || '')));
         return back.length > 0 && back.every(j => j.date === '2026-08-31' && j.period === 'Aug 2026'); }), 'gl: entries are dated in the close month and the Line Memo keeps the original date');
-      // reference IDs: one per card, by screen, numbered largest first; each entry's Memo starts with its card's
+      // reference IDs: one per card, numbered in the order each page lists its cards; each entry's Memo starts with its card's
       const refs = await p.evaluate(() => [...document.querySelectorAll('[data-item]')].map(x => ({id: x.dataset.item, amt: Math.abs(Number(x.dataset.amt)),
         shown: (x.querySelector(':scope > .ih > .ref') || {}).textContent || '', ref: refOf(x.dataset.item)})));
       ok(refs.length > 0 && refs.length === await p.evaluate(() => Object.keys(DATA.ref).length) && refs.every(r => r.shown && r.shown === r.ref), 'gl: every card shows its reference ID in its header (' + refs.length + ')');
       ok(refs.every(r => /^(CAPEX|FA|PREPAID|PPD|DEPT|DRAFT|CODING|PASS|CLEAR|NEW)-\d{2,}$/.test(r.ref)) && new Set(refs.map(r => r.ref)).size === refs.length, 'gl: reference IDs are PREFIX-NN and unique');
-      ok(['CAPEX', 'PREPAID', 'PPD', 'DEPT'].every(s => refs.some(r => r.ref === s + '-01')) && refs.some(r => r.ref.startsWith('CAPEX-') && r.id.startsWith('C-'))
+      ok(['CAPEX', 'PREPAID', 'PPD', 'CODING'].every(s => refs.some(r => r.ref === s + '-01')) && refs.some(r => r.ref.startsWith('CAPEX-') && r.id.startsWith('C-'))
         && refs.some(r => r.ref.startsWith('PREPAID-') && r.id.startsWith('P-')) && refs.some(r => r.ref.startsWith('PPD-') && r.id.startsWith('PB-'))
-        && refs.some(r => r.ref.startsWith('DEPT-') && r.id.startsWith('D-')), 'gl: CapEx, Prepaid and Dept & Entity cards are numbered by screen');
+        && refs.some(r => r.ref.startsWith('CODING-') && r.id.startsWith('D-')) && refs.some(r => r.ref.startsWith('CODING-') && r.id.startsWith('VC-')) && !refs.some(r => r.ref.startsWith('DEPT-')),
+         'gl: CapEx and Prepaid cards are numbered by screen, and every card on Organization & Account is CODING-NN');
       // a vendor flagged Coding changed or Coded off plan has a card on Dept & Entity, numbered CODING-NN,
       // unless another card already moves that coding or the vendor is new this month
       { const run = JSON.parse(fs.readFileSync(B + 'out/aug2026/gl-coding-review/run.json', 'utf8'));
@@ -285,12 +286,30 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
             ...(r.by_coding || []).filter(c => Math.abs(c.prior || 0) + Math.abs(c.prior2 || 0) > 0.005).map(c => c.account + '|' + (c.department || 'Non-Specific'))]); };
         ok(got.some(g => g.moves) && tgt.every(t => t.to.every(c => t.from.includes(c) || allowed(t.v).has(c))),
           'gl: each entry moves the flagged codings to the vendor\'s usual coding or the plan, or leaves them for the reviewer (' + got.filter(g => g.moves).length + ' of ' + got.length + ' move)');}
-      ok(Object.values(refs.reduce((m, r) => { const [s, n] = r.ref.split('-'); (m[s] = m[s] || [])[Number(n) - 1] = r; return m; }, {}))
-        .every(xs => Array.from(xs).every((r, i) => r && (!i || xs[i - 1].amt >= r.amt))), 'gl: within a screen, numbered from 01 with no gaps, largest amount first');
+      ok(Object.values(refs.reduce((m, r) => { const [s, n] = r.ref.split('-'); (m[s] = m[s] || []).push(Number(n)); return m; }, {}))
+        .every(ns => ns.every((n, i) => n === i + 1)), 'gl: within a prefix, numbered from 01 with no gaps, in the order the page lists its cards, across its tabs');
       ok(await p.evaluate(() => Object.keys(DATA.je).every(id => refOf(id) && DATA.je[id].memo.startsWith(refOf(id) + ' | ') && / \| Aug'26$/.test(DATA.je[id].memo)
         && DATA.je[id].memo.length <= 999 && DATA.je[id].lines.every(l => l.memo.startsWith(refOf(id) + ' | ') && l.memo.length <= 999))), 'gl: each entry\'s Memo and Line Memo is REF | description | Aug\'26, within NetSuite\'s 999 characters');
       ok(await p.evaluate(() => { const m = $('#p-dept [data-jeh$="|memo"]'), id = m.dataset.jeh.split('|')[0];
         return /^(DEPT|CODING)-\d{2,}$/.test(refOf(id)) && m.value === DATA.je[id].memo && m.value.startsWith(refOf(id) + ' | '); }), 'gl: the entry editor\'s Memo carries the reference ID');
+      // every card laid out alike: one write-up box with the check's reason, the item's own lines first and open on a flag,
+      // a Journal Entry that books only on Recode hidden until then, and no "Balanced" status on an entry that balances
+      ok(await p.evaluate(() => $$('.item[data-flag]').filter(x => x.querySelector('.why')).every(x => { const a = x.querySelector('.ib > .assess');
+        return a && a.contains(x.querySelector('.why')) && a.querySelector('.ah').textContent === 'Why it was flagged' && !x.querySelector('.ih .dchip, .ih .what'); })),
+         'gl: each flag\'s reason sits in one write-up box, "Why it was flagged", with no chip in the title');
+      ok(await p.evaluate(() => $$('#p-dept .item[data-flag] .xtra').every(x => { const f = x.firstElementChild; return !x.querySelector('details.lines') || (f.matches('details.lines') && f.open); })),
+         'gl: on Organization & Account an item\'s Lines come first, open');
+      ok(await p.evaluate(() => $$('#p-dept [data-item^="VC-"]').every(x => { const id = x.dataset.item, j = DATA.je[id], f = x.querySelector('details.fold.je');
+          const cr = new Set(j.lines.filter(l => Number(l.credit)).map(l => l.account + '|' + l.department));
+          const rows = [...x.querySelectorAll('details.lines tbody tr')].map(tr => tr.children[3].querySelector('.mono').textContent + '|' + (tr.children[4].textContent || 'Non-Specific'));
+          return f && (S.dec[id] || REC[id] === 'recode' || f.hidden) && rows.every(r => cr.has(r)) && !/Lines this month/.test(x.querySelector('.kv').textContent); })),
+         'gl: a vendor flag shows only the lines its entry moves, and its entry stays folded away until Recode');
+      ok(await p.evaluate(() => $$('[data-jebal], [data-jesum]').every(t => t.textContent !== 'Balanced')), 'gl: an entry that balances shows no status');
+      ok(await p.evaluate(() => { const id = Object.keys(DATA.je).find(i => /^CODING-/.test(refOf(i))), was = S.je[id], wh = S.jh[id];
+        S.je[id] = DATA.je[id].lines.map(l => Object.assign({}, l, {memo: 'CODING-999 | saved before a rebuild'})); S.jh[id] = {memo: "CODING-999 | saved before a rebuild | Aug'26"};
+        const j = jeOf(id), r = j.memo.startsWith(refOf(id) + ' | ') && j.lines.every(l => l.memo === refOf(id) + ' | saved before a rebuild');
+        if (was) S.je[id] = was; else delete S.je[id]; if (wh) S.jh[id] = wh; else delete S.jh[id]; return r; }),
+         'gl: an entry edited before a rebuild renumbered its card carries the card\'s reference ID now');
       // a rebuild of the same run numbers every card the same; a drafted entry takes its category's next ID and moves none
       const DG = B + 'out/dist/gl-coding-review/', run = B + 'out/aug2026/gl-coding-review/run.json';
       if (fs.existsSync(DG + 'build_pages.py') && fs.existsSync(run) && fs.existsSync(B + 'inputs/aug2026')){
@@ -305,9 +324,29 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
           return JSON.parse(h.match(/window\.DATA=(.*?);<\/script>/s)[1]).ref; };
         const mine = await p.evaluate(() => DATA.ref), again = refsOf('again', []), withDraft = refsOf('draft', ['--drafts', drafts]);
         ok(again && JSON.stringify(again) === JSON.stringify(mine), 'gl: a rebuild of the same data gives the same reference IDs');
-        const nextDept = 'DEPT-' + String(Object.values(mine).filter(r => r.startsWith('DEPT-')).length + 1).padStart(2, '0');
-        ok(withDraft && Object.keys(mine).every(i => withDraft[i] === mine[i]) && Object.keys(withDraft).filter(i => !(i in mine)).map(i => withDraft[i]).join() === nextDept,
-          'gl: a drafted account recode is ' + nextDept + ', after the run\'s own, and moves no other reference ID');
+        const nr = r => Number(r.split('-')[1]), added = withDraft && Object.keys(withDraft).filter(i => !(i in mine));
+        ok(withDraft && added.length === 1 && /^CODING-\d{2,}$/.test(withDraft[added[0]])
+          && Object.keys(mine).every(i => !mine[i].startsWith('CODING-') ? withDraft[i] === mine[i]
+            : withDraft[i] === mine[i] ? nr(mine[i]) < nr(withDraft[added[0]]) : nr(withDraft[i]) === nr(mine[i]) + 1 && nr(mine[i]) >= nr(withDraft[added[0]])),
+          'gl: a drafted account recode takes CODING-NN where its page lists it; the cards after it move up one and no other ID changes');
+        // SERIF-162: a note goes on the one item it names (vendor, check, document) and on no other; a note no item fits is listed
+        const cx0 = await p.evaluate(() => { const x = $('#p-capex [data-item^="C-"]'); return x && {id: x.dataset.item, vendor: x.querySelector('.ih b').textContent,
+          doc: (DATA.docs[x.dataset.item] || '').split(' ').pop()}; });
+        if (cx0 && cx0.doc){
+          const nd = path.join(tmp, 'notes.json');
+          fs.writeFileSync(nd, JSON.stringify({notes: [
+            {vendor: cx0.vendor, check: 'capex', document: cx0.doc, recommend: 'clear', note: 'A service agreement, not an asset. It stays expense.'},
+            {vendor: 'No Such Vendor', check: 'dept', document: '000', recommend: 'question', note: 'Nothing fits this.'}]}));
+          const outN = path.join(tmp, 'notes');
+          const r = cp.spawnSync('python3', ['build_pages.py', '--only', 'coding', '--coding-run', run, '--gl', ...GL, '--out', outN, '--drafts', nd], {cwd: DG, encoding: 'utf8'});
+          const h = r.status ? '' : fs.readFileSync(path.join(outN, fs.readdirSync(outN).find(f => /^serif-gl-coding-review-.*\.html$/.test(f))), 'utf8');
+          const D = h ? JSON.parse(h.match(/window\.DATA=(.*?);<\/script>/s)[1]) : {drafts: {}};
+          const placed = Object.keys(D.drafts).filter(k => /^ven:/.test(k));
+          ok(placed.length === 1 && placed[0] === 'ven:' + cx0.id && D.drafts[placed[0]].v === 'reject' && /stays expense/.test(D.drafts[placed[0]].note),
+             'gl: a note goes on the one item it names, with its recommendation, and on no other (' + placed.join() + ')');
+          ok(/Drafts Left Out/.test(h) && /No Such Vendor, dept, document 000: no item fits it/.test(h) && /no item fits it/.test(r.stdout),
+             'gl: a note no item fits is printed and listed in the Run log');
+        } else console.log('  SKIP gl: per-item notes (no CapEx item with a document in this month)');
       } else console.log('  SKIP gl: reference IDs across builds (needs out/dist, out/aug2026 and inputs/aug2026: run tools/build.sh first)');
     }
     if (k === 'gl'){
@@ -363,15 +402,15 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       await p.evaluate(() => show('capex'));
       const cx = await p.evaluate(() => $$('#p-capex [data-flag]').map(x => { const pl = x.querySelector('[data-placed]'), nt = x.querySelector('textarea[data-note]');
         return {id: x.dataset.item, text: x.querySelector('.why').textContent, to: DATA.je[x.dataset.item].lines.find(l => Number(l.debit)).account, memo: DATA.je[x.dataset.item].memo,
-                kind: pl ? pl.dataset.placed : '', note: nt && !nt.hidden ? nt.placeholder : (x.querySelector('[data-fin]:not([hidden])') ? 'saved' : ''), name: x.querySelector('.ih b').textContent}; }));
+                kind: pl ? pl.dataset.placed : '', placed: pl ? pl.textContent : '', note: nt && !nt.hidden ? nt.placeholder : (x.querySelector('[data-fin]:not([hidden])') ? 'saved' : ''), name: x.querySelector('.ih b').textContent}; }));
       ok(cx.length > 0 && cx.every(c => c.kind && (['buildout', 'not_in_service', 'no_account'].includes(c.kind) ? c.to === '1505000' && /Capital in Process/.test(c.memo) : /^15[1-9]\d{4}$/.test(c.to) && /in service: fixed asset/.test(c.memo))),
          'gl: every CapEx card says where it goes, Capital in Process or a fixed asset account, on the card and in its Memo');
       const rt = cx.find(c => c.name === 'Red Thread Spaces LLC') || {}, rp = cx.find(c => c.name === 'Repligen Corporation') || {};
       ok(rt.kind === 'buildout' && rt.to === '1505000' && /names build-out work/.test(rt.text) && /until employees begin using the space/.test(rt.text) && !/\bAsk\b/.test(rt.text),
          'gl: the office desk expansion goes to Capital in Process as build-out work, its reason with no instruction');
-      ok(rp.kind === 'in_service' && rp.to === '1510000' && /policy places it in service at the invoice date/.test(rp.text) && !/\bAsk\b/.test(rp.text) && /In-service date/.test(rp.note) && /under the \$5,000 capitalization threshold/.test(rp.text),
-         'gl: a lab purchase goes to 1510000 Lab Equipment - New, in service at the invoice date, and asks the in-service date');
-      ok(cx.every(c => c.note === 'In-service date, and a note' || c.note === 'saved'), 'gl: each CapEx card keeps its note open for the in-service date, or shows it saved');
+      ok(rp.kind === 'in_service' && rp.to === '1510000' && /^Invoice date, .*by policy: confirm$/.test(rp.placed) && !/\bAsk\b/.test(rp.text) && /under the \$5,000 capitalization threshold/.test(rp.text),
+         'gl: a lab purchase goes to 1510000 Lab Equipment - New, its Placed in service the invoice date, by policy');
+      ok(cx.every(c => c.note === '' || c.note === 'saved'), 'gl: each CapEx card\'s note waits for a decision, as on any other card, or shows it saved');
     }
     if (k === 'pl'){
       // a variance row proposes an entry: the row's account, an offset to fill, the memo from the review; it joins the same CSV
@@ -379,7 +418,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       const btn = p.locator('#p-ava [data-propose]').first(); const pid = await btn.getAttribute('data-propose');
       await btn.click();
       ok(await p.locator('[data-jerow="' + pid + '"]').isVisible(), 'pl: Propose entry opens a Journal Entry on the variance row');
-      ok(await p.evaluate(pid => !S.dec[pid] && /^P&L flux reclass, \d{7} .+, Aug 2026: \$[\d,]+ (un)?favorable MoM$/.test(jeOf(pid).memo) && jeOf(pid).memo.length < 200 && !jeLive(pid) && !jeReady(pid), pid), 'pl: the proposal is a suggestion with a short memo, nothing approved');
+      ok(await p.evaluate(pid => !S.dec[pid] && /^P&L flux reclass, \d{7} .+, Aug 2026: \$[\d,]+ (un)?favorable MoM \| Aug'26$/.test(jeOf(pid).memo) && jeOf(pid).memo.length < 200 && !jeLive(pid) && !jeReady(pid), pid), 'pl: the proposal is a suggestion with a short memo, nothing approved');
       ok(await p.evaluate(pid => $('[data-propose="' + pid + '"]').getAttribute('aria-expanded') === 'true' && jeOf(pid).date === '2026-08-31' && jeOf(pid).period === 'Aug 2026', pid), 'pl: Propose entry is expanded; dated the last day of the close month');
       ok(await p.locator('#p-ava [data-pane="mom"] tr[data-var="0"] [data-propose]').count() === 0, 'pl: no Propose entry on a row with no variance');
       // begun and not finished is open, with the reason on export; Reset is the way back
@@ -432,12 +471,16 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.locator('#p-dept .ch', {hasText: 'Credits in Expense Accounts'}).count() === 1 && await p.locator('[data-note^="cr:"]').count() > 0, 'pl: credits in expense accounts listed');
       ok(await p.locator('[data-note="bonus:total"]').count() === 1, 'pl: bonus accrual check, in total');
       ok(await p.locator('#p-adj h3', {hasText: 'Billed Twice After a Gap'}).count() === 1, 'pl: billed twice after a gap');
+      // an adjustment's "Why it was flagged" is what the check found, not the finding's instruction
+      ok(await p.evaluate(() => { const w = $$('#p-adj [data-item^="ADJ-"] .assess .why').map(x => x.textContent);
+        return w.length > 0 && w.every(t => t.trim() && !/^(Confirm|Read|Ask|If )|If the work stopped/.test(t)) && w.some(t => /billed (nothing|\$[\d,.]+) in \w+ \d{4}, against a trailing three-month average/.test(t)); }),
+         'pl: each adjustment\'s reason states what the check found, with no instruction');
       ok(await p.locator('#p-sox .ch', {hasText: 'Related Party: Flagship'}).count() === 1, 'pl: Flagship related-party schedule');
     }
     // the run log
     await p.evaluate(() => show('runlog'));
     ok(await p.locator('#p-runlog h3', {hasText: 'What each check found'}).count() === 1, k + ': run log shows each check');
-    ok(await p.locator('#p-runlog td', {hasText: '2.1.0'}).count() >= 1, k + ': build record names 2.1.0');
+    ok(await p.locator('#p-runlog td', {hasText: '2.2.0'}).count() >= 1, k + ': build record names 2.2.0');
     // the decision record: save, then load into a clean browser
     await p.evaluate(() => show('settings'));
     const [rd] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('[data-recsave]')]);
