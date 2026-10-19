@@ -903,6 +903,7 @@ runs in a Project.
 
 | File | What it is |
 |---|---|
+| `WRITING-GUIDE.md` | The style for every note, commentary, summary and Memo you write |
 | `serif_uc1_engine.py` | The coding engine |
 | `serif_views.py` | Lays the run out as schedules; imports the prepaid and capital rules from `serif_uc2_flux.py` |
 | `serif_uc2_flux.py` | The flux engine, used here for its prepaid and capital rules |

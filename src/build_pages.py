@@ -1518,7 +1518,7 @@ function paintItems(){
     if (!fold) el.classList.remove('unfold');
     el.classList.toggle('folded', fold && !el.classList.contains('unfold'));
     el.classList.toggle('foldable', fold);
-    el.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('rec', REC[id] === b.dataset.v));
+    el.querySelectorAll(':scope > .ib > .assess').forEach(a => { a.hidden = ![...a.children].some(c => !c.hidden); });
     // one status: Review while it waits and is marked for review, Pending while it waits under it, then the decision
     const rv = el.classList.contains('hi') || Array.from(el.querySelectorAll(':scope > .ih > .tag.hi')).some(t => !t.hidden);
     const st = el.querySelector('.stp'); if (st){ st.textContent = d ? (LABEL[d.v] || d.v) + ((['modify','recode'].indexOf(d.v) > -1 && !(S.notes[id]||'').trim()) ? ', add a note' : '')
@@ -1613,7 +1613,8 @@ function shapeCards(){
     if (why || pol || pts.length || dr){
       const box = document.createElement('div'); box.className = 'assess';
       if (why || pts.length || (pol && pol.textContent.trim())){
-        const h = document.createElement('div'); h.className = 'ah'; h.textContent = why || pts.length ? 'Why it was flagged' : 'Policy'; box.appendChild(h); }
+        const h = document.createElement('div'); h.className = 'ah';
+        h.textContent = why || (pts.length && it.hasAttribute('data-flag')) ? 'Why it was flagged' : pts.length ? 'Pass-through bill' : 'Policy'; box.appendChild(h); }
       if (why){ why.classList.add('ar'); box.appendChild(why); }
       pts.forEach(p => { p.classList.add('ap'); box.appendChild(p); });
       if (pol){ if (pol.textContent.trim()){ pol.classList.add('ap'); box.appendChild(pol); } else pol.remove(); }
@@ -1624,7 +1625,7 @@ function shapeCards(){
         r.textContent = b ? 'Recommendation: ' + b.textContent : d.v ? 'Recommendation: ' + (WORDS[d.v] || d.v) : 'No recommendation: the lines do not settle it';
         dr.querySelector('.dhd').after(r); box.appendChild(dr);
       }
-      if (kv) kv.after(box); else ib.prepend(box);
+      const ck = ib.querySelector(':scope > .checks'); if (ck) ck.after(box); else if (kv) kv.after(box); else ib.prepend(box);
     }
     ib.querySelectorAll(':scope > .jee').forEach(j => { fold(j, 'Journal Entry', '<span data-jesum></span>').classList.add('je'); });
     ib.querySelectorAll(':scope > .hist').forEach(h => fold(h, 'Last three months'));
@@ -1758,7 +1759,11 @@ function download(name, text, type){
 const csv = rows => rows.map(r => r.map(c => { const s = String(c == null ? '' : c); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\n');
 /* Proposed Journal Entries: filled in from the run, edited in place. An edit
    is kept in S.je and marks the item Modified (Recode on a vendor line). */
-const jeOf = id => { const b = DATA.je[id], j = Object.assign({}, b, S.jh[id] || {});   // S.je holds the lines, S.jh the header fields edited
+/* A Memo starts with its card's reference ID. A later rebuild can renumber the cards, so an
+   edit saved earlier takes the card's ID now. */
+const reRef = (id, m) => typeof m === 'string' && refOf(id) ? m.replace(/^[A-Z]+-\d{2,} \| /, refOf(id) + ' | ') : m;
+const jeOf = id => { const j = jeOf0(id); j.memo = reRef(id, j.memo); j.lines = j.lines.map(l => Object.assign({}, l, {memo: reRef(id, l.memo)})); return j; };
+const jeOf0 = id => { const b = DATA.je[id], j = Object.assign({}, b, S.jh[id] || {});   // S.je holds the lines, S.jh the header fields edited
   /* lines saved before Project, Program, Vendor and Coupa PO were carried take the run's */
   j.lines = (S.je[id] || b.lines).map((l, i) => { const o = b.lines[i] || {}, x = l.memo == null ? Object.assign({}, l, {memo: j.memo}) : l;
     return x.project == null || x.program == null || x.vendor == null || x.po == null ? Object.assign({}, x, {project: x.project == null ? o.project || '' : x.project,
@@ -2782,7 +2787,7 @@ def coding():
         kind = next((b.get("txn_type") or "Bill" for b in PT_BILLS if b["document"] == document), "Bill")
         rv, who = PT_REV.get(document), ("%s %s: " % (e(kind), e(document))) if named else ""
         if not rv:
-            return '<div class="ptflag"><b>%sPass-through bill.</b> No cost breakdown supplied; its items are on Pass-Through Bills.</div>' % who
+            return '<div class="ptflag"><b>%sPass-through bill.</b> No cost breakdown supplied; the bill is on Pass-Through Bills.</div>' % who
         return ('<div class="ptflag"><b>%sPass-through bill, breakdown supplied.</b> %d items, %s. Its items are on Pass-Through Bills.</div>'
                 % (who, len(rv["items"]), "tying to the bill" if rv["ties"] else "not tying to the bill"))
     over = lambda k, a: k.startswith("all") or (a or 0) >= THR[k]
@@ -2917,7 +2922,7 @@ def coding():
                 p = m.get("placement") or {}
                 why, do = fl.get("why") or "", fl.get("do") or ""
                 if p and p0 and p != p0:
-                    why, do = why.replace(p0["why"], p["why"]), (do.replace(p0["ask"], p["ask"]) if p0["ask"] else (do + " " + p["ask"]).strip())
+                    why, do = (why.replace(p0["why"], p["why"]) if p0["why"] and p0["why"] in why else (why + " " + p["why"]).strip() if p.get("kind") != "in_service" else why), (do.replace(p0["ask"], p["ask"]) if p0["ask"] else (do + " " + p["ask"]).strip())
                 screen[fl["id"]].append({"vendor": r["vendor"], "from_account": m.get("account") or (it or {}).get("account") or "",
                                          "to_account": m.get("to") or (to.group(1) if to else ""), "department": (it or {}).get("department") or "",
                                          "what": (it or {}).get("text") or "", "amount": (it or {}).get("amount") if len(ms) > 1 and it else fl["amount"],

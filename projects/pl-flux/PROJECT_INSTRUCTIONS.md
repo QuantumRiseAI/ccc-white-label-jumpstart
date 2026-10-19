@@ -874,6 +874,7 @@ flux runs in a Project.
 
 | File | What it is |
 |---|---|
+| `WRITING-GUIDE.md` | The style for every note, commentary, summary and Memo you write |
 | `serif_uc2_flux.py` | The flux engine |
 | `serif_views.py` | Lays the run out as schedules and Journal Entries |
 | `build_pages.py` | Builds the console |

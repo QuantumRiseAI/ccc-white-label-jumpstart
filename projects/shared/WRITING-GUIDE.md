@@ -32,8 +32,8 @@ however. A semicolon joins two statements when the second completes the first.
 
 The same content as a run of short sentences ("Triumvirate removes lab waste. It bills
 quarterly. September is low.") loses the reasoning that connects the facts. Vary length
-naturally, but do not break a sentence to make it shorter; most sentences in a note will run
-20 to 40 words.
+naturally, but do not break a sentence to make it shorter; most sentences in a note run 20 to
+45 words.
 
 Write complete sentences. A fragment such as "Lab reagents, not equipment." is a label, not a
 finding.
@@ -74,7 +74,7 @@ it beside the note, in the words of the decision it recommends.
 ## 5. Commentary and the executive summary
 
 Account commentary states what moved, by how much and against which month or plan, and then
-the driver: the vendor, the bill or the Journal Entry behind the move, with its amount. Two or
+the driver: the vendor, the bill or the Journal Entry behind the move, with its amount. One to
 three sentences.
 
 > 6311000 Corporate Legal Fees rose $341,315.52 against August because Latham & Watkins posted

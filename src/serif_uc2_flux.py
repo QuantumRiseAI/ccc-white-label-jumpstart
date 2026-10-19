@@ -233,6 +233,7 @@ def capex_placement(code, text, invoice_date=""):
                 "asset": "", "in_service": in_service,
                 "why": ("Serif's chart has no fixed asset account for office furniture and equipment, "
                         "so the entry holds it in {}.".format(cip)),
+                "basis": "The policy places it in service {}.".format(placed),
                 "ask": ("Ask the Controller which fixed asset account to use, and edit the entry. "
                         + ask).strip()}
     return {"to": asset[0], "to_name": asset[1], "kind": "in_service", "asset": asset_s,
@@ -1146,7 +1147,7 @@ def capex_findings(gl_lines, leaves, period, seq):
             ("Read bill {}. If it buys equipment or furniture with a useful life past a "
              "year, capitalize it to {} {} and depreciate from the date it is placed in service "
              "(office furniture and equipment: five years). {} {}".format(
-                 doc, asset, asset_name, place["why"], place["ask"]).strip()),
+                 doc, asset, asset_name, " ".join(x for x in (place.get("basis"), place["why"]) if x), place["ask"]).strip()),
             {"observed": "bill {} for {}{}".format(doc, money(total), (": " + text) if text else ""),
              "expected": "a capitalization decision recorded for each purchase on this account",
              "basis": "The account name asserts non-capital treatment; the policy asks whether that holds"},

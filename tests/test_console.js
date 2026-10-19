@@ -305,6 +305,11 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
           return f && (S.dec[id] || REC[id] === 'recode' || f.hidden) && rows.every(r => cr.has(r)) && !/Lines this month/.test(x.querySelector('.kv').textContent); })),
          'gl: a vendor flag shows only the lines its entry moves, and its entry stays folded away until Recode');
       ok(await p.evaluate(() => $$('[data-jebal], [data-jesum]').every(t => t.textContent !== 'Balanced')), 'gl: an entry that balances shows no status');
+      ok(await p.evaluate(() => { const id = Object.keys(DATA.je).find(i => /^CODING-/.test(refOf(i))), was = S.je[id], wh = S.jh[id];
+        S.je[id] = DATA.je[id].lines.map(l => Object.assign({}, l, {memo: 'CODING-999 | saved before a rebuild'})); S.jh[id] = {memo: "CODING-999 | saved before a rebuild | Aug'26"};
+        const j = jeOf(id), r = j.memo.startsWith(refOf(id) + ' | ') && j.lines.every(l => l.memo === refOf(id) + ' | saved before a rebuild');
+        if (was) S.je[id] = was; else delete S.je[id]; if (wh) S.jh[id] = wh; else delete S.jh[id]; return r; }),
+         'gl: an entry edited before a rebuild renumbered its card carries the card\'s reference ID now');
       // a rebuild of the same run numbers every card the same; a drafted entry takes its category's next ID and moves none
       const DG = B + 'out/dist/gl-coding-review/', run = B + 'out/aug2026/gl-coding-review/run.json';
       if (fs.existsSync(DG + 'build_pages.py') && fs.existsSync(run) && fs.existsSync(B + 'inputs/aug2026')){
