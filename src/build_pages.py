@@ -2474,6 +2474,39 @@ def flux():
 
     # ----- Adjustments
     cards_a, cards_b, impact, used_adj = [], [], 0.0, set()
+
+    def flux_reason(f, x):
+        """Why an adjustment was flagged: what the check found, from the finding's evidence, in
+        the GL Coding Review's way. The finding's recommendation is an instruction (confirm,
+        accrue, read the bill), so the card does not carry it; Claude's note says what it means."""
+        ev, rule = f.get("evidence") or {}, f.get("rule_id") or ""
+        obs, sup = (ev.get("observed") or "").strip(), (x.get("support") or ev.get("basis") or "").strip()
+        cap = lambda t: t[:1].upper() + t[1:] if t else t
+        stop = lambda t: t if not t or t.endswith(".") else t + "."
+        vendor = (f.get("title") or "").split(":")[0].strip()
+        if rule == "F10.CAPITALIZE":
+            c = f.get("correction") or {}
+            place = c.get("placement") or {}
+            lead = ("%s is an account the asset policy reviews for capital purchases." % c["current"]) if c.get("current") else stop(sup)
+            return " ".join(t for t in (lead, place.get("basis") or "", place.get("why") or "") if t)
+        if rule == "F7.REVENUE_IN_EXPENSE" and obs:
+            return stop(obs.replace(") to ", ") is posted to ", 1)) + " A customer document goes to revenue or a receivable, not to expense."
+        m = re.match(r"(\d+) PO line\(s\) received but not yet invoiced$", obs)
+        if rule == "F3.ACCRUAL_RECEIPT" and m:
+            n, pos = int(m.group(1)), [p_.strip() for p_ in re.sub(r"^Coupa PO\s*", "", sup).split(",") if p_.strip()]
+            return "%s PO %s received but not yet invoiced%s." % (n, "line was" if n == 1 else "lines were",
+                                                                ", on Coupa %s %s" % ("PO" if len(pos) == 1 else "POs", ", ".join(pos)) if pos else "")
+        m = re.match(r"(\$[\d,.]+) billed in (\w+ \d{4}) against (.+)$", obs)
+        if rule == "F6.ACCRUAL_PATTERN" and m:
+            k = re.match(r"(\d+) invoice\(s\) in the trailing six periods(; no Coupa line this period)?", sup)
+            return "%s billed %s in %s, against %s.%s" % (vendor or "The vendor", "nothing" if m.group(1) == "$0.00" else m.group(1), m.group(2), m.group(3),
+                   (" It has %s %s in the trailing six periods%s." % (k.group(1), "invoice" if k.group(1) == "1" else "invoices", " and no Coupa line this period" if k.group(2) else "")) if k else (" " + stop(cap(sup)) if sup else ""))
+        m = re.match(r"model (\S+) against ledger (\S+) \((.+)\)$", obs)
+        if rule == "F5.MODEL_TIE" and m:
+            return "The forecast models %s against the ledger's %s (%s)%s." % (m.group(1), m.group(2), m.group(3), (", in " + sup[:1].lower() + sup[1:]) if sup else "")
+        if obs:
+            return " ".join(t for t in (stop(cap(obs)), stop(cap(sup))) if t)
+        return f.get("recommendation") or x.get("support") or x["memo"]
     for x in ent:
         f = F.get(x["finding_id"]) or {}
         aid = sid("ADJ", x.get("kind"), x["memo"])
@@ -2504,7 +2537,7 @@ def flux():
                        % (" hi" if hi else "", aid, round(x["debits"], 2), e(x.get("kind") or ""), en(x["memo"]), "", money(x["debits"], True), e(acct["account"]), e(acct_name(acct["account"])), money(x["debits"], True),
                           fav(imp, ("&#9660; Favorable " if imp > 0 else "&#9650; Unfavorable " if imp < 0 else "No P&amp;L impact") + (money(abs(imp), True) if round(imp) else "")),
                           e(", ".join(vend) or "&ndash;"),
-                          facts(en(f.get("recommendation") or x.get("support") or x["memo"])), (" " + " ".join(doc_links(d) for d in docs)) if docs else "", en(f.get("policy_basis") or ""), je_editor(aid, je[aid]["lines"]) + dhtml,
+                          facts(en(flux_reason(f, x))), (" " + " ".join(doc_links(d) for d in docs)) if docs else "", en(f.get("policy_basis") or ""), je_editor(aid, je[aid]["lines"]) + dhtml,
                           aid, e(x["memo"]), aid, e(x["memo"]), aid))
     for r in revs:
         rid = sid("REV", r["account"], r.get("department"))

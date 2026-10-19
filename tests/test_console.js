@@ -471,6 +471,10 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.locator('#p-dept .ch', {hasText: 'Credits in Expense Accounts'}).count() === 1 && await p.locator('[data-note^="cr:"]').count() > 0, 'pl: credits in expense accounts listed');
       ok(await p.locator('[data-note="bonus:total"]').count() === 1, 'pl: bonus accrual check, in total');
       ok(await p.locator('#p-adj h3', {hasText: 'Billed Twice After a Gap'}).count() === 1, 'pl: billed twice after a gap');
+      // an adjustment's "Why it was flagged" is what the check found, not the finding's instruction
+      ok(await p.evaluate(() => { const w = $$('#p-adj [data-item^="ADJ-"] .assess .why').map(x => x.textContent);
+        return w.length > 0 && w.every(t => t.trim() && !/^(Confirm|Read|Ask|If )|If the work stopped/.test(t)) && w.some(t => /billed (nothing|\$[\d,.]+) in \w+ \d{4}, against a trailing three-month average/.test(t)); }),
+         'pl: each adjustment\'s reason states what the check found, with no instruction');
       ok(await p.locator('#p-sox .ch', {hasText: 'Related Party: Flagship'}).count() === 1, 'pl: Flagship related-party schedule');
     }
     // the run log

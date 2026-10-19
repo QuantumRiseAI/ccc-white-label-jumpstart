@@ -67,7 +67,10 @@ before.
 - **The check's reason says what triggered the flag**: it no longer restates the bill, its
   amount and description, the account it is on, the in-service date or the move the card's
   fields show. A pass-through bill's line on another card says only whether its breakdown is in.
-  A line booked to fixed assets or prepaid says why it is listed.
+  A line booked to fixed assets or prepaid says why it is listed. A P&L Flux adjustment's reason
+  is what its check found, from the finding's evidence ("Triumvirate Environmental Inc billed
+  $3,133.25 in Sep 2026, against a trailing three-month average of $15,454.07 ..."), in place of
+  the finding's recommendation, whose instructions left only "If the work stopped, no entry."
 - **The Journal Entry a card books only on Recode** stays folded away until the reviewer
   recodes, or shows from the start where Claude recommends the recode. An entry that balances
   shows no status; one out of balance still says so.
