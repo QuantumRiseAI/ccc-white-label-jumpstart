@@ -30,6 +30,7 @@ serif-jumpstarts/
 ├── README.md
 ├── CHANGELOG.md               every console, engine and views version
 ├── Makefile                   make package | make build PERIOD=aug2026 | make test
+├── claude-projects/           each Claude Project's instructions and upload/ folder, as links to the files below
 ├── src/                       the scripts, one copy each: engines, views, readers, console
 ├── projects/                  what is particular to each Claude Project
 │   ├── gl-coding-review/      its instructions, how-to, skill and vendor baseline
@@ -45,8 +46,14 @@ serif-jumpstarts/
 └── out/                       build output: dist/ (the Project folders) and <period>/ (not in Git)
 ```
 
-Each file lives once. `tools/package.py` assembles each Project's upload folder, flat, in
-`out/dist/<project>/` (and a `.zip`): the scripts from `src/`, the Project's docs, the shared
+Each file lives once. `claude-projects/GL Coding Review/` and `claude-projects/P&L Flux/` show
+exactly what each Project takes: `PROJECT_INSTRUCTIONS.md` to paste, and `upload/`, every file to
+upload, to select all and drag in. Each is a relative symlink to its copy in `src/`,
+`projects/` or `templates/`, or for NetSuite's lists to `inputs/reference/` (see
+[`claude-projects/README.md`](claude-projects/README.md)).
+`tools/package.py` writes them, and `make test` fails when they are out of date. It also
+assembles each Project's upload folder, flat, with real copies, in `out/dist/<project>/` (and a
+`.zip`): the scripts from `src/`, the Project's docs, the shared
 docs and its templates. The build runs from those folders, so what is tested is what is
 uploaded. `inputs/<period>/` holds a close's exports exactly as each system writes them;
 neither engine reads a sliced or derived file.
@@ -95,7 +102,11 @@ The repo is private. `.gitignore` leaves out Serif's data: `inputs/`, `out/` (th
 local builds), the local `data/` and `status/` folders, and everything in `references/` but
 its README. Chris's two August reports are kept in `docs/spec/`. The consoles in `consoles/`
 are committed, every version: they carry the ledger, names and pay, for the accounting team. To rebuild a
-month from a clone, put its exports in `inputs/<period>/` and run `make build`.
+month from a clone, put its exports in `inputs/<period>/` and run `make build`. The simplest
+way is to link `inputs/` to the engagement's OneDrive data, whose folders are `2026-08 exports`,
+`2026-09 exports` and `netsuite reference` under `7-technical-documentation/3-data/`: make a
+folder of links named `aug2026`, `sep2026` and `reference` to them, and link `inputs` to it.
+`inputs/reference/` is also where `claude-projects/*/upload/` finds NetSuite's lists.
 
 ## Setup
 
@@ -104,18 +115,20 @@ instructions, different reference material and different run orders.
 
 Configure once:
 
-1. Run `make package`.
-2. Create a Claude Project named `Serif Biomedicines, GL Coding Review` or
+1. Create a Claude Project named `Serif Biomedicines, GL Coding Review` or
    `Serif Biomedicines, P&L Flux`.
-3. Paste `PROJECT_INSTRUCTIONS.md` from `out/dist/<project>/` into the Project Instructions
-   field. It is instructions, not an upload.
-4. Upload every other file in `out/dist/<project>/`.
+2. Paste `PROJECT_INSTRUCTIONS.md` from `claude-projects/<Project>/` into the Project
+   Instructions field. It is instructions, not an upload.
+3. Open `claude-projects/<Project>/upload/`, select every file and drag them into the Project.
+   NetSuite's three lists there link to the OneDrive data through `inputs/`, so set that up
+   first. `make package` also puts every file, as real copies, in `out/dist/<project>/` and
+   its `.zip`.
 
 Then each month:
 
-5. Start a fresh chat in the Project and attach the month's exports, as each system wrote
+4. Start a fresh chat in the Project and attach the month's exports, as each system wrote
    them. Each `HOW-TO-RUN.md` lists them under Each Month.
-6. Prompt: `Run the GL coding review for Sep 2026.` or `Run the P&L flux for Sep 2026.`
+5. Prompt: `Run the GL coding review for Sep 2026.` or `Run the P&L flux for Sep 2026.`
 
 Two things to know about Project uploads. They are **flat**, so the scripts are invoked by bare
 filename. And the header-only template files must be uploaded, since their presence

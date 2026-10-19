@@ -3,13 +3,14 @@ PERIOD ?= aug2026
 
 .PHONY: package build test clean
 
-package:  ## the two Claude Project upload folders, in out/dist/
+package:  ## the two Claude Project upload folders: claude-projects/ (committed) and out/dist/ (with NetSuite's lists and a .zip)
 	python3 tools/package.py
 
 build:    ## a close month from inputs/$(PERIOD)/, run as the Projects run it
 	bash tools/build.sh $(PERIOD)
 
-test:     ## the console tests, accepted exceptions, the export readers, the Income Statement tie, the prepaid and capital screens, every account number named, and no table scrolling sideways
+test:     ## claude-projects/ up to date, the console tests, accepted exceptions, the export readers, the Income Statement tie, the prepaid and capital screens, every account number named, and no table scrolling sideways
+	python3 tools/package.py --check
 	node tests/test_console.js
 	python3 tests/test_exceptions.py
 	python3 tests/test_readers.py

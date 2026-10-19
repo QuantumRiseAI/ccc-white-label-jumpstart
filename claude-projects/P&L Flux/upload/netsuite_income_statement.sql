@@ -1,0 +1,1 @@
+../../../src/netsuite_income_statement.sql

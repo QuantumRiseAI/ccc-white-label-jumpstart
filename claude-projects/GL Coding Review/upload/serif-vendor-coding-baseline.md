@@ -1,0 +1,1 @@
+../../../projects/gl-coding-review/serif-vendor-coding-baseline.md
