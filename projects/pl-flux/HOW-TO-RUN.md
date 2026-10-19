@@ -437,7 +437,8 @@ sign-off: Prepared by, Controller Review and CFO Approval.
 Variances are not graded high and medium. Each one is either at or over the amount that
 earns commentary, or under it. The threshold defaults to **$10,000**, the pre-close adjustment
 threshold, in dollars only, changed on the chip beside each page's title, where an optional
-percent can be added too. Change it and every page is marked again.
+percent can be added too. Change it and every page is marked again, for everyone the review is
+shared with; the change is in the Audit Log and the decision record.
 
 The engine reports every variance at or above **$2,500**, below which nothing is emitted.
 

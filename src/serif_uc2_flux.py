@@ -1654,16 +1654,18 @@ def main(argv=None):
         not_run["F2.BUDGET"] = "No plan was supplied." if not args.plan else "The plan holds no lines for %s." % period
     if not args.coupa:
         not_run["F3.ACCRUAL_RECEIPT"] = "No Coupa export supplied."
-    elif "Received" in absent_cols:
-        not_run["F3.ACCRUAL_RECEIPT"] = "The Coupa report has no Received column."
+    elif absent_cols & {"Received", "Qty", "Line Total"}:
+        # the value received and not invoiced is Line Total pro-rated by Received over Qty
+        not_run["F3.ACCRUAL_RECEIPT"] = "The Coupa report has no %s column." % " or ".join(
+            sorted(absent_cols & {"Received", "Qty", "Line Total"}))
     elif not coupa_rows:
         not_run["F3.ACCRUAL_RECEIPT"] = "The Coupa report holds no lines for %s." % period
     else:
         lacks = sorted(absent_cols & {"Supplier", "Approved Invoiced"})
-        why = (["it lacks %s" % " and ".join(lacks)] if lacks else []) + (
-            ["the report stops at its %s-row limit" % format(coupa_coverage["row_limit"], ",")] if coupa_coverage.get("row_limit") else [])
+        why = (["without Coupa's %s" % " and ".join(lacks)] if lacks else []) + (
+            ["on a Coupa report stopped at its %s-row limit" % format(coupa_coverage["row_limit"], ",")] if coupa_coverage.get("row_limit") else [])
         if why:
-            degraded["F3.ACCRUAL_RECEIPT"] = "running on a Coupa report where " + " and ".join(why)
+            degraded["F3.ACCRUAL_RECEIPT"] = "running " + ", and ".join(why)
     if not (gl_lines and history):
         for r_ in ("F6.ACCRUAL_PATTERN", "F8.VENDOR_DROPPED", "F9.PREPAID"):
             not_run[r_] = "No earlier months in the NetSuite exports."

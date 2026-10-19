@@ -46,8 +46,8 @@ Console 2.2.1, GL engine 0.2.8, flux engine 0.8.2, views 1.7.2. Decisions keep t
   and Open PO commitments its Order Status (Header); without Received, Open PO commitments runs
   degraded, every issued line counted as open. The P&L Flux engine now writes `rules_run` and
   `rules_not_run`, from what each check was given: Forecast vs. Actual needs a forecast cut that
-  holds the month, Actual vs. Budget a plan that does, Received, not invoiced Coupa's Received
-  column and lines for the month (without Supplier or Approved Invoiced, or on a report at its
+  holds the month, Actual vs. Budget a plan that does, Received, not invoiced Coupa's Received,
+  Qty and Line Total columns and lines for the month (without Supplier or Approved Invoiced, or on a report at its
   row limit, it runs degraded), and the billing-pattern, dropped-vendor and prepaid checks
   earlier months of the ledger.
 - **Exports this month** lists the Income Statement, the Balance Sheet (P&L Flux) and NetSuite's
@@ -58,23 +58,27 @@ Console 2.2.1, GL engine 0.2.8, flux engine 0.8.2, views 1.7.2. Decisions keep t
   the bill and puts no item on the flagged account at or over the CapEx threshold: the bill is
   left to Pass-Through Bills, and the CapEx page says so, with the bill's largest item there
   (Sep 2026: Flagship INV19269, a MacBook Pro at $4,828.46 and AppleCare). The threshold is the
-  one the console was built with; lowering it in Settings does not bring the card back. The P&L
+  one the console was built with; lowering it on the CapEx page does not bring the card back. The P&L
   Flux does not read the breakdown and still proposes capitalizing the bill.
 - **Each capital bill gives its own reason**, from its own finding, not its vendor's first bill's.
-- **Ids that hold across runs**: items whose id would repeat another's also take what tells them
-  apart, so each keeps its id, its decision, note and edited entry whatever order a later run lists
-  them in. A department or Coupa account flag sharing its rule and title takes its line (document,
-  account, description, amount); two adjustments sharing kind and memo take their bills'
-  documents (a receipt accrual its Coupa POs) and P&L accounts; two CapEx or Prepaid flags alike
-  in vendor, accounts, item and department take their bill. Sep 2026 had 150 such department ids
-  of 250; none is left in either month. An item whose id had no repeat keeps it. A decision record
-  saved on 2.2.0 does not carry over to the items whose ids changed: they show as not in this run.
+- **Ids that hold across runs**: each item's id carries what tells it apart, so it keeps its id,
+  its decision, note and edited entry in a later run of the close, whatever order that run lists
+  items in and whether or not a like item comes or goes (a GL pulled again after close). A
+  department or Coupa account flag takes its line (document, account, description, amount); an
+  adjustment its bills' documents (a receipt accrual its Coupa POs) and P&L accounts; a CapEx or
+  Prepaid flag its bill. Sep 2026 had 150 order-numbered department ids of 250; none is left in
+  either month. These ids change once, from 2.2.0: a decision record saved on 2.2.0 does not carry
+  over to those items, which show as not in this run.
 - **Coupa department and account reasons** say what was compared ("Coupa PO FL087032703 line 1
   (DraI, $19,794.80) is on 6501100 Synthesis Costs; 2 of the item's 3 earlier lines were on
   6410000 Lab Supplies/Consumables, its usual account."), in place of counts of field names.
-- **Thresholds are changed on their pages only**: Settings no longer has a Thresholds card. Each
-  page's chip, beside its title, already changes its own threshold, with Reset and an Audit Log
-  entry; the P&L Flux's optional percent change is on the Review threshold's chip too.
+- **Thresholds are changed on their pages only, and are the review's**: Settings no longer has a
+  Thresholds card. Each page's chip, beside its title, changes its own threshold, with Reset and
+  an Audit Log entry; the P&L Flux's optional percent change is on the Review threshold's chip
+  too. The thresholds are now a store of the review (`set`), like its decisions: seen by everyone
+  it is shared with, and saved in and loaded from the decision record. Before, they stayed in the
+  browser that changed them while the Audit Log entry was shared. A review kept before 2.2.1
+  brings its thresholds in.
 - **F0.OPEX** is titled "Net P&L, every P&L account (the net loss)": it sums every P&L account,
   interest income included. Its id is unchanged.
 - `tests/test_runs.py` checks that every check is listed as run or not run with a reason, that no

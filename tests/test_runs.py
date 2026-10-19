@@ -41,9 +41,10 @@ for path in runs:
     ok(("F5.MODEL_TIE" not in off) <= ("forecast" in has), "pl %s: Forecast vs. Actual is listed as run only with a forecast cut" % month)
     gone = set((m.get("coupa_coverage") or {}).get("columns_absent") or [])
     f3 = off.get("F3.ACCRUAL_RECEIPT") or {}
-    ok((f3.get("status") == "not_run") == (not m["coupa_coverage"].get("supplied") or "Received" in gone or not m["coupa_coverage"].get("lines")),
-       "pl %s: received-not-invoiced runs only with Coupa's Received column and lines for the month" % month)
-    ok(not (gone & {"Supplier", "Approved Invoiced"}) or "Received" in gone or not m["coupa_coverage"].get("lines") or f3.get("status") == "degraded",
+    cc = m.get("coupa_coverage") or {}
+    ok((f3.get("status") == "not_run") == (not cc.get("supplied") or bool(gone & {"Received", "Qty", "Line Total"}) or not cc.get("lines")),
+       "pl %s: received-not-invoiced runs only with Coupa's Received, Qty and Line Total columns and lines for the month" % month)
+    ok(not (gone & {"Supplier", "Approved Invoiced"}) or f3.get("status") in ("degraded", "not_run"),
        "pl %s: received-not-invoiced without Supplier or Approved Invoiced is listed as run degraded" % month)
     found = {f["rule_id"] for f in r["findings"]}
     ok(not any(x in found for x, v in off.items() if v.get("status") == "not_run"), "pl %s: no check listed as not run has findings" % month)
@@ -53,7 +54,7 @@ for path in sorted(glob.glob(os.path.join(OUT, "*", "gl-coding-review", "run.jso
     m = json.load(open(path, encoding="utf-8"))["manifest"]
     gone = set((m.get("coupa_coverage") or {}).get("columns_absent") or [])
     nr = {x["rule_id"]: x.get("status") for x in m.get("rules_not_run") or []}
-    sup = m["coupa_coverage"].get("supplied")
+    sup = (m.get("coupa_coverage") or {}).get("supplied")
     ok((nr.get("T4.OFF_PO_SPEND") == "not_run") == ("Supplier" in gone or not sup)
        and (nr.get("T4.OPEN_COMMITMENTS") == "not_run") == ("Order Status (Header)" in gone or not sup),
        "gl %s: Spend with no PO runs only with Coupa's Supplier, Open PO commitments only with its Order Status" % month)

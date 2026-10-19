@@ -492,8 +492,9 @@ entry's status.
 
 Nothing is graded high, medium and low. An item is either at or over the amount at which
 Serif corrects an exception, or under it. Each review screen has its own, changed on the chip
-beside the page's title (click the amount; Reset brings back the default), recorded in the Audit
-Log and kept with the review:
+beside the page's title (click the amount; Reset brings back the default). A change is the
+review's: recorded in the Audit Log, seen by everyone the review is shared with, and saved in the
+decision record:
 
 | Screen | Default | Why |
 |---|---|---|
