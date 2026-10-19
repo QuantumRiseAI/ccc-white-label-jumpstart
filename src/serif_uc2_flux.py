@@ -47,7 +47,7 @@ from collections import defaultdict
 
 import serif_sources as sources
 
-ENGINE_VERSION = "0.8.1"
+ENGINE_VERSION = "0.8.2"
 RULESET_VERSION = "2026.10-uc2-flux-serif-thresholds+journal-moved"
 ENTITY = "FL87 Serif Biomedicines, Inc."
 
@@ -1275,7 +1275,7 @@ def build_metrics(cur, prior, prior_year, period, prior_period, coupa_rows):
 
     now, then, year = opex(cur), opex(prior), opex(prior_year)
     metrics = [
-        {"metric_id": "F0.OPEX", "title": "Total operating expense", "period": period,
+        {"metric_id": "F0.OPEX", "title": "Net P&L, every P&L account (the net loss)", "period": period,
          "value": round(now, 2), "unit": "usd", "population": round(now, 2), "share": None,
          "policy_basis": "Population measure, not a policy test",
          "prior_value": round(then, 2), "prior_share": None,
@@ -1641,6 +1641,38 @@ def main(argv=None):
         },
     }
     run["summary"]["metric_count"] = len(run["metrics"])
+    # Which checks ran, and why any did not, from what each check was given, not from the
+    # files named: a check with nothing to read reports nothing found, which reads as clean, so
+    # it is listed as not run, with the reason (design Rule 10). One that ran on partial input
+    # is listed as run degraded, with what it lacked.
+    absent_cols = set(coupa_coverage.get("columns_absent") or [])
+    not_run, degraded = {}, {}
+    if not model:
+        not_run["F5.MODEL_TIE"] = ("No forecast cut for %s was supplied." % period if not args.forecast
+                                   else "The forecast cut holds no lines for %s." % period)
+    if not budget:
+        not_run["F2.BUDGET"] = "No plan was supplied." if not args.plan else "The plan holds no lines for %s." % period
+    if not args.coupa:
+        not_run["F3.ACCRUAL_RECEIPT"] = "No Coupa export supplied."
+    elif absent_cols & {"Received", "Qty", "Line Total"}:
+        # the value received and not invoiced is Line Total pro-rated by Received over Qty
+        not_run["F3.ACCRUAL_RECEIPT"] = "The Coupa report has no %s column." % " or ".join(
+            sorted(absent_cols & {"Received", "Qty", "Line Total"}))
+    elif not coupa_rows:
+        not_run["F3.ACCRUAL_RECEIPT"] = "The Coupa report holds no lines for %s." % period
+    else:
+        lacks = sorted(absent_cols & {"Supplier", "Approved Invoiced"})
+        why = (["without Coupa's %s" % " and ".join(lacks)] if lacks else []) + (
+            ["on a Coupa report stopped at its %s-row limit" % format(coupa_coverage["row_limit"], ",")] if coupa_coverage.get("row_limit") else [])
+        if why:
+            degraded["F3.ACCRUAL_RECEIPT"] = "running " + ", and ".join(why)
+    if not (gl_lines and history):
+        for r_ in ("F6.ACCRUAL_PATTERN", "F8.VENDOR_DROPPED", "F9.PREPAID"):
+            not_run[r_] = "No earlier months in the NetSuite exports."
+    every = [r for g in run["report"]["groups"] for r in g["rules"]]
+    run["manifest"]["rules_run"] = [r for r in every if r not in not_run]
+    run["manifest"]["rules_not_run"] = ([{"rule_id": r, "status": "not_run", "reason": why} for r, why in not_run.items()]
+                                        + [{"rule_id": r, "status": "degraded", "reason": why} for r, why in degraded.items()])
 
     out_dir = os.path.join(args.out, period.replace(" ", "").lower())
     os.makedirs(out_dir, exist_ok=True)

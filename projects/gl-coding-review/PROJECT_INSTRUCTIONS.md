@@ -122,7 +122,7 @@ bonus accrual, interest) and none at this one. That says the GL was pulled befor
 closed. Say so with the tie's result, name the accounts, and ask for the GL again after close.
 The list leads the first page of the console too.
 
-The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v2.2.0.html`. Publish it
+The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.2.1 now). Publish it
 as [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML
 yourself: if it needs a change, change the script and build again.
 
@@ -344,7 +344,7 @@ section's pages open in a bar under the header.
   NetSuite CSV (External ID, Subsidiary, Journal Date, Posting Period, Memo (with the note), Reversal Date, Account, Department, Project, Program, Name (the vendor, NetSuite's entity), Coupa PO Number, Debit, Credit and Line Memo, then, for the reviewer, Account Number, Department Name, Program Name and Reversing Entry. With NetSuite's lists, Subsidiary, Account, Department and Program carry NetSuite's internal IDs) and the **Work paper, HTML**. The same export saves the support file beside it (`...-support.html`): every entry in the import, by External ID, with its reason, the decision and who made it, the note and its lines, to attach in NetSuite with the import.
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
   supplied, what each check found, any drafts the build left out (Drafts Left Out), the
-  estimated cost of a run, the inputs and the build record. Settings has the thresholds, the decision record (save and load) and **Bring in the
+  estimated cost of a run, the inputs and the build record. Settings has the decision record (save and load) and **Bring in the
   earlier run's decisions**.
 
 Every review and vendor page opens with one **Decided** counter (0 of 5, say) and a line
@@ -382,7 +382,7 @@ HTML**; the decision record's `fixes` gives each agreed fix's path (Reclass or E
 reference ID, document and, for a reclass, External ID. A decided flag's status reads "Added to
 NetSuite CSV", "Added to NetSuite CSV, edited", "Edited manually in NetSuite" or "Rejected".
 
-The thresholds are in dollars only, one per review screen, each set in Settings: **CapEx
+The thresholds are in dollars only, one per review screen, each changed on its page's threshold chip, beside the title, and recorded in the Audit Log: **CapEx
 $5,000** and **Prepaid $25,000** (Serif's capitalization and prepaid thresholds, Mike's
 write-up of 12 Oct 2026), and **$2,500** for the rest, the account recodes on Organization &
 Account and any entry you drafted. A Department flag has none: every line off Non-Specific is

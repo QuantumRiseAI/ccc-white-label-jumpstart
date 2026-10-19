@@ -3,14 +3,14 @@
 // record and the work paper), then shared mode on a mocked Artifact db:
 // two reviewers, attribution, a conflict, a read-only viewer, downloads, and a rerun
 // bringing in the earlier run's decisions. Needs Playwright with Chromium.
-//   node tests/test_console.js [folder holding the two aug2026 v2.2.0 consoles]   (or: make test)
+//   node tests/test_console.js [folder holding the two aug2026 v2.2.1 consoles]   (or: make test)
 // With no folder, it tests consoles/.
 let chromium; try { ({ chromium } = require('playwright')); }
 catch (e) { ({ chromium } = require(process.env.PLAYWRIGHT || '/Users/anniebritton/.npm/_npx/520e866687cefe78/node_modules/playwright')); }
 const fs = require('fs'), path = require('path'), os = require('os');
 const B = path.resolve(__dirname, '..') + '/';
 const DIR = process.argv[2];
-const FILES = DIR ? {gl: path.join(DIR, 'serif-gl-coding-review-aug2026-v2.2.0.html'), pl: path.join(DIR, 'serif-pl-flux-aug2026-v2.2.0.html')}
+const FILES = DIR ? {gl: path.join(DIR, 'serif-gl-coding-review-aug2026-v2.2.1.html'), pl: path.join(DIR, 'serif-pl-flux-aug2026-v2.2.1.html')}
   : {gl: B + 'consoles/serif-gl-coding-review.html', pl: B + 'consoles/serif-pl-flux.html'};
 let fails = 0;
 const ok = (c, m) => { console.log((c ? '  PASS ' : '  FAIL ') + m); if (!c) fails++; };
@@ -119,9 +119,19 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       await p.evaluate(k => { delete S.notes[k]; save(); refresh(); }, nk);
     }
     if (k === 'pl') ok(await p.evaluate(() => { const n0 = $$('#p-ava [data-pane="mom"] tr[data-var]').filter(overThr).length;
-        S.thr_pct = 1000; refresh(); const n1 = $$('#p-ava [data-pane="mom"] tr[data-var]').filter(overThr).length, chip = $('#p-ava [data-thrv="thr"]').textContent;
-        delete S.thr_pct; save(); refresh(); return n1 < n0 && /and 1000%/.test(chip) && $$('#p-ava [data-pane="mom"] tr[data-var]').filter(overThr).length === n0; }),
+        S.set.thr_pct = 1000; refresh(); const n1 = $$('#p-ava [data-pane="mom"] tr[data-var]').filter(overThr).length, chip = $('#p-ava [data-thc="thr"]').textContent;
+        delete S.set.thr_pct; save(); refresh(); return n1 < n0 && /and 1000%/.test(chip) && $$('#p-ava [data-pane="mom"] tr[data-var]').filter(overThr).length === n0; }),
       'pl: an optional percent narrows the lines needing commentary, shows on the chip, and clears');
+    if (k === 'pl'){
+      // the percent is set on the Review threshold's chip, where the amount is, and blank turns it off; Settings has no threshold
+      await p.evaluate(() => show('ava')); await p.click('#p-ava [data-thpct]');
+      await p.fill('#p-ava input.thin', '25'); await p.press('#p-ava input.thin', 'Enter');
+      const on = await p.evaluate(() => S.set.thr_pct === 25 && /and 25%/.test($('#p-ava [data-thc="thr"]').textContent));
+      await p.click('#p-ava [data-thpct]'); await p.fill('#p-ava input.thin', ''); await p.press('#p-ava input.thin', 'Enter');
+      ok(on && await p.evaluate(() => S.set.thr_pct === undefined && /Any % change/.test($('#p-ava [data-thc="thr"]').textContent)
+           && !$('#p-settings [data-thedit], #p-settings [data-thpct], #p-settings input[inputmode="numeric"]')),
+         'pl: the percent is set and cleared on the Review threshold\'s chip, and Settings has no threshold');
+    }
     if (k === 'gl') ok(await p.evaluate(() => $$('#p-dept .item').filter(x => /Same item, two accounts/.test(x.textContent)).every(x => DATA.je[x.dataset.item] && x.querySelector('[data-v="reject"]').textContent === 'Reject')),
       'gl: a same item on two accounts is a card with the recode and Reject');
     if (k === 'pl'){
@@ -350,10 +360,15 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       } else console.log('  SKIP gl: reference IDs across builds (needs out/dist, out/aug2026 and inputs/aug2026: run tools/build.sh first)');
     }
     if (k === 'gl'){
-      // SERIF-142: a threshold per screen. CapEx and Prepaid have their own, saved like the general one; a Department flag has none
-      await p.evaluate(() => show('settings'));
-      ok(JSON.stringify(await p.evaluate(() => $$('[data-thrin]').map(t => [t.dataset.thrin, t.value]))) === JSON.stringify([['thr', '2,500'], ['thr_capex', '5,000'], ['thr_prepaid', '25,000']])
-         && /Department recodes are always reviewed/.test(await p.textContent("#p-settings")), 'gl: Settings has the review, CapEx and Prepaid thresholds ($2,500, $5,000, $25,000); department flags have none');
+      // SERIF-142: a threshold per screen. CapEx and Prepaid have their own, saved like the general one; a Department flag has none.
+      // Each is changed on its page, by its chip; Settings has none.
+      const PG = {thr: 'dept', thr_capex: 'capex', thr_prepaid: 'prepaid'};
+      const setThr = async (k, v) => { await p.evaluate(id => show(id), PG[k]); await p.click('#p-' + PG[k] + ' [data-thedit="' + k + '"]');
+        await p.fill('#p-' + PG[k] + ' input.thin', v); await p.press('#p-' + PG[k] + ' input.thin', 'Enter'); };
+      ok(JSON.stringify(await p.evaluate(() => Object.entries({thr: 'dept', thr_capex: 'capex', thr_prepaid: 'prepaid'}).map(([k, g]) => [k, $('#p-' + g + ' [data-thrv="' + k + '"]').textContent])))
+           === JSON.stringify([['thr', '$2,500'], ['thr_capex', '$5,000'], ['thr_prepaid', '$25,000']])
+         && /Always reviewed/.test(await p.textContent('#p-dept .thrchips')) && !(await p.evaluate(() => !!$('#p-settings [data-thedit], #p-settings input[inputmode="numeric"]'))),
+         'gl: the review, CapEx and Prepaid thresholds ($2,500, $5,000, $25,000) are on their pages, department flags have none, and Settings has no threshold');
       const marked = s => p.evaluate(s => $$(s).filter(x => { const g = x.querySelector(':scope > .ih > [data-rev]'); return x.classList.contains('hi') && g && !g.hidden; }).map(x => x.dataset.item), s);
       const over = (s, t) => p.evaluate(([s, t]) => $$(s).filter(x => Number(x.dataset.tamt || x.dataset.amt) >= t).map(x => x.dataset.item), [s, t]);
       const same = async (s, t) => { const a = await marked(s), b = await over(s, t); return a.length === b.length && a.every((x, i) => x === b[i]); };
@@ -361,16 +376,16 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.locator(CAP).count() >= 3 && await same(CAP, 5000) && (await marked(CAP)).length === 1, 'gl: CapEx cards are marked Review at or over $5,000 (1 of ' + await p.locator(CAP).count() + ')');
       ok(await p.locator(PRE).count() > 0 && await same(PRE, 25000), 'gl: Prepaid cards are marked Review at or over $25,000 (' + (await marked(PRE)).length + ' of ' + await p.locator(PRE).count() + ')');
       const dept = await p.evaluate(() => [$$('#p-dept [data-thr="all"]').length, $$('#p-dept [data-thr="thr"]').length]);
-      await p.fill('#thr', '1000000');
+      await setThr('thr', '1000000');
       ok(dept[0] > 0 && (await marked('#p-dept [data-thr="all"]')).length === dept[0] && dept[1] > 0 && (await marked('#p-dept [data-thr="thr"]')).length === 0,
          'gl: at a $1,000,000 review threshold every Department flag is still Review (' + dept[0] + '); account recodes are not');
       ok(await same(CAP, 5000) && await same(PRE, 25000), 'gl: the review threshold does not move CapEx or Prepaid');
       // the prepaid screen lists from the $2,500 reporting floor, as CapEx does: lowering the Prepaid threshold marks more
       const PF = '#p-prepaid [data-flag]', pf = await p.locator(PF).count();
       ok(pf > 0 && (await marked(PF)).length === (await over(PF, 25000)).length && (await over(PF, 2500)).length === pf, 'gl: prepaid flags are listed from $2,500 and marked Review from $25,000 (' + (await marked(PF)).length + ' of ' + pf + ')');
-      await p.fill('#thrprepaid', '5000');
+      await setThr('thr_prepaid', '5000');
       ok(await same(PF, 5000) && (await marked(PF)).length > (await over(PF, 25000)).length, 'gl: lowering the Prepaid threshold to $5,000 marks more prepaid flags (' + (await marked(PF)).length + ')');
-      await p.fill('#thrcapex', '3000'); await p.fill('#thrprepaid', '10000');
+      await setThr('thr_capex', '3000'); await setThr('thr_prepaid', '10000');
       ok(await same(CAP, 3000) && (await marked(CAP)).length === 2 && await same(PRE, 10000), 'gl: changing the CapEx and Prepaid thresholds marks their screens again');
       ok(await p.evaluate(() => $('#p-capex .thrchips [data-thrv="thr_capex"]').textContent === '$3,000' && /Default \$5,000/.test($('#p-capex [data-thrdef="thr_capex"]').textContent)
          && $('#p-capex [data-thc="thr_capex"]').classList.contains('chg') && $('#p-prepaid [data-thrv="thr_prepaid"]').textContent === '$10,000'
@@ -379,23 +394,29 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       // changed where it shows: the value becomes a field, Enter keeps it, Reset goes back to the default
       await p.evaluate(() => show('capex')); await p.click('#p-capex [data-thedit="thr_capex"]');
       await p.fill('#p-capex input.thin', '4,000'); await p.press('#p-capex input.thin', 'Enter');
-      ok(await p.evaluate(() => S.thr_capex === 4000 && $('#thrcapex').value === '4,000'), 'gl: a threshold changed by its title is the Settings threshold');
+      ok(await p.evaluate(() => S.set.thr_capex === 4000 && $('#p-capex [data-thrv="thr_capex"]').textContent === '$4,000'
+           && logList().some(l => l.label === 'CapEx threshold' && l.v === '$4,000')), 'gl: a threshold changed by its title is saved, and the Audit Log records it');
       await p.click('#p-capex [data-threset="thr_capex"]');
       ok(await p.evaluate(() => thrOf('thr_capex') === 5000 && $('#p-capex [data-thrdef="thr_capex"]').hidden), 'gl: Reset returns it to the default');
-      await p.evaluate(() => { S.thr_capex = 3000; save(); refresh(); });
+      await p.evaluate(() => { S.set.thr_capex = 3000; save(); refresh(); });
       await p.reload(); await p.waitForTimeout(400);
-      ok(await p.evaluate(() => S.thr === 1000000 && S.thr_capex === 3000 && S.thr_prepaid === 10000 && $('#thrcapex').value === '3,000') && await same(CAP, 3000),
+      ok(await p.evaluate(() => S.set.thr === 1000000 && S.set.thr_capex === 3000 && S.set.thr_prepaid === 10000 && $('#p-capex [data-thrv="thr_capex"]').textContent === '$3,000') && await same(CAP, 3000),
          'gl: the three thresholds are saved with the review and survive a reload');
-      await p.evaluate(() => { S.thr = DATA.thr; delete S.thr_capex; delete S.thr_prepaid; save(); refresh(); });
+      // the thresholds are the review's: in the decision record, and a record's thresholds come in like its decisions
+      ok(await p.evaluate(() => { const r = JSON.parse(JSON.stringify(recordOf())); const kept = JSON.stringify(S.set);
+        delete S.set.thr_capex; const pl = planRecord(r); const took = (pl.take.set || []).some(([k, v]) => k === 'thr_capex' && v === 3000);
+        S.set = JSON.parse(kept); return r.set && r.set.thr_capex === 3000 && took; }),
+         'gl: the thresholds are saved in the decision record, and a loaded record brings them in');
+      await p.evaluate(() => { delete S.set.thr; delete S.set.thr_capex; delete S.set.thr_prepaid; save(); refresh(); });
       // a review saved before SERIF-142 holds one threshold: it loads, keeps it, and CapEx and Prepaid take their defaults
       const c0 = await b.newContext(); const o = await c0.newPage(), key = await p.evaluate(() => KEY), idOld = await p.evaluate(() => $('#p-dept [data-flag]').dataset.item);
       o.on('pageerror', e => errs.push('gl old state: ' + e.message));
       await o.addInitScript(([k, v]) => { if (!sessionStorage.getItem('seeded')){ localStorage.setItem(k, v); sessionStorage.setItem('seeded', '1'); } },
         [key, JSON.stringify({dec: {[idOld]: {v: 'approve', at: '2026-09-02T10:00:00Z'}}, notes: {}, thr: 40000})]);
       await o.goto('file://' + FILES.gl); await o.waitForTimeout(500);
-      ok(await o.evaluate(id => S.thr === 40000 && thrOf('thr_capex') === 5000 && thrOf('thr_prepaid') === 25000 && (S.dec[id] || {}).v === 'approve' && decided(id), idOld),
+      ok(await o.evaluate(id => S.set.thr === 40000 && thrOf('thr_capex') === 5000 && thrOf('thr_prepaid') === 25000 && (S.dec[id] || {}).v === 'approve' && decided(id), idOld),
          'gl: a review saved with one threshold restores, its decisions and threshold kept, CapEx and Prepaid at their defaults');
-      ok(await o.evaluate(() => $$('#p-dept [data-thr="thr"]').every(x => x.classList.contains('hi') === Number(x.dataset.amt) >= 40000) && $('#thr').value === '40,000'), 'gl: its threshold marks the account recodes');
+      ok(await o.evaluate(() => $$('#p-dept [data-thr="thr"]').every(x => x.classList.contains('hi') === Number(x.dataset.amt) >= 40000) && $('#p-dept [data-thrv="thr"]').textContent === '$40,000'), 'gl: its threshold marks the account recodes');
       await c0.close();
       // SERIF-147: each CapEx recommendation says whether it goes to Capital in Process or its fixed asset account and why; the note asks
       // the in-service date. SERIF-172: the reason states what was found, not what to do, so it carries no 'Ask ...' sentence.
@@ -480,7 +501,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     // the run log
     await p.evaluate(() => show('runlog'));
     ok(await p.locator('#p-runlog h3', {hasText: 'What each check found'}).count() === 1, k + ': run log shows each check');
-    ok(await p.locator('#p-runlog td', {hasText: '2.2.0'}).count() >= 1, k + ': build record names 2.2.0');
+    ok(await p.locator('#p-runlog td', {hasText: '2.2.1'}).count() >= 1, k + ': build record names 2.2.1');
     // the decision record: save, then load into a clean browser
     await p.evaluate(() => show('settings'));
     const [rd] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('[data-recsave]')]);
@@ -539,6 +560,15 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     await sleep(1500);
     ok(await Bp.evaluate(id => (S.dec[id] || {}).v === 'approve', ids[0]), 'B sees A\'s decision');
     ok(await A.evaluate(id => (S.dec[id] || {}).v === 'reject', ids[1]), 'A sees B\'s decision');
+    // a threshold is the review's: one reviewer changes it on its page's chip and the other's console marks by it
+    await A.evaluate(() => { show(DATA.kind === 'coding' ? 'capex' : 'ava'); });
+    const tk = k === 'gl' ? 'thr_capex' : 'thr', tp = k === 'gl' ? '#p-capex' : '#p-ava';
+    await A.click(tp + ' [data-thedit="' + tk + '"]'); await A.fill(tp + ' input.thin', '4,321'); await A.press(tp + ' input.thin', 'Enter');
+    await sleep(1500);
+    ok(await Bp.evaluate(k => thrOf(k) === 4321 && $$('[data-thrv="' + k + '"]').every(x => x.textContent === '$4,321'), tk),
+       'B sees A\'s threshold change, and marks by it');
+    await A.evaluate(k => { delete S.set[k]; save(); refresh(); }, tk); await sleep(1200);
+    ok(await Bp.evaluate(k => thrOf(k) === DATA[k], tk), 'B sees the threshold reset');
     const stp = await A.evaluate(id => document.querySelector('[data-item="' + id + '"] .stp').textContent, ids[1]);
     ok(/Bob Checker/.test(stp), 'decision named by who made it: ' + stp);
     const nsId = k === 'gl' ? await A.evaluate(() => $('#p-dept [data-flag] [data-v="netsuite"]').closest('[data-item]').dataset.item) : null;

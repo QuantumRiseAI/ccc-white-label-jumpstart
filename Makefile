@@ -9,7 +9,7 @@ package:  ## the two Claude Project upload folders: claude-projects/ (committed)
 build:    ## a close month from inputs/$(PERIOD)/, run as the Projects run it
 	bash tools/build.sh $(PERIOD)
 
-test:     ## claude-projects/ up to date, the console tests, accepted exceptions, the export readers, the Income Statement tie, the prepaid and capital screens, every account number named, and no table scrolling sideways
+test:     ## claude-projects/ up to date, checks run or listed as not run, stable item ids, the console tests, accepted exceptions, the export readers, the Income Statement tie, the prepaid and capital screens, every account number named, and no table scrolling sideways
 	python3 tools/package.py --check
 	node tests/test_console.js
 	python3 tests/test_exceptions.py
@@ -18,6 +18,7 @@ test:     ## claude-projects/ up to date, the console tests, accepted exceptions
 	python3 tests/test_screens.py
 	python3 tests/test_passthrough.py
 	python3 tests/test_facts.py
+	python3 tests/test_runs.py
 	node tests/test_flux_coding.js
 	node tests/audit_account_names.js
 	node tests/audit_table_width.js 1280

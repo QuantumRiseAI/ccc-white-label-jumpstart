@@ -92,7 +92,7 @@ In a Claude Project every uploaded file sits at the top level, so all of these a
 filenames. In the repo, `make build PERIOD=sep2026` runs the same commands from the packaged
 Project folder on the exports in `inputs/sep2026/`.
 
-The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v2.2.0.html`, one
+The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.2.1 now), one
 self-contained file that opens in any browser. That is the deliverable.
 
 The filename carries the period and the console version, so builds of different versions do
@@ -491,8 +491,10 @@ entry's status.
 ### The Threshold
 
 Nothing is graded high, medium and low. An item is either at or over the amount at which
-Serif corrects an exception, or under it. Each review screen has its own, set in Settings and
-kept in this browser with the review:
+Serif corrects an exception, or under it. Each review screen has its own, changed on the chip
+beside the page's title (click the amount; Reset brings back the default). A change is the
+review's: recorded in the Audit Log, seen by everyone the review is shared with, and saved in the
+decision record:
 
 | Screen | Default | Why |
 |---|---|---|

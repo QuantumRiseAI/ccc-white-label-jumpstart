@@ -33,7 +33,7 @@ prepaid and capital screens list from the **$2,500** reporting floor, so a revie
 below the line; a flag under its threshold says it stays expense, and the P&L Flux proposes
 no prepaid entry under $25,000 and no capital entry under $5,000.
 
-The GL Coding Review gives each review screen its own threshold, in Settings: CapEx at
+The GL Coding Review gives each review screen its own threshold, changed on the page's threshold chip: CapEx at
 **$5,000**, Prepaid at **$25,000**, the others at **$2,500**. Department flags have none:
 every line off Non-Specific is recoded, whatever its size. The P&L Flux commentary threshold
 is a separate question, still open with Serif.

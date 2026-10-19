@@ -36,7 +36,7 @@ sys.path.insert(0, HERE)
 import serif_sources as SS  # noqa: E402
 import serif_design as DS   # noqa: E402
 
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 ap = argparse.ArgumentParser(description="Build the GL Coding Review and P&L Flux consoles.")
 ap.add_argument("--only", choices=("coding", "flux"), help="build one console; both by default")
 ap.add_argument("--coding-run", help="the GL Coding Review run.json, after serif_views.py --keep-names")
@@ -938,7 +938,6 @@ details.lines td small{display:block;color:var(--color-fg-secondary)}
 .tiebar .pad{display:flex;flex-wrap:wrap;gap:.25em 1em;align-items:baseline}
 .tiebar.bad{box-shadow:inset 3px 0 0 var(--color-red-text)}.tiebar.bad b{color:var(--color-red-text)}
 .tiebar.none{box-shadow:inset 3px 0 0 var(--color-mid-gray)}
-.setcard{display:flex;align-items:center;gap:var(--spacing-xs)}
 #sharedbar{background-color:var(--color-bg-inverse);color:var(--color-warm-gray);font-size:var(--text--1);padding:.45em var(--spacing-md-lg);border-top:1px solid rgba(255,255,255,.1)}
 #toast{position:fixed;left:50%;bottom:var(--spacing-md);transform:translateX(-50%);z-index:40;background-color:var(--color-bg-inverse);color:#fff;
   font-size:var(--text--1);padding:.7em 1.1em;border-radius:var(--radius-xs);max-width:min(36rem,90vw)}
@@ -975,7 +974,10 @@ def runlog(run, kind, also=None, read=()):
     """The run log: the exports, what each check found, the estimated cost of a
     run, every input, and the build record."""
     m, views = run.get("manifest") or {}, run.get("views") or {}
-    out = [DS.exports_card(m, views), DS.checks_card(run)]
+    # the reports the build itself reads, beside the exports the engine and schedules read
+    extra = {"netsuite_income_statement": [p_ for p_ in IS_X or [] if os.path.exists(p_)],
+             "netsuite_ref": [p_ for p_ in A.netsuite_ref or [] if os.path.exists(p_)]}
+    out = [DS.exports_card(m, views, extra), DS.checks_card(run)]
     if SKIPPED:
         out.append('<div class="card"><h3>Drafts Left Out</h3><div class="tw"><table><tbody>%s</tbody></table></div></div>'
                    % "".join("<tr><td>%s</td></tr>" % e(x) for x in SKIPPED))
@@ -1127,18 +1129,8 @@ def shell(title, product, sections, pages, data, js):
             '<button id="tosign" class="tosign" data-tosign hidden><span data-tosignn>Sign Off</span><span aria-hidden="true">&darr;</span></button>'
             '<div id="ask" hidden><div class="askbox" role="dialog" aria-modal="true"><h3></h3><div class="askbody"></div><div class="acts">'
             '<button class="pill solid" data-askok>OK</button><button class="pill" data-askno>Cancel</button></div></div></div><main>' + "".join(pages)
-            + page("settings", hero("Settings", "", []) + '<div class="card"><h3>Thresholds</h3>' + "".join(
-                       '<div class="pad setcard"><label for="%s"%s>%s</label><span>$</span><input class="f" id="%s" data-thrin="%s" inputmode="numeric" style="width:9ch">%s</div>'
-                       % (i, ' style="min-width:9.5rem"' if n else "", lab, i, k, n)
-                       for i, k, lab, n in ((("thr", "thr", "Review threshold", ""),) if data.get("kind") != "coding" else (
-                           ("thr", "thr", "Account recode threshold", '<span class="note">Dept &amp; Entity account recodes, and drafted entries</span>'),
-                           ("thrcapex", "thr_capex", "CapEx threshold", '<span class="note">CapEx Flags</span>'),
-                           ("thrprepaid", "thr_prepaid", "Prepaid threshold", '<span class="note">Prepaid Flags</span>'))))
-                   + ('<div class="pad setcard"><span class="note">Department recodes are always reviewed, whatever their size.</span></div>'
-                      if data.get("kind") == "coding" else
-                      '<div class="pad setcard"><label for="thrpct" style="min-width:9.5rem">And percent change</label><input class="f" id="thrpct" data-thrpct inputmode="numeric" style="width:6ch" placeholder="off"><span>%</span>'
-                      '<span class="note">Optional. Set it and a line needs commentary only when it moved by the review threshold and by this percent too.</span></div>') + "</div>"
-                   '<div class="card"><h3>Decision record</h3><div class="pad acts"><button class="pill" data-recsave>Save decision record</button>'
+            + page("settings", hero("Settings", "", [])
+                   + '<div class="card"><h3>Decision record</h3><div class="pad acts"><button class="pill" data-recsave>Save decision record</button>'
                    '<button class="pill" data-recload>Load decision record</button><input type="file" id="recfile" accept=".json,application/json" hidden>'
                    '<button class="pill" data-carry hidden>Bring in the earlier run&rsquo;s decisions</button></div></div>')
             + '<datalist id="accts">' + "".join('<option value="%s">%s</option>' % (e(k), e(v)) for k, v in sorted(ACC.items()) if v) + "</datalist>"
@@ -1158,11 +1150,14 @@ const KEY = 'serif-console::' + DATA.kind + '::' + DATA.run;
    log. The thresholds are this browser's settings: thr, and on the GL Coding Review
    thr_capex and thr_prepaid, each falling back to the build's default, so a state saved
    with thr alone keeps it and takes the CapEx and Prepaid defaults. */
-const STORES = ['dec', 'notes', 'fin', 'je', 'jh', 'ck', 'sign', 'log'];
+const STORES = ['dec', 'notes', 'fin', 'je', 'jh', 'ck', 'sign', 'log', 'set'];
 const refOf = id => (DATA.ref || {})[id] || '';
-let S = {dec: {}, notes: {}, fin: {}, sign: {}, ck: {}, je: {}, jh: {}, log: {}, thr: DATA.thr};
+let S = {dec: {}, notes: {}, fin: {}, sign: {}, ck: {}, je: {}, jh: {}, log: {}, set: {}};
 let hadFin = true;
 try { const kept = JSON.parse(localStorage.getItem(KEY) || '{}'); hadFin = 'fin' in kept || !Object.keys(kept.notes || {}).length; S = Object.assign(S, kept); } catch (e) {}
+/* The thresholds are the review's, shared and saved in the record like its decisions (set).
+   A review kept before 2.2.1 held them loose on S: they move in, a default left behind. */
+['thr', 'thr_capex', 'thr_prepaid', 'thr_pct'].forEach(k => { if (S[k] != null && S.set[k] == null && !(k === 'thr' && Number(S[k]) === DATA.thr)) S.set[k] = Number(S[k]); delete S[k]; });
 // Notes written before notes were saved count as saved, once: a review kept from before the
 // saved store existed. A note typed and not saved since stays unsaved.
 if (!hadFin) Object.keys(S.notes || {}).forEach(k => { if (String(S.notes[k] || '').trim() && !S.fin[k]) S.fin[k] = {text: String(S.notes[k]), at: '', by_uid: null}; });
@@ -1349,7 +1344,7 @@ const Shared = (function(){
   }
   /* A viewer cannot type into a field their access does not let them save. */
   document.addEventListener('beforeinput', ev => { if (!st.on || !st.ro) return; const t = ev.target;
-    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT') && t.dataset.thrin === undefined) ev.preventDefault(); }, true);
+    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) ev.preventDefault(); }, true);
   return {start: start, changed: changed, earlierRecord: earlierRecord,
           on: () => st.on, ro: () => st.on && st.ro, uid: () => st.on ? st.uid : null, name: nameOf};
 })();
@@ -1391,7 +1386,7 @@ function saveRecord(){
 function planRecord(rec){
   const here = {dec: new Set($$('[data-item],[data-jerow]').map(x => x.dataset.item || x.dataset.jerow)), ck: new Set($$('[data-ckrow]').map(x => x.dataset.ckrow)),
                 sign: new Set($$('[data-sname]').map(x => x.dataset.sname)), notes: new Set($$('[data-note]').map(x => x.dataset.note))};
-  here.je = new Set(Object.keys(DATA.je)); here.jh = here.je; here.fin = here.notes; here.log = null;
+  here.je = new Set(Object.keys(DATA.je)); here.jh = here.je; here.fin = here.notes; here.log = null; here.set = null;
   const p = {take: {}, add: 0, kept: 0, missed: 0};
   STORES.forEach(n => { p.take[n] = [];
     Object.keys(rec[n] || {}).forEach(k => { const v = rec[n][k];
@@ -1483,9 +1478,6 @@ document.addEventListener('input', ev => {
     const bar = $('[data-fbar="' + CSS.escape(t.dataset.note) + '"]'); if (bar){ bar.hidden = !t.value.trim();
       bar.querySelector('.uns').textContent = S.fin[t.dataset.note] ? 'Changed since saved' : 'Not saved'; } t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; save(); return; }
   if (t.dataset.jef || t.dataset.jeh){ editJE(t); return; }
-  if (t.dataset.thrpct !== undefined){ const v = Number(String(t.value).replace(/[^0-9.]/g, ''));
-    if (isFinite(v) && v > 0) S.thr_pct = v; else delete S.thr_pct; save(); refresh(); return; }
-  if (t.dataset.thrin){ const v = Number(String(t.value).replace(/[^0-9.]/g, '')); if (isFinite(v) && v > 0){ S[t.dataset.thrin] = v; save(); refresh(); } }
 });
 /* tabs are announced as tabs, the selected one marked */
 $$('.tabs').forEach(tl => { tl.setAttribute('role', 'tablist');
@@ -1662,6 +1654,7 @@ function shapeThresholds(){
       ? '<span class="thc none" data-tipsm data-tip="' + esc(THR_TXT[k][1]) + '"><span class="tl">' + THR_TXT[k][0] + '</span><span class="tv0">Always reviewed</span></span>'
       : '<span class="thc" data-thc="' + k + '" data-tipsm data-tip=""><span class="tl">' + THR_TXT[k][0] + '</span>'
         + '<button class="tv" data-thedit="' + k + '" aria-label="Change the ' + THR_TXT[k][0] + '"><span data-thrv="' + k + '"></span>' + PENCIL + '</button>'
+        + (k === 'thr' && DATA.kind !== 'coding' ? '<button class="tv pct" data-thpct aria-label="Change the percent change a line also needs"><span data-thrpv></span>' + PENCIL + '</button>' : '')
         + '<span class="def" data-thrdef="' + k + '" hidden></span></span>').join('');
     // beside the page's title: in the hero, or on the title line of a page without one
     const hero = pg.querySelector(':scope > .hero'), t = hero ? hero.querySelector('h1') : pg.querySelector(':scope > h3');
@@ -1669,27 +1662,42 @@ function shapeThresholds(){
     else pg.prepend(box); });
 }
 function paintThresholds(){
-  $$('[data-thrv]').forEach(x => { x.textContent = money(thrOf(x.dataset.thrv)) + (x.dataset.thrv === 'thr' && DATA.kind !== 'coding' && pctThr() ? ' and ' + pctThr() + '%' : ''); });
-  $$('[data-thrpct]').forEach(t => { if (document.activeElement !== t) t.value = pctThr() || ''; });
+  $$('[data-thrv]').forEach(x => { x.textContent = money(thrOf(x.dataset.thrv)); });
+  $$('[data-thrpv]').forEach(x => { x.textContent = pctThr() ? 'and ' + pctThr() + '%' : 'Any % change';
+    x.parentElement.setAttribute('aria-label', x.textContent + ': change the percent change a line also needs'); });
+  $$('[data-thedit]').forEach(b => { const k = b.dataset.thedit; b.setAttribute('aria-label', THR_TXT[k][0] + ' ' + money(thrOf(k)) + ': change it'); });
   $$('[data-thc]').forEach(c => { const k = c.dataset.thc; c.dataset.tip = esc(THR_TXT[k][1].replace('{v}', money(thrOf(k)) + (k === 'thr' && DATA.kind !== 'coding' && pctThr() ? ' and ' + pctThr() + '%' : ''))); });
   $$('[data-thrdef]').forEach(x => { const k = x.dataset.thrdef, d = Number(DATA[k]) || DATA.thr, v = thrOf(k);
     x.hidden = v === d; x.innerHTML = v === d ? '' : 'Default ' + money(d) + ' <button class="lk" data-threset="' + k + '">Reset</button>';
     x.closest('.thc').classList.toggle('chg', v !== d); });
 }
 // A threshold is changed where it shows: its value becomes a field; Enter or leaving it keeps
-// the new value, Escape leaves it as it was.
+// the new value, Escape leaves it as it was. On the P&L Flux the Review threshold also takes an
+// optional percent: a line then needs commentary only when it moved by both; blank turns it off.
 document.addEventListener('click', ev => {
+  const pc = ev.target.closest('[data-thpct]');
+  if (pc){ if (blocked()) return; const inp = document.createElement('input');
+    inp.className = 'thin'; inp.inputMode = 'numeric'; inp.value = pctThr() || ''; inp.placeholder = 'off'; inp.setAttribute('aria-label', pc.getAttribute('aria-label'));
+    let fin = false;
+    const done = keep => { if (fin) return; fin = true; const v = Number(String(inp.value).replace(/[^0-9.]/g, ''));
+      inp.replaceWith(pc); if (!keep) return; const raw = String(inp.value).trim();
+      if (raw && !/^\d+(\.\d+)?%?$/.test(raw)) return;   // not a percent: left as it was; blank turns it off
+      const now = isFinite(v) && v > 0 ? v : 0;
+      if (now !== pctThr()){ if (now) S.set.thr_pct = now; else delete S.set.thr_pct; logAdd({id: 'thr_pct', label: 'Percent change', v: now ? now + '%' : 'off', note: ''}); save(); refresh(); } };
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(true); else if (e.key === 'Escape') done(false); });
+    inp.addEventListener('blur', () => done(true));
+    pc.replaceWith(inp); inp.focus(); inp.select(); return; }
   const ed = ev.target.closest('[data-thedit]');
   if (ed){ if (blocked()) return; const k = ed.dataset.thedit, inp = document.createElement('input');
     inp.className = 'thin'; inp.inputMode = 'numeric'; inp.value = thrOf(k).toLocaleString('en-US'); inp.setAttribute('aria-label', ed.getAttribute('aria-label'));
     let fin = false;
     const done = keep => { if (fin) return; fin = true; const v = Number(String(inp.value).replace(/[^0-9.]/g, ''));
-      inp.replaceWith(ed); if (keep && isFinite(v) && v > 0 && v !== thrOf(k)){ S[k] = v; logAdd({id: k, label: THR_TXT[k][0], v: money(v), note: ''}); save(); refresh(); } };
+      inp.replaceWith(ed); if (keep && isFinite(v) && v > 0 && v !== thrOf(k)){ S.set[k] = v; logAdd({id: k, label: THR_TXT[k][0], v: money(v), note: ''}); save(); refresh(); } };
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(true); else if (e.key === 'Escape') done(false); });
     inp.addEventListener('blur', () => done(true));
     ed.replaceWith(inp); inp.focus(); inp.select(); return; }
   const rs = ev.target.closest('[data-threset]');
-  if (rs){ if (blocked()) return; const k = rs.dataset.threset; if (k === 'thr') S.thr = DATA.thr; else delete S[k];
+  if (rs){ if (blocked()) return; const k = rs.dataset.threset; delete S.set[k];
     logAdd({id: k, label: THR_TXT[k][0], v: 'default', note: ''}); save(); refresh(); }
 });
 document.addEventListener('click', ev => {
@@ -1907,7 +1915,7 @@ function alertBox(msg){ const t = $('#tip'); t.innerHTML = esc(msg); t.style.dis
    commentary. */
 function checklist(){
   const host = $('[data-checklist]'); if (!host) return;
-  const thr = S.thr || DATA.thr, rows = [];
+  const thr = thrOf('thr'), rows = [];
   $$('.tb.pg').forEach(b => { const pid = b.dataset.p, pg = $('#p-' + pid); if (!pg || pid === 'ov' || pid === 'settings' || pid === 'runlog') return;
     let total = 0, open = 0, value = 0;
     pg.querySelectorAll('[data-item]').forEach(x => { total++; if (!decided(x.dataset.item)){ open++; value += Number(x.dataset.amt) || 0; } });
@@ -1926,18 +1934,17 @@ document.addEventListener('click', ev => { const h = ev.target.closest('.item.fo
   const el = h.parentElement; el.classList.toggle('unfold', el.classList.contains('folded')); paintItems(); });
 /* a line at or over the threshold is marked for review; a card, at or over its screen's
    (data-thr names it; "all" is always reviewed) */
-const thrOf = k => Number(S[k]) || DATA[k] || S.thr || DATA.thr;
+const thrOf = k => Number(S.set[k]) || DATA[k] || Number(S.set.thr) || DATA.thr;
 /* A line needs review at or over the dollar threshold and, when a percent is set, at or over that
    percent of its comparison too (a line with no comparison is judged on dollars alone). */
-const pctThr = () => Number(S.thr_pct) || 0;
-function overThr(tr){ const v = Math.abs(Number(tr.dataset.var) || 0); if (v < (S.thr || DATA.thr)) return false;
+const pctThr = () => Number(S.set.thr_pct) || 0;
+function overThr(tr){ const v = Math.abs(Number(tr.dataset.var) || 0); if (v < (thrOf('thr'))) return false;
   const p = pctThr(), b = Math.abs(Number(tr.dataset.base) || 0); return !p || !b || 100 * v / b >= p; }
 function marks(){
   $$('.item[data-thr]').forEach(x => { const k = x.dataset.thr, hi = k.startsWith('all') || Number(x.dataset.tamt || x.dataset.amt) >= thrOf(k);
     x.classList.toggle('hi', hi); const g = x.querySelector(':scope > .ih > [data-rev]'); if (g) g.hidden = !hi; });
-  $$('[data-thrin]').forEach(t => { if (document.activeElement !== t) t.value = thrOf(t.dataset.thrin).toLocaleString('en-US'); });
   if (typeof paintThresholds === 'function') paintThresholds();
-  const thr = S.thr || DATA.thr;
+  const thr = thrOf('thr');
   $$('tr[data-var]').forEach(tr => {
     const k = overThr(tr) ? 'rev' : 'ok';
     tr.classList.toggle('crit', k === 'rev'); tr.classList.remove('mat');
@@ -2507,9 +2514,16 @@ def flux():
         if obs:
             return " ".join(t for t in (stop(cap(obs)), stop(cap(sup))) if t)
         return f.get("recommendation") or x.get("support") or x["memo"]
+    # An adjustment's id is its kind, memo, bills (or, for a receipt accrual, its Coupa POs) and
+    # P&L accounts, so two alike (two Flagship bills capitalized alike, two receipt accruals) each
+    # keep their own id, and decision, in a later run, whatever its order and whether or not a
+    # like one comes or goes.
     for x in ent:
         f = F.get(x["finding_id"]) or {}
-        aid = sid("ADJ", x.get("kind"), x["memo"])
+        bills = {d for l in x["lines"] for d in (l.get("documents") or [])} or \
+            {t.get("document_number") for t in f.get("transactions") or [] if t.get("document_number")} or \
+            {x.get("support") or ""}   # a receipt accrual has no bill; its Coupa POs tell it apart
+        aid = sid("ADJ", x.get("kind"), x["memo"], *(sorted(bills) + sorted({l["account"] for l in x["lines"] if PNL(l["account"])})))
         pl = [l for l in x["lines"] if PNL(l["account"])]
         imp = sum((l.get("credit") or 0) - (l.get("debit") or 0) for l in pl)
         impact += imp
@@ -2621,6 +2635,9 @@ def flux():
         tie("Expense accounts 6xxxxxx", gsum("6"), isv("Total - 6000000 - Operating Expenses"), "GL 6xxxxxx", "Income Statement")
         tie("Total expense", gsum("6") + gsum("7"), isv("Total - Expense"), "GL 6xxxxxx and 7xxxxxx", "Income Statement")
         tie("Net income", gl_ni, isv("Total - Income") - isv("Total - Expense") + isv("Total - Other Income") - isv("Total - Other Expense"), "GL", "Income Statement")
+    if not bs["rows"]:
+        ties.append('<tr><td>Balance Sheet tie-outs: net income, balances, cash, prepaids, fixed assets, depreciation, payables and accruals</td>'
+                    '<td class="n2" colspan="2">They need the NetSuite Balance Sheet report</td><td>Not run</td></tr>')
     if bs["rows"]:
         tie("Net income", gl_ni, bsv("Net Income", PERIOD) - bsv("Net Income", PRIOR), "GL", "Balance Sheet, change in Net Income")
         tie("Balance sheet balances", bsv("Total ASSETS", PERIOD), bsv("Total Liabilities & Equity", PERIOD), "Total assets", "Total liabilities and equity")
@@ -2675,7 +2692,7 @@ def flux():
     js = r"""
 function refresh(){
   marks(); paintItems(); counts(); signs(); checklist();
-  const thr = S.thr || DATA.thr, over = vs => vs.filter(overThr);
+  const thr = thrOf('thr'), over = vs => vs.filter(overThr);
   const mom = over($$('#p-ava [data-pane="mom"] tr[data-var]'));
   $$('[data-cm]').forEach(x => x.textContent = mom.length);
   $$('[data-cmn]').forEach(x => x.textContent = 'Moved ' + money(thr) + ' or more vs. ' + DATA.prior);
@@ -2692,7 +2709,7 @@ function refresh(){
 /* The flux pack: what the close hands on, read-only. Only saved writing goes in; what is
    still open is listed, so the pack says whether the close is finished. */
 function fluxPack(){
-  const thr = S.thr || DATA.thr, usd = v => (Number(v) || 0).toLocaleString('en-US', {style: 'currency', currency: 'USD'});
+  const thr = thrOf('thr'), usd = v => (Number(v) || 0).toLocaleString('en-US', {style: 'currency', currency: 'USD'});
   const when = iso => iso ? new Date(iso).toLocaleString('en-US', {month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'}) : '';
   const who = uid => uid ? Shared.name(uid) : '';
   // an element's text with its parts spaced, as it reads on screen
@@ -2801,7 +2818,7 @@ def coding():
     V = GLR["views"]
     G = {f["finding_id"]: f for f in GLR["findings"]}
     thr = 2500.0
-    # Each review screen's own line, set in Settings: CapEx at Serif's PP&E capitalization
+    # Each review screen's own line, changed on its page's chip: CapEx at Serif's PP&E capitalization
     # threshold, Prepaid at its prepaid threshold (12 Oct 2026), the rest at thr. A Department
     # flag has none ("all"): every line off Non-Specific is recoded, whatever its size.
     THR = {"thr": thr, "thr_capex": 5000.0, "thr_prepaid": 25000.0}
@@ -2951,10 +2968,11 @@ def coding():
             for m in ms:
                 it = next((i for i in its if i["document"] == m.get("document") and i["account"] == m.get("account")), None)
                 to = re.search(r"\b(1\d{6})\b", fl.get("do") or "")
-                # The flag's words are its first bill's; a capital bill says where it goes in its own.
+                # Each bill gives its own finding's reason; a run from before views 1.7.2 gives
+                # the flag's, its first bill's, so a capital bill says where it goes in its own.
                 p = m.get("placement") or {}
-                why, do = fl.get("why") or "", fl.get("do") or ""
-                if p and p0 and p != p0:
+                why, do = (m.get("why") or "", m.get("do") or "") if "why" in m else (fl.get("why") or "", fl.get("do") or "")
+                if "why" not in m and p and p0 and p != p0:
                     why, do = (why.replace(p0["why"], p["why"]) if p0["why"] and p0["why"] in why else (why + " " + p["why"]).strip() if p.get("kind") != "in_service" else why), (do.replace(p0["ask"], p["ask"]) if p0["ask"] else (do + " " + p["ask"]).strip())
                 screen[fl["id"]].append({"vendor": r["vendor"], "from_account": m.get("account") or (it or {}).get("account") or "",
                                          "to_account": m.get("to") or (to.group(1) if to else ""), "department": (it or {}).get("department") or "",
@@ -2969,10 +2987,27 @@ def coding():
               "not_in_service": ("Capital in Process: not yet in service", "Not yet; ask the date"),
               "no_account": ("Capital in Process: the chart has no fixed asset account for it", "Invoice date, %s, by policy: confirm"),
               "in_service": ("in service: fixed asset", "Invoice date, %s, by policy: confirm")}
-    cap_cards, pre_cards = [], []
+    cap_cards, pre_cards, pt_settled = [], [], []
     for sec_id, prefix, bucket, typ in (("capital", "C", cap_cards, "CapEx missed"), ("prepaid", "P", pre_cards, "Prepaid missed")):
+        key = lambda r: (r["vendor"], r["from_account"], r["to_account"], r.get("what"), r.get("department"))
         for r in screen[sec_id]:
-            iid = sid(prefix, r["vendor"], r["from_account"], r["to_account"], r.get("what"), r.get("department"))
+            # A capital flag on a pass-through bill is settled by its cost breakdown when the
+            # breakdown ties to the bill and every item it puts on the flagged account is under
+            # the threshold: nothing there is capital, and Pass-Through Bills reviews the bill
+            # item by item. A breakdown that does not tie, or puts nothing on the account,
+            # leaves the flag.
+            rv_ = PT_REV.get(str((r["doc"] or {}).get("document") or ""))
+            # the items whose activity is booked to the flagged account, on any of its lines, not
+            # only those whose activity's largest line is there
+            hits_ = {g["acct_no"] for g in (rv_ or {}).get("groups") or [] if any(x["account_code"] == r["from_account"] for x in g["booked"] or [])}
+            on_ = [i for i in (rv_ or {}).get("items") or [] if i["acct_no"] in hits_]
+            if sec_id == "capital" and rv_ and rv_.get("ties") and on_ and all(abs(i["amount"]) < THR["thr_capex"] for i in on_):
+                pt_settled.append((r["vendor"], r["doc"]["document"], r["amount"], "%s %s" % (r["from_account"], acct_name(r["from_account"])),
+                                   max(abs(i["amount"]) for i in on_)))
+                continue
+            # with its bill, so two alike (two Flagship bills on one account) each keep their id in
+            # a later run, whatever its order and whether or not a like one comes or goes
+            iid = sid(prefix, *key(r), (r["doc"] or {}).get("document"))
             doc = r["doc"] or line_doc(r["vendor"], r["from_account"])
             p = r["placement"]
             memo, placed = PLACED.get(p.get("kind"), ("", ""))
@@ -3026,14 +3061,30 @@ def coding():
         """What a department or Coupa account finding saw, from its evidence: the coding and what
         the vendor's earlier lines were coded to."""
         ev = f.get("evidence") or {}
-        sc = {k: v for k, v in (ev.get("supporting_counts") or {}).items() if isinstance(v, (int, float))}
+        raw = ev.get("supporting_counts") or {}
+        sc = {k: v for k, v in raw.items() if isinstance(v, (int, float))}
         seen = en(ev.get("observed") or "")
-        if sc:
+        A_ = lambda c: e(("%s %s" % (c, acct_name(c))).strip())
+        # The Coupa checks count lines and dollars, not codings: each says what it compared.
+        if f.get("rule_id") == "T4.PO_ACCOUNT_MISMATCH":
+            m_ = re.search(r"has ([\d,]+) Coupa PO line\(s\), (\d+)% approved against account (\d{7})", ev.get("basis") or "")
+            return "%s%s.%s" % (stop_(seen.replace("line(s)", "lines" if raw.get("gl_lines") != 1 else "line")).rstrip("."),
+                                (", %s" % money(raw["gl_exposure"], True)) if raw.get("gl_exposure") else "",
+                                (" The vendor's %s Coupa PO lines were %s%% approved against %s." % (format(int(m_.group(1).replace(",", "")), ","), m_.group(2), A_(m_.group(3)))) if m_ else "")
+        if f.get("rule_id") == "T4.ITEM_ACCOUNT_DRIFT" and raw.get("usual_account"):
+            n_, k_ = raw.get("earlier_lines", 0), raw.get("earlier_lines_on_usual", 0)
+            return "Coupa PO %s line %s (%s, %s) is on %s; %s, its usual account." % (
+                e(raw.get("po_number") or ""), e(str(raw.get("po_line") or "")), e(raw.get("item") or ""), money(raw.get("po_amount") or 0, True),
+                A_(raw.get("account") or ""), ("the item's one earlier line was on %s" if n_ == 1 and k_ == 1 else
+                                               "%s of the item's %s earlier lines %s on %%s" % (k_, n_, "was" if k_ == 1 else "were")) % A_(raw["usual_account"]))
+        if sc and f.get("rule_id") == "T1.DEPT_INCONSISTENCY":
             n_ = sum(sc.values())
             return "Coded to %s. Of the vendor's %d earlier lines, %s." % (
                 seen.replace("department ", "").replace("account ", ""), n_,
                 ", ".join("%d %s %s" % (v, "is" if v == 1 else "are", "coded " + e(k)) for k, v in sorted(sc.items(), key=lambda kv: -kv[1])))
         return facts(en(f.get("recommendation") or "")) or seen
+
+    stop_ = lambda t: t if not t or t.endswith(".") else t + "."
 
     def what_changes(lines):
         cr = {(l["account"], l.get("department") or "") for l in lines if l.get("credit")}
@@ -3081,13 +3132,19 @@ def coding():
     small = [f for f in drift if (f.get("amount_at_risk") or 0) < thr and f not in excepted]
     dfind = sorted([f for f in GLR["findings"] if f["rule_id"] in ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")]
                    + [f for f in drift if f not in small], key=lambda f: -(f.get("amount_at_risk") or 0))
+    # A department or account flag's id is its rule, title and line: its document, account,
+    # description and amount. Many flags share a rule and title (one vendor's lines moved alike),
+    # so the line is what keeps each id, and its decision, note and entry, in a later run of the
+    # close, whatever order that run lists them in and whether or not a like flag comes or goes.
+    line_of = lambda f: (lambda t: (t.get("document_number"), t.get("account_code"), t.get("description") or t.get("memo"), round(t.get("amount") or 0, 2)))(
+        f.get("transaction") or (f.get("transactions") or [{}])[0])
     for f in dfind:
         if f in excepted:
             continue
         sc = (f.get("evidence") or {}).get("supporting_counts") or {}
         isdrift = f["rule_id"] == "T4.ITEM_ACCOUNT_DRIFT"
         iid = (sid("D", f["rule_id"], " ".join(sc["item"].split()).casefold(), sc["po_number"], sc["po_line"]) if isdrift
-               else sid("D", f["rule_id"], f.get("title")))
+               else sid("D", f["rule_id"], f.get("title"), *line_of(f)))
         x = ents.get(f["finding_id"])
         vname = sc["supplier"] if isdrift else (f.get("transaction") or {}).get("vendor_or_name") or f["title"].split(":")[0].split(" coded to ")[0]
         if x:
@@ -3470,7 +3527,11 @@ def coding():
         if booked_:
             what.append("%d booked to a %s account (%s): %s" % (len(booked_), acct, prefix, money(booked_amt(booked_), True)))
         return hero(title + ", " + PERIOD, "", [("Decided", live("done", pid), ". ".join(what) or "Nothing flagged in " + PERIOD)])
-    pages.append(page("capex", screen_hero("CapEx Flags", "capex", "capex", cap_cards, cap_booked, "Fixed Assets") + two_way("Capital", cap_cards, cap_booked, "capex", "Fixed Assets")))
+    pt_note = ('<p class="note">Left to Pass-Through Bills, whose cost breakdown ties to the bill and puts no item on the flagged account at or '
+               'over the %s CapEx threshold, so none is a capital asset: %s.</p>'
+               % (money(THR["thr_capex"]), "; ".join("%s %s, %s on %s, its largest item %s" % (e(v), e(d), money(a, True), e(acct), money(top, True))
+                                                     for v, d, a, acct, top in pt_settled))) if pt_settled else ""
+    pages.append(page("capex", screen_hero("CapEx Flags", "capex", "capex", cap_cards, cap_booked, "Fixed Assets") + pt_note + two_way("Capital", cap_cards, cap_booked, "capex", "Fixed Assets")))
     pages.append(page("prepaid", screen_hero("Prepaid Flags", "prepaid", "prepaid", pre_cards, pre_booked, "Prepaid") + two_way("Prepaid", pre_cards, pre_booked, "prepaid", "Prepaid")))
     exc_html = ""
     issues = ([("Not applied", "the file is malformed: " + exc_run.get("error", ""))] if exc_run.get("status") == "malformed" else []) \

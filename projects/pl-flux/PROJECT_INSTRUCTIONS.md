@@ -116,7 +116,7 @@ bonus accrual, interest) and none at this one. That says the GL was pulled befor
 closed. Say so with the tie's result, name the accounts, and ask for the GL again after close.
 The list leads the first page of the console too.
 
-The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.2.0.html`. Publish it as
+The last command writes `out/sep2026/serif-pl-flux-sep2026-v<version>.html` (the console version, 2.2.1 now). Publish it as
 [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML yourself:
 if it needs a change, change the script and build again.
 
@@ -315,7 +315,7 @@ pages open in a bar under the header.
     GAAP checklist, the source data and the sign-off.
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
   supplied, what each check found, the estimated cost of a run, the inputs and the build
-  record. Settings has the threshold, the decision record (save and load) and **Bring in the
+  record. Settings has the decision record (save and load) and **Bring in the
   earlier run's decisions**.
 
 The threshold is in dollars only and defaults to **$10,000**, the pre-close adjustment
@@ -386,8 +386,8 @@ Read from `out/<period>/run.json`:
 Two kinds, each on its own page. `commentary` explains each P&L account whose move against the
 prior month reaches the threshold; it sits on the account's line on Actual vs. Actual (MoM).
 `budget_commentary` explains each account whose move against plan reaches the threshold; it
-sits beside the account's plan line on Actual vs. Budget. An account can need both. Settings can
-add a percent to the threshold (off unless set; Serif has not chosen one): a line then needs
+sits beside the account's plan line on Actual vs. Budget. An account can need both. The threshold's
+chip can add a percent to it (off unless set; Serif has not chosen one): a line then needs
 commentary only when it moved by both the dollar threshold and that percent of its comparison.
 The chip beside each page title shows both. The same rules apply to both kinds:
 
@@ -522,8 +522,8 @@ Serif's senior leadership. Write it last, from your commentary, in plain paragra
 
 1. Total operating expense and the net loss for the month, and their moves from the prior
    month. Operating expense is accounts 6xxxxxx and 7xxxxxx, as the console's Total OpEx tile
-   shows. `F0.OPEX` in `metrics` sums every P&L account, interest income included, so it is the
-   net loss; do not call it operating expense.
+   shows. `F0.OPEX` in `metrics`, titled "Net P&L", sums every P&L account, interest income
+   included, so it is the net loss; do not call it operating expense.
 2. The largest moves over the threshold, a few sentences each, from the commentary: the
    driver, and whether it is timing that will reverse next month.
 3. The adjustments the run proposes, by kind, and open PO commitments as a disclosure, not

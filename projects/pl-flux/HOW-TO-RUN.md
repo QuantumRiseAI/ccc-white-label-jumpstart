@@ -103,7 +103,7 @@ In a Claude Project every uploaded file sits at the top level, so all of these a
 filenames. In the repo, `make build PERIOD=sep2026` runs the same commands from the packaged
 Project folder on the exports in `inputs/sep2026/`.
 
-The last command writes `out/sep2026/serif-pl-flux-sep2026-v2.2.0.html`, one self-contained
+The last command writes `out/sep2026/serif-pl-flux-sep2026-v<version>.html` (the console version, 2.2.1 now), one self-contained
 file that opens in any browser. The filename carries the period and the console version.
 Inside, the **Run log** has a Build record listing the console, engine and ruleset versions,
 the run id, and a fingerprint for every input file, so if a figure moves between two builds
@@ -436,7 +436,9 @@ sign-off: Prepared by, Controller Review and CFO Approval.
 
 Variances are not graded high and medium. Each one is either at or over the amount that
 earns commentary, or under it. The threshold defaults to **$10,000**, the pre-close adjustment
-threshold, in dollars only, set in Settings. Change it and every page is marked again.
+threshold, in dollars only, changed on the chip beside each page's title, where an optional
+percent can be added too. Change it and every page is marked again, for everyone the review is
+shared with; the change is in the Audit Log and the decision record.
 
 The engine reports every variance at or above **$2,500**, below which nothing is emitted.
 
