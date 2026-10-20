@@ -122,7 +122,7 @@ bonus accrual, interest) and none at this one. That says the GL was pulled befor
 closed. Say so with the tie's result, name the accounts, and ask for the GL again after close.
 The list leads the first page of the console too.
 
-The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.2.1 now). Publish it
+The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.2.2 now). Publish it
 as [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML
 yourself: if it needs a change, change the script and build again.
 

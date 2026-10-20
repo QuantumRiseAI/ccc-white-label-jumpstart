@@ -37,6 +37,37 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## 2.2.2: the P&L Flux reads the Flagship breakdown (SERIF-176)
+
+Console 2.2.2, views 1.7.3. Decisions keep their stored verbs. No id changes on Sep or Aug 2026; a
+CapEx or Prepaid card on a bill split across departments, which those months do not have, is now
+one card, keeping the id of its largest department's.
+
+- **The two consoles agree on a pass-through bill its cost breakdown settles.** With
+  `--flagship-breakdown`, the P&L Flux does not propose capitalizing a pass-through bill whose
+  breakdown ties to it and puts no item on the account at or over the $5,000 CapEx threshold, as
+  the GL Coding Review leaves its CapEx flag to Pass-Through Bills. Adjustments says which bill it
+  left out and why. Before, the flux proposed it (Sep 2026: Flagship INV19269, a MacBook Pro at
+  $4,828.46 and AppleCare), and approving it would have booked an asset the coding review says is
+  not one. One function, `breakdown_settles`, decides for both consoles.
+- The P&L Flux's build commands pass `--flagship-breakdown` (left out when there is none), and its
+  monthly exports list the breakdowns as optional; `tools/build.sh` passes them to both builds.
+- The build prints each capitalize it leaves out, with its finding, since `run.json` still lists
+  it: the instructions tell Claude to write no note for it and leave it out of the summary's count.
+- Both notes are one sentence pattern, listing each bill and account once with the bill's amount
+  there, and a breakdown settles only its own vendor's bill.
+- **A CapEx or Prepaid flag on a bill with lines in two departments** is one card for the bill and
+  account at its net amount, its entry taking each department's lines off on their own line (a
+  department netting the other way on the other side), and no other card moving any of them,
+  made from the finding's own lines (views 1.7.3 names each one's
+  department and amount), so a line a Journal Entry already moved off the account makes no card.
+  Before, each card took the first line's amount, and a department netting negative made a
+  negative card. A capitalize or prepaid adjustment's Amount is its balance sheet line. The P&L Flux's entry for such a bill takes each
+  department's lines off it, where before it took the whole bill off the first line's department;
+  a department netting the other way (a credit line in it) goes on the other side.
+- `tests/test_runs.py` checks that both consoles settle the same bills each month (the flux only
+  those at or over $5,000, as it proposes nothing capital below that).
+
 ## 2.2.1: checks that could not run say so, and ids that hold across runs (SERIF-175)
 
 Console 2.2.1, GL engine 0.2.8, flux engine 0.8.2, views 1.7.2. Decisions keep their stored verbs.

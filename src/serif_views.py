@@ -56,7 +56,7 @@ from collections import defaultdict
 
 import serif_sources as sources
 
-VIEWS_VERSION = "1.7.2"
+VIEWS_VERSION = "1.7.3"
 
 # The flux engine's definition, so the two agree on what counts as P&L.
 PL_PREFIXES = ("6", "7", "8")
@@ -971,7 +971,10 @@ def _flag(fid, label, amount, why=(), do=(), finding_id=None, match=None):
 
 
 def _doc_match(f):
-    return [{"document": (t.get("document_number") or "").strip(), "account": t.get("account_code", "")}
+    """The lines a finding is about, each with its department and amount, so the console makes
+    its cards from these lines and no others (not a line a Journal Entry already moved)."""
+    return [{"document": (t.get("document_number") or "").strip(), "account": t.get("account_code", ""),
+             "department": t.get("department") or "", "amount": r2(num(t.get("amount")))}
             for t in txns_of(f) if (t.get("document_number") or "").strip()]
 
 
@@ -1498,6 +1501,24 @@ def entries(findings, period, accrual_depts=None, lookup=None):
                     line["reverses_line"] = True
                 if line["debit"] and not line["department"]:
                     line["department"] = accrual_depts.get(f["finding_id"], "")
+            # A prepaid or capital bill with lines in several departments: the reversing line
+            # becomes one per department, each its lines' amount, so each department's posted
+            # balance is taken off, not the whole bill off the first department.
+            if rule in ("F9.PREPAID", "F10.CAPITALIZE"):
+                for line in [l for l in parsed if l.get("reverses_line")]:
+                    by = defaultdict(float)
+                    for t in txns_of(f):
+                        if (t.get("account_code") or "").strip() == line["account"]:
+                            by[t.get("department") or ""] += num(t.get("amount"))
+                    total = sum(by.values())
+                    if len(by) > 1 and abs(abs(total) - (line["credit"] or line["debit"])) < 0.01:
+                        # a department netting the other way (a credit line in it) goes on the other side
+                        i = parsed.index(line)
+                        side = "credit" if line["credit"] else "debit"
+                        other = "debit" if side == "credit" else "credit"
+                        parsed[i:i + 1] = [dict(line, department=d, **({side: r2(abs(a)), other: 0.0} if (a > 0) == (total > 0)
+                                                                       else {other: r2(abs(a)), side: 0.0}))
+                                           for d, a in sorted(by.items()) if r2(a)]
             # NetSuite requires a department on every line. A P&L line still without one takes
             # the department of the ledger lines behind the finding, when they share one.
             depts = {(t.get("department") or "").strip() for t in txns_of(f)} - {""}
