@@ -53,7 +53,9 @@ Console 2.2.2. Decisions keep their stored verbs; no id changes.
 - The build prints each capitalize it leaves out, with its finding, since `run.json` still lists
   it: the instructions tell Claude to write no note for it and leave it out of the summary's count.
 - Both notes are one sentence pattern, listing each bill and account once with the bill's amount
-  there (not one GL line's), and a breakdown settles only its own vendor's bill.
+  there, and a breakdown settles only its own vendor's bill.
+- **A CapEx or Prepaid flag on a bill with lines in two departments** is one card per department,
+  each with its own amount. Before, each card took the first line's amount.
 - `tests/test_runs.py` checks that both consoles settle the same bills each month (the flux only
   those at or over $5,000, as it proposes nothing capital below that).
 

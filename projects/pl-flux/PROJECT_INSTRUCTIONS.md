@@ -87,7 +87,7 @@ python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite
 
 Leave out `--balance-sheet`, `--netsuite-ids`, `--flagship-breakdown` or `--netsuite-ref` when its file is absent, and say
 so in the chat. A pattern that matches no file stops the command before it runs in zsh, and
-in bash `build_pages.py` ignores an unmatched `--netsuite-ref` without a word; leave the flag out. Without the Balance Sheet,
+in bash `build_pages.py` ignores an unmatched `--netsuite-ref` or `--flagship-breakdown` without a word; leave the flag out. Without the Balance Sheet,
 Balance Sheet Flux and the tie-outs to it do not run; name them.
 
 When the reviewer attaches the GL Coding Review's run (`run.json`, from that Project) and its decision
@@ -463,8 +463,8 @@ or undercuts the entry. The recommendation goes in `recommend`, not in the note.
   Coding Review does: when the breakdown ties to the bill and puts no item on the account at or over
   the $5,000 capitalization threshold, the adjustment is not proposed, and Adjustments says so.
   The build prints each one ("Not proposed, its cost breakdown settles it: …", with its finding),
-  but `run.json` still lists it under `views.entries`: write no note for it, and leave it out of
-  the summary's count of proposed entries.
+  but `run.json` still lists it under `views.entries`: write no note for it. In the summary it is
+  not a proposed entry; say in one sentence that the breakdown settled it, as Adjustments does.
   Otherwise read it with `serif_sources.read_flagship_breakdowns` to settle a prepaid adjustment,
   or a capital one it does not settle, and cite it in the note. A bill that a Journal Entry in the month already
   moves off its account, with a memo naming the bill's document number, is not proposed: the
@@ -533,8 +533,9 @@ Serif's senior leadership. Write it last, from your commentary, in plain paragra
    included, so it is the net loss; do not call it operating expense.
 2. The largest moves over the threshold, a few sentences each, from the commentary: the
    driver, and whether it is timing that will reverse next month.
-3. The adjustments the run proposes, by kind, and open PO commitments as a disclosure, not
-   accrued.
+3. The adjustments the console proposes, by kind (not counting a capitalize the build left out
+   because a cost breakdown settles it; name that one in a sentence), and open PO commitments
+   as a disclosure, not accrued.
 4. Every check that did not run, and that Serif's policies are drafts.
 
 It is a draft until the reviewer accepts it, or edits it, and saves it.
