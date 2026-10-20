@@ -64,8 +64,13 @@ python3 serif_views.py out/sep2026/run.json \
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json \
   --gl netsuite_gl_detail_* \
   --income-statement netsuite_income_statement_by_* \
+  --flagship-breakdown flagship_breakdown_*.xlsx \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
+
+With a Flagship cost breakdown (`--flagship-breakdown`, left out when there is none), a proposal
+to capitalize a pass-through bill whose breakdown ties and has no item on the account at or over
+$5,000 is not made, as on the GL Coding Review, and Adjustments names the bill.
 
 To carry the GL Coding Review's booked corrections into Actual vs. Actual (MoM), add the coding
 run and its decision record to the build:
@@ -103,7 +108,7 @@ In a Claude Project every uploaded file sits at the top level, so all of these a
 filenames. In the repo, `make build PERIOD=sep2026` runs the same commands from the packaged
 Project folder on the exports in `inputs/sep2026/`.
 
-The last command writes `out/sep2026/serif-pl-flux-sep2026-v<version>.html` (the console version, 2.2.1 now), one self-contained
+The last command writes `out/sep2026/serif-pl-flux-sep2026-v<version>.html` (the console version, 2.2.2 now), one self-contained
 file that opens in any browser. The filename carries the period and the console version.
 Inside, the **Run log** has a Build record listing the console, engine and ruleset versions,
 the run id, and a fingerprint for every input file, so if a figure moves between two builds
@@ -128,6 +133,8 @@ Serif sends these exports, uploaded as they are:
 4. The newest UKG roster, as `.csv`.
 5. The NetSuite Balance Sheet report with monthly columns, and the Income Statement by month,
    as `.xls`.
+6. Optional: each Flagship pass-through bill's cost breakdown from Coupa,
+   `flagship_breakdown_<invoice>.xlsx`, the same files as for the GL Coding Review.
 
 Open the close's chat, below, and ask: `Run the P&L flux for Sep 2026.`
 

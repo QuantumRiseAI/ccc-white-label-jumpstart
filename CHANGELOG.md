@@ -37,6 +37,21 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## 2.2.2: the P&L Flux reads the Flagship breakdown (SERIF-176)
+
+Console 2.2.2. Decisions keep their stored verbs; no id changes.
+
+- **The two consoles agree on a pass-through bill its cost breakdown settles.** With
+  `--flagship-breakdown`, the P&L Flux does not propose capitalizing a pass-through bill whose
+  breakdown ties to it and puts no item on the account at or over the $5,000 CapEx threshold, as
+  the GL Coding Review leaves its CapEx flag to Pass-Through Bills. Adjustments says which bill it
+  left out and why. Before, the flux proposed it (Sep 2026: Flagship INV19269, a MacBook Pro at
+  $4,828.46 and AppleCare), and approving it would have booked an asset the coding review says is
+  not one. One function, `breakdown_settles`, decides for both consoles.
+- The P&L Flux's build commands pass `--flagship-breakdown` (left out when there is none), and its
+  monthly exports list the breakdowns as optional; `tools/build.sh` passes them to both builds.
+- `tests/test_runs.py` checks that both consoles settle the same bills each month.
+
 ## 2.2.1: checks that could not run say so, and ids that hold across runs (SERIF-175)
 
 Console 2.2.1, GL engine 0.2.8, flux engine 0.8.2, views 1.7.2. Decisions keep their stored verbs.

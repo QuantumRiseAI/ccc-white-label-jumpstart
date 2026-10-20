@@ -46,7 +46,7 @@ for J in gl-coding-review pl-flux; do
   else
     python3 serif_views.py "$O/run.json" --gl "${GL[@]}" --plan "$FC" --plan-vintage 2026-06 --coupa "$CO" \
       --roster "$RO" "${IDS[@]}" "${BS[@]}" --keep-names | tail -1
-    python3 build_pages.py --only flux --flux-run "$O/run.json" --gl "${GL[@]}" "${IS[@]}" "${REF[@]}" --out "$O"
+    python3 build_pages.py --only flux --flux-run "$O/run.json" --gl "${GL[@]}" "${IS[@]}" "${BD[@]}" "${REF[@]}" --out "$O"
   fi
   V=$(python3 -c "import re,sys; print(re.search(r'^VERSION = \"(.+)\"', open(sys.argv[1]).read(), re.M).group(1))" build_pages.py)
   cp "$O/serif-$J-$SLUG-v$V.html" "$B/consoles/serif-$J.html"

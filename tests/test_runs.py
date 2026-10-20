@@ -68,4 +68,16 @@ for path in sorted(glob.glob(os.path.join(OUT, "*", "*", "serif-*-v*.html"))):
     rep = sorted(k for k in set(D.get("je") or {}) | set(D.get("ref") or {}) if re.match(r"^[A-Z]+-[0-9a-f]{8}-\d+$", k))
     ok(not rep, "%s: no item's id depends on its order%s" % (os.path.basename(path), (" (" + ", ".join(rep[:8]) + ")") if rep else ""))
 
+# The two consoles agree on a pass-through bill its cost breakdown settles: the GL Coding Review
+# leaves its CapEx flag to Pass-Through Bills, and the P&L Flux does not propose capitalizing it.
+for month in sorted({p.split(os.sep)[-3] for p in glob.glob(os.path.join(OUT, "*", "*", "run.json"))}):
+    pages = {k: glob.glob(os.path.join(OUT, month, k, "serif-%s-%s-v*.html" % (k, month))) for k in ("gl-coding-review", "pl-flux")}
+    if not all(pages.values()):
+        continue
+    docs = []
+    for k, pat in (("gl-coding-review", r"Left to Pass-Through Bills[^<]*"), ("pl-flux", r"Not proposed: capitalizing[^<]*")):
+        t = re.search(pat, open(max(pages[k], key=os.path.getmtime), encoding="utf-8").read())
+        docs.append(sorted(re.findall(r"\b(INV\d+|\d{6,})\b", t.group(0))) if t else [])
+    ok(docs[0] == docs[1], "%s: the GL Coding Review and the P&L Flux settle the same pass-through bills by their breakdowns (%s)" % (month, ", ".join(docs[0]) or "none"))
+
 sys.exit(1 if fails else 0)

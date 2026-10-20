@@ -36,7 +36,7 @@ sys.path.insert(0, HERE)
 import serif_sources as SS  # noqa: E402
 import serif_design as DS   # noqa: E402
 
-VERSION = "2.2.1"
+VERSION = "2.2.2"
 ap = argparse.ArgumentParser(description="Build the GL Coding Review and P&L Flux consoles.")
 ap.add_argument("--only", choices=("coding", "flux"), help="build one console; both by default")
 ap.add_argument("--coding-run", help="the GL Coding Review run.json, after serif_views.py --keep-names")
@@ -491,6 +491,31 @@ def _match_groups(groups, booked):
             for x in hit:
                 free.remove(x)
     return free
+
+
+CAPEX_THR, PREPAID_THR = 5000.0, 25000.0   # Serif's capitalization and prepaid thresholds (Mike's write-up, 12 Oct 2026)
+
+
+def breakdown_settles(rv, account, thr):
+    """Whether a pass-through bill's cost breakdown settles a capital question about its lines on
+    `account`: the breakdown ties to the bill, and every item whose activity is booked to that
+    account, on any of its lines, is under the threshold, so none is a capital asset. -> the
+    largest such item's amount, or None when the breakdown does not settle it (no breakdown, it
+    does not tie, or nothing of it is booked to the account). Both consoles ask it, so the GL
+    Coding Review and the P&L Flux agree on a bill."""
+    if not rv or not rv.get("ties"):
+        return None
+    hits = {g["acct_no"] for g in rv.get("groups") or [] if any(x["account_code"] == account for x in g["booked"] or [])}
+    on = [abs(i["amount"]) for i in rv.get("items") or [] if i["acct_no"] in hits]
+    return max(on) if on and all(a < thr for a in on) else None
+
+
+def pt_reviews(thr_capex, thr_prepaid):
+    """The month's pass-through bills, their cost breakdowns as supplied, and each bill read
+    against its breakdown: (bills, breakdowns, {document: review})."""
+    bills = SS.passthrough_bills(by_period, PERIOD)
+    bds = SS.read_flagship_breakdowns(A.flagship_breakdown)
+    return bills, bds, {b["document"]: review_breakdown(b, bds[b["document"]], thr_capex, thr_prepaid, PERIOD) for b in bills if b["document"] in bds}
 
 
 def review_breakdown(bill, bd, thr_capex, thr_prepaid, period):
@@ -2102,6 +2127,24 @@ def flux():
         j = next(i for i, r in enumerate(bs["rows"]) if r["name"] == "Total Bank")
         banks = [r for r in bs["rows"][i:j] if r["kind"] == "account" and round(r["values"].get(PERIOD) or 0)]
     ent = (V.get("entries") or []) + drafted_entries()
+    # A proposal to capitalize a pass-through bill whose cost breakdown settles it (it ties, and
+    # nothing of it on the account is at or over the CapEx threshold) is left out, as the GL
+    # Coding Review leaves its CapEx flag, and the Adjustments page says so.
+    _, _, rev_pt = pt_reviews(CAPEX_THR, PREPAID_THR)
+    pt_left = []
+    if rev_pt:
+        keep_ = []
+        for x in ent:
+            f_ = next((f for f in PLR.get("findings") or [] if f["finding_id"] == x.get("finding_id")), {})
+            t_ = (f_.get("transactions") or [{}])[0]
+            top_ = breakdown_settles(rev_pt.get(str(t_.get("document_number") or "")), t_.get("account_code"), CAPEX_THR) \
+                if f_.get("rule_id") == "F10.CAPITALIZE" else None
+            if top_ is None:
+                keep_.append(x)
+            else:
+                pt_left.append(((t_.get("vendor_or_name") or "").strip(), t_.get("document_number"), abs(t_.get("amount") or 0),
+                                "%s %s" % (t_.get("account_code"), acct_name(t_.get("account_code"))), top_))
+        ent = keep_
     used_com, used_bud = set(), set()
     mt = next((t for t in V["tables"] if t["id"] == "model_tie"), {"sections": []})
     revs = [r for s in mt["sections"] for r in s["rows"]]
@@ -2601,7 +2644,12 @@ def flux():
         ("Decided", '<span data-progn></span>', "Proposed entries in Section A: accruals, reclasses and capitalizations, each with a Journal Entry"
          + ("; %s in Section B" % count(len(revs), "forecast revision") if revs else "")),
         ("P&amp;L Impact if All Added to CSV", fav(impact, ("&#9660; " if impact > 0 else "&#9650; ") + short(abs(impact))), "Favorable" if impact > 0 else "Unfavorable")])
-        + '<div class="card"><div class="ch">NetSuite Journal Entries<button class="pill solid r" data-export>Export to NetSuite, CSV</button></div></div><h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section A: Accounting Adjustments</h3>' + "".join(cards_a)
+        + '<div class="card"><div class="ch">NetSuite Journal Entries<button class="pill solid r" data-export>Export to NetSuite, CSV</button></div></div><h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section A: Accounting Adjustments</h3>'
+        + ('<p class="note">Not proposed: capitalizing %s. %s a pass-through bill whose cost breakdown ties to it and puts no item on the account '
+           'at or over the %s CapEx threshold, so none is a capital asset; the GL Coding Review reviews it on Pass-Through Bills.</p>'
+           % ("; ".join("%s %s, %s on %s, its largest item %s" % (e(v), e(d), money(a, True), e(ac), money(t, True)) for v, d, a, ac, t in pt_left),
+              "It is" if len(pt_left) == 1 else "Each is", money(CAPEX_THR))
+           if pt_left else "") + "".join(cards_a)
         + '<h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section B: Forecast / Budget Revisions</h3>'
         + ("".join(cards_b) or '<p class="note">%s</p>' % ("No forecast revisions in %s." % PERIOD if any("forecast" in (i.get("roles") or []) for i in M.get("inputs") or [])
                                                           else "Not run for %s: no forecast was supplied." % PERIOD))
@@ -2821,13 +2869,10 @@ def coding():
     # Each review screen's own line, changed on its page's chip: CapEx at Serif's PP&E capitalization
     # threshold, Prepaid at its prepaid threshold (12 Oct 2026), the rest at thr. A Department
     # flag has none ("all"): every line off Non-Specific is recoded, whatever its size.
-    THR = {"thr": thr, "thr_capex": 5000.0, "thr_prepaid": 25000.0}
+    THR = {"thr": thr, "thr_capex": CAPEX_THR, "thr_prepaid": PREPAID_THR}
     # Flagship pass-through bills: each reviewed item by item where its cost breakdown was
     # supplied; without one, the bill and every card on it say a breakdown would show more.
-    PT_BILLS = SS.passthrough_bills(by_period, PERIOD)
-    PT_BD = SS.read_flagship_breakdowns(A.flagship_breakdown)
-    PT_REV = {b["document"]: review_breakdown(b, PT_BD[b["document"]], THR["thr_capex"], THR["thr_prepaid"], PERIOD)
-              for b in PT_BILLS if b["document"] in PT_BD}
+    PT_BILLS, PT_BD, PT_REV = pt_reviews(THR["thr_capex"], THR["thr_prepaid"])
 
     def pt_flag(document, named=False):
         """The line on another card for a pass-through bill: what its breakdown shows, or that it would show more.
@@ -2996,14 +3041,9 @@ def coding():
             # the threshold: nothing there is capital, and Pass-Through Bills reviews the bill
             # item by item. A breakdown that does not tie, or puts nothing on the account,
             # leaves the flag.
-            rv_ = PT_REV.get(str((r["doc"] or {}).get("document") or ""))
-            # the items whose activity is booked to the flagged account, on any of its lines, not
-            # only those whose activity's largest line is there
-            hits_ = {g["acct_no"] for g in (rv_ or {}).get("groups") or [] if any(x["account_code"] == r["from_account"] for x in g["booked"] or [])}
-            on_ = [i for i in (rv_ or {}).get("items") or [] if i["acct_no"] in hits_]
-            if sec_id == "capital" and rv_ and rv_.get("ties") and on_ and all(abs(i["amount"]) < THR["thr_capex"] for i in on_):
-                pt_settled.append((r["vendor"], r["doc"]["document"], r["amount"], "%s %s" % (r["from_account"], acct_name(r["from_account"])),
-                                   max(abs(i["amount"]) for i in on_)))
+            top_ = breakdown_settles(PT_REV.get(str((r["doc"] or {}).get("document") or "")), r["from_account"], THR["thr_capex"]) if sec_id == "capital" else None
+            if top_ is not None:
+                pt_settled.append((r["vendor"], r["doc"]["document"], r["amount"], "%s %s" % (r["from_account"], acct_name(r["from_account"])), top_))
                 continue
             # with its bill, so two alike (two Flagship bills on one account) each keep their id in
             # a later run, whatever its order and whether or not a like one comes or goes

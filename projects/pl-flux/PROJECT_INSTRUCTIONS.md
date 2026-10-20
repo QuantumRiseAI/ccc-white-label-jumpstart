@@ -81,11 +81,11 @@ python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_detail_* \
   --balance-sheet netsuite_balance_sheet_*.xls --keep-names
 
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_detail_* \
-  --income-statement netsuite_income_statement_by_* \
+  --income-statement netsuite_income_statement_by_* --flagship-breakdown flagship_breakdown_*.xlsx \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 
-Leave out `--balance-sheet`, `--netsuite-ids` or `--netsuite-ref` when its file is absent, and say
+Leave out `--balance-sheet`, `--netsuite-ids`, `--flagship-breakdown` or `--netsuite-ref` when its file is absent, and say
 so in the chat. A pattern that matches no file stops the command before it runs in zsh, and
 in bash `build_pages.py` ignores an unmatched `--netsuite-ref` without a word; leave the flag out. Without the Balance Sheet,
 Balance Sheet Flux and the tie-outs to it do not run; name them.
@@ -116,7 +116,7 @@ bonus accrual, interest) and none at this one. That says the GL was pulled befor
 closed. Say so with the tie's result, name the accounts, and ask for the GL again after close.
 The list leads the first page of the console too.
 
-The last command writes `out/sep2026/serif-pl-flux-sep2026-v<version>.html` (the console version, 2.2.1 now). Publish it as
+The last command writes `out/sep2026/serif-pl-flux-sep2026-v<version>.html` (the console version, 2.2.2 now). Publish it as
 [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML yourself:
 if it needs a change, change the script and build again.
 
@@ -335,7 +335,8 @@ After the three scripts run, write `drafts.json` and build the console again wit
 
 ```sh
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_detail_* \
-  --income-statement netsuite_income_statement_by_* --netsuite-ref netsuite_ref_*.csv --out out/sep2026 --drafts drafts.json
+  --income-statement netsuite_income_statement_by_* --flagship-breakdown flagship_breakdown_*.xlsx \
+  --netsuite-ref netsuite_ref_*.csv --out out/sep2026 --drafts drafts.json
 ```
 
 The build checks every draft against the run. Commentary for an account that is not in the
@@ -457,9 +458,12 @@ or undercuts the entry. The recommendation goes in `recommend`, not in the note.
   billing-pattern accrual is an estimate: say so, and name who confirms the work was done.
 * **Prepaids and Capital**: say what the item is and what term or useful life the invoice
   shows. If the invoice is needed, say so. A Flagship cost breakdown
-  (`flagship_breakdown_<invoice>.xlsx`) itemizes a Flagship pass-through bill: read it with
-  `serif_sources.read_flagship_breakdowns` to settle a capitalize or prepaid adjustment on that
-  bill (an item under the $5,000 capitalization threshold stays expense), and cite it in the note. A bill that a Journal Entry in the month already
+  (`flagship_breakdown_<invoice>.xlsx`) itemizes a Flagship pass-through bill. With
+  `--flagship-breakdown`, the build settles a capitalize adjustment on that bill itself, as the GL
+  Coding Review does: when the breakdown ties to the bill and puts no item on the account at or over
+  the $5,000 capitalization threshold, the adjustment is not proposed, and Adjustments says so.
+  Otherwise read it with `serif_sources.read_flagship_breakdowns` to settle a prepaid adjustment,
+  or a capital one it does not settle, and cite it in the note. A bill that a Journal Entry in the month already
   moves off its account, with a memo naming the bill's document number, is not proposed: the
   close entry has booked it. Before recommending any adjustment, read the month's journals for
   one that already books it, and if one does, recommend Reject and name the journal.
