@@ -37,7 +37,7 @@ for path in runs:
     m = r["manifest"]
     every = [x for g in r["report"]["groups"] for x in g["rules"]]
     ran, off = m.get("rules_run") or [], {x["rule_id"]: x for x in m.get("rules_not_run") or []}
-    gone_ = {x for x, v in off.items() if v.get("status") == "not_run"}
+    gone_ = {x for x, v in off.items() if v.get("status") == "not_run"} & set(every)
     ok(sorted(ran + list(gone_)) == sorted(every) and not set(ran) & gone_ and all(v.get("reason") for v in off.values()),
        "pl %s: every check is listed once, as run or not run, with a reason (%d run, %d not)" % (month, len(ran), len(gone_)))
     has = {i.get("role") for i in r["views"]["inputs"]} | {x for i in m["inputs"] for x in i.get("roles") or []}
@@ -49,6 +49,11 @@ for path in runs:
        "pl %s: received-not-invoiced runs only with Coupa's Received, Qty and Line Total columns and lines for the month" % month)
     ok(not (gone & {"Supplier", "Approved Invoiced"}) or f3.get("status") in ("degraded", "not_run"),
        "pl %s: received-not-invoiced without Supplier or Approved Invoiced is listed as run degraded" % month)
+    mets = {x["metric_id"]: x for x in r.get("metrics") or []}
+    ok(("F4.OPEN_COMMITMENT" in off) == bool(gone & {"Line Status", "Order Status (Header)"}) and cc.get("supplied")
+       or not cc.get("supplied"), "pl %s: open commitments are listed as not run without Coupa's statuses" % month)
+    ok(all(mets[k]["value"] is None for k in ("F4.OPEN_COMMITMENT",) if k in off and k in mets),
+       "pl %s: a commitment total not read is no figure, not $0.00" % month)
     found = {f["rule_id"] for f in r["findings"]}
     ok(not any(x in found for x, v in off.items() if v.get("status") == "not_run"), "pl %s: no check listed as not run has findings" % month)
 

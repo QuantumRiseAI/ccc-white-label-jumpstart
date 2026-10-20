@@ -39,7 +39,7 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ## 2.2.3: fixes from the Sep 2026 mock Project runs
 
-Console 2.2.3, flux engine 0.8.3, views 1.7.4. Decisions keep their stored verbs; no id changes.
+Console 2.2.3, flux engine 0.8.4, views 1.7.4. Decisions keep their stored verbs; no id changes.
 
 - **A correction imported from the NetSuite CSV is not counted twice.** A booked correction is not
   applied again when a journal of the month in the GL the P&L Flux reads names its description
@@ -56,6 +56,15 @@ Console 2.2.3, flux engine 0.8.3, views 1.7.4. Decisions keep their stored verbs
 - **"No Coupa line" only when Coupa could show one.** A billing-pattern accrual now says "Coupa's
   report has no Supplier, so its PO lines could not be matched", or that no Coupa lines were
   supplied, instead of offering the absence of a line as evidence.
+- **Open PO commitments that could not be read are not $0.00.** Without Coupa's Line Status or
+  Order Status (Header), the P&L Flux lists the commitments disclosure (F4) as not run, and the
+  open commitments and received-not-invoiced totals in `run.json` are no figure, with a "Not
+  read" note, where they read $0.00 before. The Coupa row of Exports this month and the engine's
+  printout give the month's lines against the report's ("343 lines for the month, of 5,000 in
+  the report"). Flux engine 0.8.4.
+- **Two contradictions in the P&L Flux instructions are settled.** A total of the run's own rows
+  (operating expense from `tables[0]`) is reading the run, not computing; and the summary says
+  whether the period is right rather than calling a move timing.
 - **The requester check** is listed as not run when the Coupa report has no Supplier column, or
   no roster was supplied, in `run.json` (views 1.7.4) as well as the Run log.
 - **Vendors Reviewed & Cleared no longer ticks "Account matches its Coupa PO" when that check did

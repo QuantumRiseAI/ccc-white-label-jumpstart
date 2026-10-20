@@ -47,7 +47,7 @@ from collections import defaultdict
 
 import serif_sources as sources
 
-ENGINE_VERSION = "0.8.3"
+ENGINE_VERSION = "0.8.4"
 RULESET_VERSION = "2026.10-uc2-flux-serif-thresholds+journal-moved"
 ENTITY = "FL87 Serif Biomedicines, Inc."
 
@@ -1409,9 +1409,11 @@ def main(argv=None):
     coupa_rows = []
     coupa_coverage = {"supplied": False}
     if args.coupa:
-        coupa_rows = [r for r in sources.read_coupa(args.coupa) if r["period"] == period]
+        all_coupa = sources.read_coupa(args.coupa)
+        coupa_rows = [r for r in all_coupa if r["period"] == period]
         coupa_coverage = {
-            "supplied": True, "lines": len(coupa_rows),
+            # lines: the month's; report_lines: the report's, all months (a capped report stops at 5,000)
+            "supplied": True, "lines": len(coupa_rows), "report_lines": len(all_coupa),
             # Columns this pull lacks or leaves empty: what reads them finds nothing.
             "columns_absent": sources.coupa_rows(args.coupa)[1],
             # A report that stops at a row limit holds only part of the year.
@@ -1671,11 +1673,22 @@ def main(argv=None):
             ["on a Coupa report stopped at its %s-row limit" % format(coupa_coverage["row_limit"], ",")] if coupa_coverage.get("row_limit") else [])
         if why:
             degraded["F3.ACCRUAL_RECEIPT"] = "running " + ", and ".join(why)
+    # Open commitments (a disclosure, F4) are lines still Issued and not fully received: without
+    # the statuses no line reads as open, and $0.00 would look like none.
+    if args.coupa and absent_cols & {"Line Status", "Order Status (Header)"}:
+        not_run["F4.OPEN_COMMITMENT"] = "The Coupa report has no %s column, so no PO line reads as open." % " or ".join(
+            sorted(absent_cols & {"Line Status", "Order Status (Header)"}))
+    for mt in run["metrics"]:
+        if mt["metric_id"] == "F4.OPEN_COMMITMENT" and "F4.OPEN_COMMITMENT" in not_run:
+            mt.update(value=None, note="Not read: " + not_run["F4.OPEN_COMMITMENT"])
+        if mt["metric_id"] == "F3.RECEIVED_NOT_INVOICED" and not_run.get("F3.ACCRUAL_RECEIPT"):
+            mt.update(value=None, note="Not read: " + not_run["F3.ACCRUAL_RECEIPT"])
     if not (gl_lines and history):
         for r_ in ("F6.ACCRUAL_PATTERN", "F8.VENDOR_DROPPED", "F9.PREPAID"):
             not_run[r_] = "No earlier months in the NetSuite exports."
     every = [r for g in run["report"]["groups"] for r in g["rules"]]
     run["manifest"]["rules_run"] = [r for r in every if r not in not_run]
+    run["summary"]["metric_count"] = len(run["metrics"])
     run["manifest"]["rules_not_run"] = ([{"rule_id": r, "status": "not_run", "reason": why} for r, why in not_run.items()]
                                         + [{"rule_id": r, "status": "degraded", "reason": why} for r, why in degraded.items()])
 
@@ -1703,11 +1716,14 @@ def main(argv=None):
             len(findings), by_sev.get("high", 0), by_sev.get("medium", 0)))
         print("AMOUNT AT RISK  " + money(run["summary"]["amount_at_risk"]))
         if coupa_rows:
-            rni = sum(num(r.get("received_not_invoiced_value")) for r in coupa_rows)
-            openc = sum(num(r.get("line_total")) for r in coupa_rows
-                        if str(r.get("is_open_commitment")).strip() == "1")
+            mv = {m_["metric_id"]: m_.get("value") for m_ in run["metrics"]}
+            said = lambda v: money(v) if v is not None else "not read"
             print("\nACCRUAL POPULATION  {}   (open commitments {}, NOT accrued)".format(
-                money(rni), money(openc)))
+                said(mv.get("F3.RECEIVED_NOT_INVOICED")), said(mv.get("F4.OPEN_COMMITMENT"))))
+        cc_ = run["manifest"].get("coupa_coverage") or {}
+        if cc_.get("supplied"):
+            print("COUPA  {} lines for {}, of {} in the report{}".format(
+                cc_.get("lines"), period, cc_.get("report_lines"), ", stopped at its row limit" if cc_.get("row_limit") else ""))
         print("\nWrote " + path)
         print("Next: python3 serif_views.py " + path + ", then build_pages.py")
     return 0

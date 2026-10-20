@@ -183,6 +183,8 @@ def exports_card(m, views, extra=None):
             got.setdefault(role, many[role][0])
     cc = m.get("coupa_coverage") or {}
     limits = []
+    if cc.get("report_lines") is not None:
+        limits.append("%s lines for the month, of %s in the report." % (format(cc.get("lines") or 0, ","), format(cc["report_lines"], ",")))
     if cc.get("row_limit"):
         limits.append("It stops at the %s-row limit, so it may not hold every line for the months it covers." % format(cc["row_limit"], ","))
     if cc.get("columns_absent"):
@@ -208,6 +210,7 @@ CHECK_NAMES = {
     "T0.TIE_OUT": "Debits equal credits", "T0.DUPLICATE_LINE": "Duplicate postings",
     "T0.POSTING_LAG": "Posting lag", "T0.ABERRANT_POSTING_LAG": "Posting lag",
     "V.REQUESTER": "Requester's department against the coding",
+    "F4.OPEN_COMMITMENT": "Open PO commitments, a disclosure",
     "T1.DEPT_INCONSISTENCY": "Department against the vendor's usual coding",
     "T1.MISSING_PROJECT_CODE": "Missing project code", "T1.MEMO_FORMAT": "Memo format",
     "T1.VENDOR_NAME_VARIANTS": "Vendor name variants", "T1B.UNALLOCATED_SPEND": "Unallocated spend",
