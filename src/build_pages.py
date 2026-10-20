@@ -522,9 +522,11 @@ def settled_note(rows, lead, thr):
     if not by:
         return ""
     items = ["%s %s, %s on %s, whose largest item there is %s" % (e(v), e(d), money(a, True), e(ac), money(t, True)) for (v, d, ac), (a, t) in by.items()]
-    return ('<p class="note" data-settled="%s">%s %s. %s cost breakdown ties to the bill and puts no item on that account at or over the %s CapEx '
+    accts = len({ac for (v, d, ac) in by})
+    return ('<p class="note" data-settled="%s">%s %s. %s cost breakdown ties to the bill and puts no item on %s at or over the %s CapEx '
             'threshold, so none of its items there is a capital asset.</p>' % (e(json.dumps({"%s|%s" % (d, ac.split()[0]): round(a, 2) for (v, d, ac), (a, t) in by.items()})), lead,
-                                                                     "; ".join(items), "Its" if len({d for (v, d, ac) in by}) == 1 else "Each bill's", money(thr)))
+                                                                     "; ".join(items), "Its" if len({d for (v, d, ac) in by}) == 1 else "Each bill's",
+                                                                     "that account" if accts == 1 else "those accounts", money(thr)))
 
 
 def pt_reviews(thr_capex, thr_prepaid):
@@ -2666,7 +2668,7 @@ def flux():
          + ("; %s in Section B" % count(len(revs), "forecast revision") if revs else "")),
         ("P&amp;L Impact if All Added to CSV", fav(impact, ("&#9660; " if impact > 0 else "&#9650; ") + short(abs(impact))), "Favorable" if impact > 0 else "Unfavorable")])
         + '<div class="card"><div class="ch">NetSuite Journal Entries<button class="pill solid r" data-export>Export to NetSuite, CSV</button></div></div><h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section A: Accounting Adjustments</h3>'
-        + settled_note(pt_left, "No entry is proposed to capitalize these pass-through bills, which the GL Coding Review leaves to Pass-Through Bills:" if len(pt_left) > 1
+        + settled_note(pt_left, "No entry is proposed to capitalize these pass-through bills, which the GL Coding Review leaves to Pass-Through Bills:" if len({x[1] for x in pt_left}) > 1
                        else "No entry is proposed to capitalize this pass-through bill, which the GL Coding Review leaves to Pass-Through Bills:", CAPEX_THR) + "".join(cards_a)
         + '<h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section B: Forecast / Budget Revisions</h3>'
         + ("".join(cards_b) or '<p class="note">%s</p>' % ("No forecast revisions in %s." % PERIOD if any("forecast" in (i.get("roles") or []) for i in M.get("inputs") or [])
@@ -3037,11 +3039,21 @@ def coding():
                 if k_ in seen_:
                     continue
                 seen_.add(k_)
+                # the finding's own lines (views 1.7.3 names each one's department and amount), so a
+                # line a Journal Entry already moved off the account makes no card; an older run
+                # names only the bill and account, and takes the vendor's lines on them
+                own = [x for x in ms if (x.get("document"), x.get("account")) == k_ and "department" in x]
                 by_dept = {}
                 for i in its:
                     if i["document"] == m.get("document") and i["account"] == m.get("account"):
                         d_ = i.get("department") or ""
-                        by_dept[d_] = dict(i, amount=round(by_dept[d_]["amount"] + (i.get("amount") or 0), 2)) if d_ in by_dept else i
+                        if own and not any((x["department"] or "") == d_ for x in own):
+                            continue
+                        by_dept.setdefault(d_, dict(i, amount=0.0))
+                for d_ in by_dept:
+                    by_dept[d_]["amount"] = round(sum(x["amount"] for x in own if (x["department"] or "") == d_) if own else
+                                                  sum(i.get("amount") or 0 for i in its if i["document"] == m.get("document")
+                                                      and i["account"] == m.get("account") and (i.get("department") or "") == d_), 2)
                 rows_ += [(m, i) for i in by_dept.values()] or [(m, None)]
             for m, it in rows_:
                 to = re.search(r"\b(1\d{6})\b", fl.get("do") or "")

@@ -122,6 +122,18 @@ ok(len(F.prepaid_findings([sub], {}, LEAVES, "Aug 2026", [0])) == 1
    and not F.prepaid_findings([sub, jline("6891000", -30_000, "To record prepaid insurance INS-77")], {}, LEAVES, "Aug 2026", [0]),
    "the prepaid screen skips a bill a journal already moves to prepaid")
 
+# a capital bill with lines in two departments: the entry takes each department's lines off it, and
+# the finding names each line, so the console makes a card per department and no other
+split2 = F.capex_findings([bill("Flagship Labs LLC", "6815000", 2_000, "Non-Capital Equipment", doc="INV1", dept="General G&A"),
+                           bill("Flagship Labs LLC", "6815000", 3_280.67, "Non-Capital Equipment", doc="INV1", dept="Finance")], LEAVES, "Aug 2026", [0])
+e2 = V.entries(split2, "Aug 2026")
+rev = sorted((l["department"], l["credit"]) for l in (e2[0]["lines"] if e2 else []) if l.get("reverses_line"))
+ok(len(e2) == 1 and rev == [("Finance", 3280.67), ("General G&A", 2000.0)]
+   and abs(sum(l["debit"] for l in e2[0]["lines"]) - sum(l["credit"] for l in e2[0]["lines"])) < 0.01,
+   "a capital bill split across departments is taken off each department, and the entry balances")
+ok(sorted((m["department"], m["amount"]) for m in V._doc_match(split2[0])) == [("Finance", 3280.67), ("General G&A", 2000.0)],
+   "the finding names each of its lines, with its department and amount, for the console's cards")
+
 if FAILED:
     print("%d failed" % len(FAILED))
     sys.exit(1)

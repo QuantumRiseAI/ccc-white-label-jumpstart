@@ -39,7 +39,7 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ## 2.2.2: the P&L Flux reads the Flagship breakdown (SERIF-176)
 
-Console 2.2.2. Decisions keep their stored verbs; no id changes.
+Console 2.2.2, views 1.7.3. Decisions keep their stored verbs; no id changes on Sep or Aug 2026.
 
 - **The two consoles agree on a pass-through bill its cost breakdown settles.** With
   `--flagship-breakdown`, the P&L Flux does not propose capitalizing a pass-through bill whose
@@ -55,7 +55,10 @@ Console 2.2.2. Decisions keep their stored verbs; no id changes.
 - Both notes are one sentence pattern, listing each bill and account once with the bill's amount
   there, and a breakdown settles only its own vendor's bill.
 - **A CapEx or Prepaid flag on a bill with lines in two departments** is one card per department,
-  each with its own amount. Before, each card took the first line's amount.
+  each with its own amount, made from the finding's own lines (views 1.7.3 names each one's
+  department and amount), so a line a Journal Entry already moved off the account makes no card.
+  Before, each card took the first line's amount. The P&L Flux's entry for such a bill takes each
+  department's lines off it, where before it took the whole bill off the first line's department.
 - `tests/test_runs.py` checks that both consoles settle the same bills each month (the flux only
   those at or over $5,000, as it proposes nothing capital below that).
 
