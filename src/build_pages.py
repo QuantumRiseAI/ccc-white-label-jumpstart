@@ -36,7 +36,7 @@ sys.path.insert(0, HERE)
 import serif_sources as SS  # noqa: E402
 import serif_design as DS   # noqa: E402
 
-VERSION = "2.2.2"
+VERSION = "2.2.3"
 ap = argparse.ArgumentParser(description="Build the GL Coding Review and P&L Flux consoles.")
 ap.add_argument("--only", choices=("coding", "flux"), help="build one console; both by default")
 ap.add_argument("--coding-run", help="the GL Coding Review run.json, after serif_views.py --keep-names")
@@ -1019,6 +1019,18 @@ def runlog(run, kind, also=None, read=()):
     """The run log: the exports, what each check found, the estimated cost of a
     run, every input, and the build record."""
     m, views = run.get("manifest") or {}, run.get("views") or {}
+    # The requester check is the schedules', not the engine's: it ties a Coupa PO line's requester
+    # to the vendor's bills by supplier, so without Coupa's Supplier it finds nothing, and says so.
+    cc_ = m.get("coupa_coverage") or {}
+    # (views 1.7.4 records it in run.json; an earlier run gets it here)
+    old_views = tuple(int(x) for x in re.findall(r"\d+", str(views.get("version") or "0"))[:3]) < (1, 7, 4)
+    if kind == "coding" and old_views and not any(x.get("rule_id") == "V.REQUESTER" for x in m.get("rules_not_run") or []) \
+            and (not cc_.get("supplied") or "Supplier" in (cc_.get("columns_absent") or [])):
+        m = dict(m, rules_not_run=list(m.get("rules_not_run") or []) + [{
+            "rule_id": "V.REQUESTER", "status": "not_run",
+            "reason": "No Coupa export supplied." if not cc_.get("supplied")
+            else "The Coupa report has no Supplier column, so no PO line ties to a vendor's bills."}])
+        run = dict(run, manifest=m)
     # the reports the build itself reads, beside the exports the engine and schedules read
     extra = {"netsuite_income_statement": [p_ for p_ in IS_X or [] if os.path.exists(p_)],
              "netsuite_ref": [p_ for p_ in A.netsuite_ref or [] if os.path.exists(p_)]}
@@ -2048,7 +2060,43 @@ def coding_corrections():
                         if "netsuite_gl" in (i.get("roles") or []) or os.path.basename(str(i.get("path") or "")).startswith("netsuite_gl")}
     same_gl = bool(gl_sha(PLR)) and gl_sha(PLR) == gl_sha(GLR)
     booked, held, missing, corr, opened = [], [], [], defaultdict(float), defaultdict(list)
-    edited, ns_corr, ns_blank, ns_later = [], defaultdict(float), [], []
+    edited, ns_corr, ns_blank, ns_later, imported = [], defaultdict(float), [], [], []
+    refOf_py = lambda iid: (CODING_BUILT.get("ref") or {}).get(iid, iid)
+    # A correction booked through the NetSuite CSV is in a GL exported after the import, as a
+    # Journal Entry whose Memo carries the card's description ("CODING-07 | <description> |
+    # Sep'26") and whose lines are the entry's. A correction is in the ledger when a journal of the
+    # month names its description and moves its accounts and departments by its amounts; it is not
+    # applied again. The reference ID is not matched: a later build can renumber the cards, and
+    # many cards share a description. Each journal answers for one correction.
+    gl_je = defaultdict(lambda: {"text": "", "moves": defaultdict(float)})
+    for l in by_period.get(PERIOD, []):
+        if l.get("txn_type") == "Journal":
+            g = gl_je[l.get("document_number") or ""]
+            g["text"] += " " + (l.get("memo") or "") + " " + (l.get("description") or "")
+            g["moves"][((l.get("account_code") or "").strip(), (l.get("department") or "").strip().casefold())] += l.get("amount") or 0
+    used_je = set()
+    def desc_of(m):
+        """The entry's description: its Memo without the reference ID in front or the month and
+        original date after, so a Memo edited down to "Sep'26" matches nothing."""
+        parts = [p.strip() for p in str(m or "").split(" | ")]
+        if parts and re.fullmatch(r"[A-Z]+-\d{2,}", parts[0]):
+            parts = parts[1:]
+        parts = [p for p in parts if not re.fullmatch(r"[A-Z][a-z]{2}'\d\d|Original date .*", p)]
+        return parts[0] if parts and len(parts[0]) >= 8 else ""
+
+    def in_gl(memo, lines):
+        d = desc_of(memo)
+        want = defaultdict(float)
+        for l in lines:
+            want[((l.get("account") or "").strip(), (l.get("department") or "").strip().casefold())] += amt(l.get("debit"), "") - amt(l.get("credit"), "")
+        want = {k: round(v, 2) for k, v in want.items() if round(v, 2)}
+        for jd, g in gl_je.items():
+            if jd in used_je or not d or d not in g["text"]:
+                continue
+            if all(abs(round(g["moves"].get(k, 0), 2) - v) < 0.01 for k, v in want.items()):
+                used_je.add(jd)
+                return jd
+        return None
     for iid, d in dec.items():
         if iid not in je and iid not in known:
             missing.append(iid)
@@ -2082,6 +2130,10 @@ def coding_corrections():
         if ns and not same_gl:
             ns_later.append(vendor)
             continue
+        jd_ = None if ns else in_gl(head.get("memo"), lines)
+        if jd_:
+            imported.append("%s %s (%s)" % (refOf_py(iid), vendor.rstrip("."), jd_))
+            continue
         (edited if ns else booked).append(iid)
         for a, v in net.items():
             if PNL(a):
@@ -2104,6 +2156,9 @@ def coding_corrections():
         drafted = [i for i in missing if i.startswith("DR-")]
         notes_out.append("%s not in this run, not applied%s" % (count(len(missing), "decision"),
                          (" (%d on Journal Entries Claude drafted: pass --coding-drafts)" % len(drafted)) if drafted and not CODING_DRAFTS else ""))
+    if imported:
+        notes_out.append("%s already in this GL, imported from the NetSuite CSV, not applied again: %s" % (
+            count(len(imported), "correction"), "; ".join(imported[:5]) + (" and %d more" % (len(imported) - 5) if len(imported) > 5 else "")))
     if held:
         notes_out.append("%s held, not applied: %s" % (count(len(held), "decision"), "; ".join("%s (%s)" % (v, w) for _, v, w in held[:5]) + (" and %d more" % (len(held) - 5) if len(held) > 5 else "")))
     few = lambda vs: "; ".join(vs[:5]) + (" and %d more" % (len(vs) - 5) if len(vs) > 5 else "")
@@ -2571,9 +2626,9 @@ def flux():
                                                                 ", on Coupa %s %s" % ("PO" if len(pos) == 1 else "POs", ", ".join(pos)) if pos else "")
         m = re.match(r"(\$[\d,.]+) billed in (\w+ \d{4}) against (.+)$", obs)
         if rule == "F6.ACCRUAL_PATTERN" and m:
-            k = re.match(r"(\d+) invoice\(s\) in the trailing six periods(; no Coupa line this period)?", sup)
+            k = re.match(r"(\d+) invoice\(s\) in the trailing six periods(?:; (.+))?$", sup)
             return "%s billed %s in %s, against %s.%s" % (vendor or "The vendor", "nothing" if m.group(1) == "$0.00" else m.group(1), m.group(2), m.group(3),
-                   (" It has %s %s in the trailing six periods%s." % (k.group(1), "invoice" if k.group(1) == "1" else "invoices", " and no Coupa line this period" if k.group(2) else "")) if k else (" " + stop(cap(sup)) if sup else ""))
+                   (" It has %s %s in the trailing six periods%s." % (k.group(1), "invoice" if k.group(1) == "1" else "invoices", (", and " + k.group(2)) if k.group(2) else "")) if k else (" " + stop(cap(sup)) if sup else ""))
         m = re.match(r"model (\S+) against ledger (\S+) \((.+)\)$", obs)
         if rule == "F5.MODEL_TIE" and m:
             return "The forecast models %s against the ledger's %s (%s)%s." % (m.group(1), m.group(2), m.group(3), (", in " + sup[:1].lower() + sup[1:]) if sup else "")
@@ -3416,6 +3471,43 @@ def coding():
     clear = [r for r in vrows if not r.get("flags") and round(r.get("amount") or 0)]
     P2 = SS.shift(PERIOD, -2)
 
+    # A bill a Journal Entry of the month already moves to the balance sheet (Serif's close
+    # entries name the bill: "Capitalize freezer VWR International LLC bill 8822578887"): its
+    # document -> the entry, the balance sheet accounts it debits, and any account its memo names.
+    jl_ = [l for l in by_period.get(PERIOD, []) if l.get("txn_type") == "Journal"]
+    by_je_ = defaultdict(list)
+    for l in jl_:
+        by_je_[l.get("document_number")].append(l)
+
+    def moved_to_bs(doc, posted):
+        """posted: the accounts the vendor's bill is on. The journal must name the bill and credit
+        one of them, so a number like 2026 or 5000 in a memo does not count."""
+        says = re.compile(r"(?<![\w-])" + re.escape(str(doc)) + r"(?![\w-])")
+        for jd, ls in by_je_.items():
+            text = " ".join((l.get("memo") or "") + " " + (l.get("description") or "") for l in ls)
+            if len(str(doc)) >= 4 and says.search(text) and any(l["account_code"] in posted and (l.get("amount") or 0) < 0 for l in ls):
+                to = sorted({l["account_code"] for l in ls if l["account_code"][:2] in ("13", "15") and (l.get("amount") or 0) > 0})
+                if to:
+                    named = sorted(set(re.findall(r"\b(1[35]\d{5})\b", text)) - set(to) - {str(doc)})
+                    return jd, to, named
+        return None
+
+    def bs_check(r):
+        """Not a prepaid or capital purchase, or a bill a Journal Entry already moved there,
+        named with the entry and, where its memo names another account, that account."""
+        A_ = lambda a: "%s %s" % (a, acct_name(a))
+        its_ = (r.get("detail") or {}).get("items") or []
+        for d_ in dict.fromkeys(str(i["document"]) for i in its_):
+            mv = moved_to_bs(d_, {i["account"] for i in its_ if str(i["document"]) == d_})
+            if mv:
+                jd, to, named = mv
+                return ("ok", "Bill %s already moved to %s by Journal Entry %s%s" % (
+                    d_, ", ".join(A_(a) for a in to), jd, ("; its memo names %s" % ", ".join(A_(a) for a in named)) if named else ""))
+        return ("ok", "Not a prepaid or capital purchase")
+
+    po_off = next((x.get("reason") or "it did not run" for x in GLR["manifest"].get("rules_not_run") or []
+                   if x.get("rule_id") == "T4.PO_ACCOUNT_MISMATCH" and (x.get("status") or "not_run") == "not_run"), "")
+
     def passed(r):
         """What was checked on a vendor no check flagged, and what each found. A check
         with nothing to compare against says so, and is not counted as passed."""
@@ -3424,8 +3516,10 @@ def coding():
         coupa = any((LINKS.get(str(i["document"])) or {}).get("coupa") for i in ((r.get("detail") or {}).get("items") or []))
         out = [("ok", "Coded as in %s and %s" % (P2[:3], PRIOR[:3])) if hist and cur <= hist else
                ("ok", "Department is the vendor's usual") if hist else ("na", "No bills in %s or %s to compare" % (P2[:3], PRIOR[:3])),
+               # the PO account check ran only if the run says so; a Coupa link alone compares nothing
+               ("na", "Account against its Coupa PO not checked: " + po_off[:1].lower() + po_off[1:].rstrip(".")) if po_off else
                ("ok", "Account matches its Coupa PO") if coupa else ("na", "No Coupa PO to compare"),
-               ("ok", "Not a prepaid or capital purchase"),
+               bs_check(r),
                ("ok", "Coded as planned") if r.get("planned") else ("na", "No plan line for this vendor")]
         return ('<div class="checks"><span class="l">Checks</span>' + "".join(
             '<span class="%s">%s%s</span>' % (k, "&#10003; " if k == "ok" else "&ndash; ", e(t)) for k, t in out) + "</div>")
@@ -3463,6 +3557,17 @@ def coding():
     carded |= {(l.get("vendor") or "", l["account"], l.get("department") or "") for x in drafted for l in x["lines"] if l.get("credit")}
     vc_cards = []
     vc = []
+
+    def off_plan_said(why, amt):
+        # amt: the card's off-plan codings only (a card may also hold a Coding changed one)
+        """The off-plan flag's amount is the vendor's whole spend off plan; the card moves only the
+        codings no other card covers (a pass-through bill is on Pass-Through Bills), so it says
+        its own amount, and where the rest is."""
+        m = re.search(r"(\$[\d,]+\.\d\d) this month is on other coding\.", why)
+        if not m or abs(float(m.group(1)[1:].replace(",", "")) - abs(amt)) < 0.01:
+            return why
+        return why.replace(m.group(0), "%s of the %s off plan is on this card; the rest is on its other cards and pages."
+                           % (money(abs(amt), True), m.group(1)))
     for r in vrows:
         fls = sorted((f for f in r.get("flags") or [] if f.get("id") in VC_FLAGS), key=lambda f: f["id"] != "changed")
         if not fls or any(f.get("id") == "new" for f in r["flags"]):
@@ -3539,7 +3644,9 @@ def coding():
         items.append(("dept", iid, " / ".join(VC_FLAGS[f["id"]] for f in fls), r["vendor"], (doc or {}).get("text") or "", amt,
                       ", ".join(a_ for a_, _ in keys), ", ".join(a_ for a_, _ in tos)))
         vc_cards.append(vcard(iid, r, "Review" if amt >= thr else "Routine",
-                              " ".join("<b>%s:</b> %s" % (VC_FLAGS[f["id"]], en(f.get("why") or "")) for f in fls)
+                              " ".join("<b>%s:</b> %s" % (VC_FLAGS[f["id"]], off_plan_said(en(f.get("why") or ""), sum(abs(cods[k]["current"]) for k in keys
+                                                                    if k not in {(q.get("account"), q.get("department") or "") for m in f.get("match") or [] for q in m.get("not") or []}))
+                                                                    if f["id"] == "plan" else en(f.get("why") or "")) for f in fls)
                               + (" The coding matches the vendor's earlier months; only the plan differs." if steady else ""),
                               (("confirm", "Confirm, Coding Stands"), ("recode", "Recode, Add to NetSuite CSV"), ("netsuite", "Edited Manually in NetSuite")),
                               flag=True, move={"lines": lines, "memo": memo, "amount": amt, "doc": doc, "keys": keys}))
@@ -3743,7 +3850,7 @@ def coding():
     for iid, j in je.items():
         j["memo"] = ref_memo(ref.get(iid), j["memo"])
     pages = [re.sub(r"\{ref:([\w-]+)\}", lambda m: '<span class="ref mono">%s</span>' % ref[m.group(1)] if m.group(1) in ref else m.group(0), x) for x in pages]
-    CODING_BUILT.update(je=je_finish(je), items=items)
+    CODING_BUILT.update(je=je_finish(je), items=items, ref=ref)
     data = {"kind": "coding", "run": GLR["manifest"]["run_id"], "slug": SLUG, "thr": thr, "thr_capex": THR["thr_capex"], "thr_prepaid": THR["thr_prepaid"], "je":je_finish(je), "ref": ref, "icons": {}, "drafts": DRAFTS, "nsref": NSREF, "sub_id": JE_SUBSIDIARY_ID}
     js = r"""
 function refresh(){

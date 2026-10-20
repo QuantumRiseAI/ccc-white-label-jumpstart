@@ -37,6 +37,62 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## 2.2.3: fixes from the Sep 2026 mock Project runs
+
+Console 2.2.3, flux engine 0.8.4, views 1.7.4. Decisions keep their stored verbs; no id changes.
+
+- **A correction imported from the NetSuite CSV is not counted twice.** A booked correction is not
+  applied again when a journal of the month in the GL the P&L Flux reads names its description
+  and moves its accounts and departments by its amounts; each journal answers for one
+  correction, departments compared as NetSuite holds them, and the run log lists each by reference
+  ID and journal. The reference ID itself is
+  not matched, since a later build can renumber the cards. Before, only fixes Edited Manually in
+  NetSuite had a guard. `tests/test_imported.py` posts two of three approved corrections into a
+  copy of the Sep 2026 GL under other reference IDs and checks only the third is applied.
+- **A coding error is the GL Coding Review's.** The P&L Flux's instructions say not to draft a
+  reclass for a line the GL Coding Review's cards or drafted entries cover; without its run, a
+  reclass drafted in the flux says the coding review may propose the same one. (In the mock
+  runs both drafted the Fisher Scientific reagents, $27,078.91.)
+- **"No Coupa line" only when Coupa could show one.** A billing-pattern accrual now says "Coupa's
+  report has no Supplier, so its PO lines could not be matched", or that no Coupa lines were
+  supplied, instead of offering the absence of a line as evidence.
+- **Open PO commitments that could not be read are not $0.00.** Without Coupa's Line Status or
+  Order Status (Header), the P&L Flux lists the commitments disclosure (F4) as not run, and the
+  open commitments and received-not-invoiced totals in `run.json` are no figure, with a "Not
+  read" note, where they read $0.00 before. The Coupa row of Exports this month and the engine's
+  printout give the month's lines against the report's ("343 lines for the month, of 5,000 in
+  the report"). Flux engine 0.8.4.
+- **Two contradictions in the P&L Flux instructions are settled.** A total of the run's own rows
+  (operating expense from `tables[0]`) is reading the run, not computing; and the summary says
+  whether the period is right rather than calling a move timing.
+- **The requester check** is listed as not run when the Coupa report has no Supplier column, or
+  no roster was supplied, in `run.json` (views 1.7.4) as well as the Run log.
+- **Vendors Reviewed & Cleared no longer ticks "Account matches its Coupa PO" when that check did
+  not run**: it says it was not checked, and why. Before, any bill with a Coupa link was ticked.
+- **A bill a Journal Entry already moved to the balance sheet** reads so on Vendors Reviewed &
+  Cleared ("Bill 8822578887 already moved to 1505000 Capital in Process by Journal Entry
+  JE1536973474623; its memo names 1510000 Lab Equipment - New"), not "Not a prepaid or capital
+  purchase".
+- **An off-plan vendor card** states the amount it moves and that the rest of the vendor's off-plan
+  spend is on its other cards (the Flagship card said $282,774.15 and moved $228,872.00).
+- **An accrual's lines reverse no posted line** (`reverses_line` is no longer set on them).
+- **Instructions**, from the gaps the mock runs listed:
+  - A later run asks for the Income Statement exported with the newest GL.
+  - Connector-format files a reviewer attaches count as the month's exports.
+  - The Coupa export's months and its row limit are described as Serif sends them.
+  - Pass-Through Bills has no threshold, and a note there only where the check does not settle it.
+  - A vendor Recode recommendation says where the lines belong, with no second entry.
+  - Every adjustment card gets a note, under the threshold too; open commitments that could not
+    be read are said to be so, not $0.00; checks not run are named in one sentence; close
+    entries for earlier periods are context.
+  - The roster-against-GL comparison by department is gone: the roster's departments are not
+    the ledger's. 6900000 names its accounts.
+  - Names and pay may appear in the consoles and the files these Projects build, never in any
+    other document.
+  - The writing guide's examples are from a real close: take their form, never their figures.
+  - The Load Summary has DEGRADED and COUPA rows; the posting-lag check's two ids are explained;
+    the Aug 2026 reference counts are current (279 findings, engine 0.2.8).
+
 ## 2.2.2: the P&L Flux reads the Flagship breakdown (SERIF-176)
 
 Console 2.2.2, views 1.7.3. Decisions keep their stored verbs. No id changes on Sep or Aug 2026; a

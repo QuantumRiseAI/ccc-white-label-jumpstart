@@ -92,7 +92,7 @@ In a Claude Project every uploaded file sits at the top level, so all of these a
 filenames. In the repo, `make build PERIOD=sep2026` runs the same commands from the packaged
 Project folder on the exports in `inputs/sep2026/`.
 
-The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.2.2 now), one
+The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.2.3 now), one
 self-contained file that opens in any browser. That is the deliverable.
 
 The filename carries the period and the console version, so builds of different versions do
@@ -118,7 +118,7 @@ Serif sends these exports, uploaded as they are (link IDs, Flagship cost breakdo
    month's own export is then the only new one.
    Claude can also pull the month through the NetSuite connector with `netsuite_gl_detail.sql`
    and `netsuite_income_statement.sql`; the scripts read the saved results as they are.
-2. The Coupa PO line report with all available columns, for the calendar year, as `.csv`.
+2. The Coupa PO line report with all available columns, the months Coupa returns through the month, as `.csv`.
    First column `PO Number (Header)`. The shorter Coupa Data Pull (PO Lines) report also
    reads, but it carries no supplier or account, so the checks that join Coupa to the
    ledger find nothing on it.
@@ -408,8 +408,8 @@ text and in its Journal Entry Memo:
   names one, the entry holds it in Capital in Process and the card says the chart has no fixed
   asset account for it.
 
-The ledger has no in-service date, so the card's Placed in service says the date is not known;
-give the date in the note when you decide. A capital purchase under the $5,000 capitalization threshold is listed, not marked
+The ledger has no in-service date, so unless the line states one, the card's Placed in service
+gives the invoice date, by policy, to confirm; give the real date in the note when you decide. A capital purchase under the $5,000 capitalization threshold is listed, not marked
 Review, and says it is under the threshold.
 
 On every proposed entry a new balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the
@@ -545,8 +545,8 @@ The engine prints a load summary before any finding. Read it in this order:
    and the report says so on its own page.
 3. **Findings**, grouped by the action they call for rather than by rule.
 
-The Aug 2026 run is the reference: 56 findings (engine 0.2.7), tie-out PASS, 50 proposed Journal Entries,
-all in balance. After any change to a script, run Aug 2026 again. If its numbers move, the
+The Aug 2026 run is the reference: 279 findings (engine 0.2.8), 56 of them other than the 223 item
+account drift findings, tie-out PASS, 50 proposed Journal Entries, all in balance. After any change to a script, run Aug 2026 again. If its numbers move, the
 script changed what it finds; say so rather than explaining the new figure as though it
 were expected.
 

@@ -56,7 +56,7 @@ from collections import defaultdict
 
 import serif_sources as sources
 
-VIEWS_VERSION = "1.7.3"
+VIEWS_VERSION = "1.7.4"
 
 # The flux engine's definition, so the two agree on what counts as P&L.
 PL_PREFIXES = ("6", "7", "8")
@@ -1497,7 +1497,8 @@ def entries(findings, period, accrual_depts=None, lookup=None):
                 line["vendor"] = vendor
                 line["document"] = ""
                 line["project"], line["program"] = pp
-                if line["account"] in posted:
+                # an accrual adds to the expense; it reverses no posted line
+                if line["account"] in posted and rule not in ("F3.ACCRUAL_RECEIPT", "F6.ACCRUAL_PATTERN"):
                     line["reverses_line"] = True
                 if line["debit"] and not line["department"]:
                     line["department"] = accrual_depts.get(f["finding_id"], "")
@@ -1772,7 +1773,10 @@ def explain(f, accounts, period):
                                          period)]
         if mm:
             why.append("The average of the last three months is %s: %s." % (mm.group(1), mm.group(2)))
-        why.append("Coupa has no line for this vendor this month.")
+        basis = ev.get("basis", "")
+        why.append("Coupa has no line for this vendor this month." if "no Coupa line this period" in basis
+                   else "The Coupa report has no Supplier column, so it could not show a PO line for this vendor." if "no Supplier" in basis
+                   else "Coupa has no lines for this month to check against.")
         do = ["Ask the budget owner if the vendor did work in %s." % period,
               "If yes, choose Entry booked. It accrues %s and reverses next month." % _m(amt),
               "If no, choose Cleared."]
@@ -2063,6 +2067,19 @@ def main(argv=None):
     if not args.keep_names:
         redact_run(run, people, filers)
     run["views"] = build_views(run, args)
+    # The requester check is the schedules': it ties a Coupa PO line's requester (by the UKG
+    # roster) to the vendor's bills by supplier. Without either input it finds nothing, so the run
+    # lists it as not run, where Claude and the console read the checks.
+    m = run.get("manifest") or {}
+    if "uc1" in str(m.get("ruleset_version", "")):
+        cc = m.get("coupa_coverage") or {}
+        dark_req = any(t.get("id") == "requester" for t in run["views"].get("not_built") or [])
+        why = ("The Coupa report has no Supplier column, so no PO line ties to a vendor's bills." if "Supplier" in (cc.get("columns_absent") or [])
+               else "" if not dark_req
+               else "No Coupa export supplied to the schedules." if not getattr(args, "coupa", None)
+               else "No UKG roster supplied, or none of its people could be read, so no requester has a department.")
+        m["rules_not_run"] = [x for x in m.get("rules_not_run") or [] if x.get("rule_id") != "V.REQUESTER"] + (
+            [{"rule_id": "V.REQUESTER", "status": "not_run", "reason": why}] if why else [])
     if not args.keep_names:
         redact_run(run, people, filers)
     with open(args.run_json, "w", encoding="utf-8") as handle:

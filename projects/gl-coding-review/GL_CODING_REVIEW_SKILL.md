@@ -12,7 +12,7 @@ Engine findings, in `findings`:
 |---|---|---|
 | `T0.TIE_OUT` | SOX Documentation, GL Tie-Out | Debits equal credits. A failure stops the run. |
 | `T0.DUPLICATE_LINE` | Run log | One document posting the same account, amount, department and description more than once |
-| `T0.ABERRANT_POSTING_LAG` | Run log | A line dated three or more months before its period, or after it |
+| `T0.ABERRANT_POSTING_LAG` | Run log | A line dated three or more months before its period, or after it. The check is `T0.POSTING_LAG` in `rules_run` and the Run log; its findings carry this id |
 | `T1.DEPT_INCONSISTENCY` | Organization & Account, Coding Inconsistencies, vs. Vendor History ("Department") | A department other than the vendor's usual one in earlier months |
 | `T4.PO_ACCOUNT_MISMATCH` | Organization & Account, Coding Inconsistencies, vs. Coupa PO ("Account vs. Coupa") | An account other than the one the vendor's Coupa POs were approved against. When it did not run, the tab shows a dash and the run's reason |
 | `T4.ITEM_ACCOUNT_DRIFT` | Organization & Account, Coding Inconsistencies, vs. Coupa PO ("Account vs. Coupa") | A Coupa PO line in the close month on an account other than the one the same item had on earlier lines of the year (a tie in that history sets no expectation). Lines under the review threshold are a count and a total. Not run when the Coupa export has no Item column |
@@ -112,7 +112,8 @@ Capital in Process or a fixed asset account. Every capital recommendation says w
 * **An asset in service** goes to its fixed asset account, below. The policy places it in
   service at the invoice date.
 * The ledger has no in-service date. Unless the line states one, the card's Placed in
-  service says it is not known, and the reviewer gives the date in the note.
+  service gives the invoice date, by policy, to confirm, and the reviewer gives the real date
+  in the note.
 
 | Expense account | Fixed asset account, in service |
 |---|---|
@@ -151,8 +152,11 @@ Period: [Mon YYYY] | Entity: FL87 Serif Biomedicines, Inc.
 LOADED:    [file]  [N] lines   (one row per file)
 TIE-OUT:   Dr [X] / Cr [Y] / net [Z]   [PASS or FAIL]
 NOT RUN:   [check]  needs [feed]        (one row per check)
+DEGRADED:  [check]  without [column or feed]   (one row per check run on partial input)
+COUPA:     [N] lines, [months]; at its row limit: [yes or no]
 ```
 
+The tie-out row restates the tie's result already given; keep it, so the block stands on its own.
 A failed tie-out stops the run. Report the difference and produce nothing else.
 
 ## When Something Is Off
