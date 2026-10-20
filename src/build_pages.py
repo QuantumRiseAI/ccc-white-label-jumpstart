@@ -2586,6 +2586,10 @@ def flux():
     # like one comes or goes.
     for x in ent:
         f = F.get(x["finding_id"]) or {}
+        # what a capitalize or prepaid moves is its new balance sheet line, not its gross debits,
+        # which also count a department's credit line taken off the other way
+        if x.get("kind") in ("Capitalize", "Prepaid"):
+            x = dict(x, debits=round(sum(l.get("debit") or 0 for l in x["lines"] if not l.get("reverses_line")), 2))
         bills = {d for l in x["lines"] for d in (l.get("documents") or [])} or \
             {t.get("document_number") for t in f.get("transactions") or [] if t.get("document_number")} or \
             {x.get("support") or ""}   # a receipt accrual has no bill; its Coupa POs tell it apart
@@ -3054,7 +3058,15 @@ def coding():
                     by_dept[d_]["amount"] = round(sum(x["amount"] for x in own if (x["department"] or "") == d_) if own else
                                                   sum(i.get("amount") or 0 for i in its if i["document"] == m.get("document")
                                                       and i["account"] == m.get("account") and (i.get("department") or "") == d_), 2)
-                rows_ += [(m, i) for i in by_dept.values()] or [(m, None)]
+                # One card per bill and account, at its net amount: a department netting the other
+                # way (a credit line in it) is taken off on its own line of the entry, not a
+                # negative card of its own. The card's department is the largest one's.
+                if by_dept:
+                    main = max(by_dept.values(), key=lambda i: abs(i["amount"]))
+                    rows_.append((m, dict(main, amount=round(sum(i["amount"] for i in by_dept.values()), 2),
+                                          depts={d: i["amount"] for d, i in by_dept.items() if round(i["amount"], 2)})))
+                else:
+                    rows_.append((m, None))
                 from_lines = from_lines or bool(own)
             for m, it in rows_:
                 to = re.search(r"\b(1\d{6})\b", fl.get("do") or "")
@@ -3067,7 +3079,8 @@ def coding():
                 screen[fl["id"]].append({"vendor": r["vendor"], "from_account": m.get("account") or (it or {}).get("account") or "",
                                          "to_account": m.get("to") or (to.group(1) if to else ""), "department": (it or {}).get("department") or "",
                                          "what": (it or {}).get("text") or "", "amount": (it or {}).get("amount") if (len(rows_) > 1 or from_lines) and it else fl["amount"],
-                                         "total": m.get("total"), "placement": p, "why": why, "do": do, "doc": it})
+                                         "total": m.get("total"), "placement": p, "why": why, "do": do, "doc": it,
+                                         "depts": (it or {}).get("depts") or {}})
     for k in screen:
         screen[k].sort(key=lambda x: -(x["amount"] or 0))
     # A capital recode says where it goes and why: Capital in Process for build-out work and
@@ -3101,7 +3114,9 @@ def coding():
             elif "%s" in placed:
                 placed %= (doc or {}).get("date") or "not shown"
             je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": doc["date"] if doc else "", "memo": "Recode %s %s from %s to %s%s" % (r["vendor"], r.get("what") or "", r["from_account"], r["to_account"], (", " + memo) if memo else ""),
-                       "lines": je_lines([{"account": r["to_account"], "department": r["department"], "debit": r["amount"]}, {"account": r["from_account"], "department": r["department"], "credit": r["amount"], "reverses_line": True}], doc)}
+                       "lines": je_lines([{"account": r["to_account"], "department": r["department"], "debit": r["amount"]}]
+                                         + [{"account": r["from_account"], "department": d_, ("credit" if a_ > 0 else "debit"): abs(a_), "reverses_line": True}
+                                            for d_, a_ in sorted((r.get("depts") or {r["department"]: r["amount"]}).items())], doc)}
             items.append(("capex" if prefix == "C" else "prepaid", iid, typ, r["vendor"], r.get("what") or "", r["amount"], r["from_account"], r["to_account"]))
             bucket.append(card(iid, r["vendor"], r["amount"], True, coding_(r["from_account"], r["department"]), '<span class="arrow">&rarr;</span> ' + coding_(r["to_account"], je[iid]["lines"][0]["department"]),
                                doc, ('<div><div class="l">Placed in service</div><div class="x" data-placed="%s">%s</div></div>' % (e(p.get("kind")), e(placed)) if p else ""),

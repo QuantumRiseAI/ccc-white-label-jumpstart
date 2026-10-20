@@ -54,10 +54,12 @@ Console 2.2.2, views 1.7.3. Decisions keep their stored verbs; no id changes on 
   it: the instructions tell Claude to write no note for it and leave it out of the summary's count.
 - Both notes are one sentence pattern, listing each bill and account once with the bill's amount
   there, and a breakdown settles only its own vendor's bill.
-- **A CapEx or Prepaid flag on a bill with lines in two departments** is one card per department,
-  each with its own amount, made from the finding's own lines (views 1.7.3 names each one's
+- **A CapEx or Prepaid flag on a bill with lines in two departments** is one card for the bill and
+  account at its net amount, its entry taking each department's lines off on their own line (a
+  department netting the other way on the other side), made from the finding's own lines (views 1.7.3 names each one's
   department and amount), so a line a Journal Entry already moved off the account makes no card.
-  Before, each card took the first line's amount. The P&L Flux's entry for such a bill takes each
+  Before, each card took the first line's amount, and a department netting negative made a
+  negative card. A capitalize or prepaid adjustment's Amount is its balance sheet line. The P&L Flux's entry for such a bill takes each
   department's lines off it, where before it took the whole bill off the first line's department;
   a department netting the other way (a credit line in it) goes on the other side.
 - `tests/test_runs.py` checks that both consoles settle the same bills each month (the flux only
