@@ -58,7 +58,8 @@ Console 2.2.2, views 1.7.3. Decisions keep their stored verbs; no id changes on 
   each with its own amount, made from the finding's own lines (views 1.7.3 names each one's
   department and amount), so a line a Journal Entry already moved off the account makes no card.
   Before, each card took the first line's amount. The P&L Flux's entry for such a bill takes each
-  department's lines off it, where before it took the whole bill off the first line's department.
+  department's lines off it, where before it took the whole bill off the first line's department;
+  a department netting the other way (a credit line in it) goes on the other side.
 - `tests/test_runs.py` checks that both consoles settle the same bills each month (the flux only
   those at or over $5,000, as it proposes nothing capital below that).
 

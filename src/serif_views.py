@@ -1510,10 +1510,14 @@ def entries(findings, period, accrual_depts=None, lookup=None):
                     for t in txns_of(f):
                         if (t.get("account_code") or "").strip() == line["account"]:
                             by[t.get("department") or ""] += num(t.get("amount"))
-                    if len(by) > 1 and abs(sum(by.values()) - (line["credit"] or line["debit"])) < 0.01:
+                    total = sum(by.values())
+                    if len(by) > 1 and abs(abs(total) - (line["credit"] or line["debit"])) < 0.01:
+                        # a department netting the other way (a credit line in it) goes on the other side
                         i = parsed.index(line)
                         side = "credit" if line["credit"] else "debit"
-                        parsed[i:i + 1] = [dict(line, department=d, **{side: r2(abs(a)), ("debit" if side == "credit" else "credit"): 0.0})
+                        other = "debit" if side == "credit" else "credit"
+                        parsed[i:i + 1] = [dict(line, department=d, **({side: r2(abs(a)), other: 0.0} if (a > 0) == (total > 0)
+                                                                       else {other: r2(abs(a)), side: 0.0}))
                                            for d, a in sorted(by.items()) if r2(a)]
             # NetSuite requires a department on every line. A P&L line still without one takes
             # the department of the ledger lines behind the finding, when they share one.

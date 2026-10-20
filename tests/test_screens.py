@@ -131,6 +131,12 @@ rev = sorted((l["department"], l["credit"]) for l in (e2[0]["lines"] if e2 else 
 ok(len(e2) == 1 and rev == [("Finance", 3280.67), ("General G&A", 2000.0)]
    and abs(sum(l["debit"] for l in e2[0]["lines"]) - sum(l["credit"] for l in e2[0]["lines"])) < 0.01,
    "a capital bill split across departments is taken off each department, and the entry balances")
+neg = F.capex_findings([bill("Flagship Labs LLC", "6815000", 8_000, "Non-Capital Equipment", doc="INV2", dept="General G&A"),
+                        bill("Flagship Labs LLC", "6815000", -1_000, "Non-Capital Equipment", doc="INV2", dept="Finance")], LEAVES, "Aug 2026", [0])
+en = V.entries(neg, "Aug 2026")
+ok(len(en) == 1 and abs(sum(l["debit"] for l in en[0]["lines"]) - sum(l["credit"] for l in en[0]["lines"])) < 0.01
+   and any(l["department"] == "Finance" and l["debit"] == 1000.0 and l.get("reverses_line") for l in en[0]["lines"]),
+   "a department netting the other way (a credit line) goes on the other side, and the entry still balances")
 ok(sorted((m["department"], m["amount"]) for m in V._doc_match(split2[0])) == [("Finance", 3280.67), ("General G&A", 2000.0)],
    "the finding names each of its lines, with its department and amount, for the console's cards")
 

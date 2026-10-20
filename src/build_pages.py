@@ -3033,7 +3033,7 @@ def coding():
             # One row per bill, account and department the flag is about, its lines' amounts added.
             # The match names a bill and account once per line, so a bill with lines in two
             # departments is two rows, each with its own department and amount, not the first twice.
-            seen_, rows_ = set(), []
+            seen_, rows_, from_lines = set(), [], False
             for m in ms:
                 k_ = (m.get("document"), m.get("account"))
                 if k_ in seen_:
@@ -3055,6 +3055,7 @@ def coding():
                                                   sum(i.get("amount") or 0 for i in its if i["document"] == m.get("document")
                                                       and i["account"] == m.get("account") and (i.get("department") or "") == d_), 2)
                 rows_ += [(m, i) for i in by_dept.values()] or [(m, None)]
+                from_lines = from_lines or bool(own)
             for m, it in rows_:
                 to = re.search(r"\b(1\d{6})\b", fl.get("do") or "")
                 # Each bill gives its own finding's reason; a run from before views 1.7.2 gives
@@ -3065,7 +3066,7 @@ def coding():
                     why, do = (why.replace(p0["why"], p["why"]) if p0["why"] and p0["why"] in why else (why + " " + p["why"]).strip() if p.get("kind") != "in_service" else why), (do.replace(p0["ask"], p["ask"]) if p0["ask"] else (do + " " + p["ask"]).strip())
                 screen[fl["id"]].append({"vendor": r["vendor"], "from_account": m.get("account") or (it or {}).get("account") or "",
                                          "to_account": m.get("to") or (to.group(1) if to else ""), "department": (it or {}).get("department") or "",
-                                         "what": (it or {}).get("text") or "", "amount": (it or {}).get("amount") if len(rows_) > 1 and it else fl["amount"],
+                                         "what": (it or {}).get("text") or "", "amount": (it or {}).get("amount") if (len(rows_) > 1 or from_lines) and it else fl["amount"],
                                          "total": m.get("total"), "placement": p, "why": why, "do": do, "doc": it})
     for k in screen:
         screen[k].sort(key=lambda x: -(x["amount"] or 0))
