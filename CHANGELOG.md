@@ -39,7 +39,9 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ## 2.2.2: the P&L Flux reads the Flagship breakdown (SERIF-176)
 
-Console 2.2.2, views 1.7.3. Decisions keep their stored verbs; no id changes on Sep or Aug 2026.
+Console 2.2.2, views 1.7.3. Decisions keep their stored verbs. No id changes on Sep or Aug 2026; a
+CapEx or Prepaid card on a bill split across departments, which those months do not have, is now
+one card, keeping the id of its largest department's.
 
 - **The two consoles agree on a pass-through bill its cost breakdown settles.** With
   `--flagship-breakdown`, the P&L Flux does not propose capitalizing a pass-through bill whose
@@ -56,7 +58,8 @@ Console 2.2.2, views 1.7.3. Decisions keep their stored verbs; no id changes on 
   there, and a breakdown settles only its own vendor's bill.
 - **A CapEx or Prepaid flag on a bill with lines in two departments** is one card for the bill and
   account at its net amount, its entry taking each department's lines off on their own line (a
-  department netting the other way on the other side), made from the finding's own lines (views 1.7.3 names each one's
+  department netting the other way on the other side), and no other card moving any of them,
+  made from the finding's own lines (views 1.7.3 names each one's
   department and amount), so a line a Journal Entry already moved off the account makes no card.
   Before, each card took the first line's amount, and a department netting negative made a
   negative card. A capitalize or prepaid adjustment's Amount is its balance sheet line. The P&L Flux's entry for such a bill takes each

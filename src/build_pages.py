@@ -3118,7 +3118,8 @@ def coding():
                                          + [{"account": r["from_account"], "department": d_, ("credit" if a_ > 0 else "debit"): abs(a_), "reverses_line": True}
                                             for d_, a_ in sorted((r.get("depts") or {r["department"]: r["amount"]}).items())], doc)}
             items.append(("capex" if prefix == "C" else "prepaid", iid, typ, r["vendor"], r.get("what") or "", r["amount"], r["from_account"], r["to_account"]))
-            bucket.append(card(iid, r["vendor"], r["amount"], True, coding_(r["from_account"], r["department"]), '<span class="arrow">&rarr;</span> ' + coding_(r["to_account"], je[iid]["lines"][0]["department"]),
+            bucket.append(card(iid, r["vendor"], r["amount"], True, "<br>".join(coding_(r["from_account"], d_) for d_ in sorted(r.get("depts") or {r["department"]: 0},
+                                                                                                         key=lambda d_: -abs((r.get("depts") or {}).get(d_, 0)))), '<span class="arrow">&rarr;</span> ' + coding_(r["to_account"], je[iid]["lines"][0]["department"]),
                                doc, ('<div><div class="l">Placed in service</div><div class="x" data-placed="%s">%s</div></div>' % (e(p.get("kind")), e(placed)) if p else ""),
                                en(r["why"]), "",
                                FLAG_ACTS, lines_html(r["vendor"], r["from_account"], docs={r["doc"]["document"]} if r["doc"] else None), je_editor(iid, je[iid]["lines"]) + history(r["vendor"]),
@@ -3447,7 +3448,8 @@ def coding():
     VC_FLAGS = {"changed": "Coding changed", "plan": "Coded off plan"}
     # A coding another card already moves (CapEx, Prepaid, a Dept & Entity entry, Same item)
     # is left to that card, and a new vendor is on New This Period: one bill, one card.
-    carded = {(r_["vendor"], r_["from_account"], r_["department"]) for k in screen for r_ in screen[k]}
+    # every department a CapEx or Prepaid card's entry takes off, not only its main one
+    carded = {(r_["vendor"], r_["from_account"], d_) for k in screen for r_ in screen[k] for d_ in (r_.get("depts") or {r_["department"]: 0})}
     for f in dfind:
         x = ents.get(f["finding_id"])
         t = f.get("transaction") or {}
