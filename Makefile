@@ -19,6 +19,7 @@ test:     ## claude-projects/ up to date, checks run or listed as not run, stabl
 	python3 tests/test_passthrough.py
 	python3 tests/test_facts.py
 	python3 tests/test_runs.py
+	python3 tests/test_imported.py
 	node tests/test_flux_coding.js
 	node tests/audit_account_names.js
 	node tests/audit_table_width.js 1280

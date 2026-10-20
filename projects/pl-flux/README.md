@@ -20,7 +20,7 @@ Add the month's exports, as the systems write them:
 | Export | What it is |
 |---|---|
 | `netsuite_gl_detail_<range>.xls` | NetSuite Custom General Ledger saved search. Together the exports hold the month, the six before it and the same month last year. |
-| `coupa_po_lines_<year>.csv` | Coupa PO line report with all available columns, for the calendar year |
+| `coupa_po_lines_<year>.csv` | Coupa PO line report with all available columns, the months Coupa returns through the month |
 | `serif_rolling_forecast_<vintage>.xlsx` | The workbook FP&A saved after the month closed, and the one whose prior cut is the plan |
 | `ukg_full_roster_hrbp_<date>.csv` | The newest UKG roster |
 | `netsuite_balance_sheet_*.xls` | The Balance Sheet report, monthly columns, for Balance Sheet Flux and the tie-outs |

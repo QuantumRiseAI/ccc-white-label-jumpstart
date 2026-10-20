@@ -1776,7 +1776,7 @@ def explain(f, accounts, period):
         basis = ev.get("basis", "")
         why.append("Coupa has no line for this vendor this month." if "no Coupa line this period" in basis
                    else "The Coupa report has no Supplier column, so it could not show a PO line for this vendor." if "no Supplier" in basis
-                   else "No Coupa lines for the month were supplied to check against.")
+                   else "Coupa has no lines for this month to check against.")
         do = ["Ask the budget owner if the vendor did work in %s." % period,
               "If yes, choose Entry booked. It accrues %s and reverses next month." % _m(amt),
               "If no, choose Cleared."]
@@ -2067,6 +2067,17 @@ def main(argv=None):
     if not args.keep_names:
         redact_run(run, people, filers)
     run["views"] = build_views(run, args)
+    # The requester check is the schedules': it ties a Coupa PO line's requester (by the UKG
+    # roster) to the vendor's bills by supplier. Without either input it finds nothing, so the run
+    # lists it as not run, where Claude and the console read the checks.
+    m = run.get("manifest") or {}
+    if "uc1" in str(m.get("ruleset_version", "")):
+        cc = m.get("coupa_coverage") or {}
+        why = ("No Coupa export supplied." if not cc.get("supplied")
+               else "The Coupa report has no Supplier column, so no PO line ties to a vendor's bills." if "Supplier" in (cc.get("columns_absent") or [])
+               else "No UKG roster supplied, so no requester has a department." if not getattr(args, "roster", None) else "")
+        m["rules_not_run"] = [x for x in m.get("rules_not_run") or [] if x.get("rule_id") != "V.REQUESTER"] + (
+            [{"rule_id": "V.REQUESTER", "status": "not_run", "reason": why}] if why else [])
     if not args.keep_names:
         redact_run(run, people, filers)
     with open(args.run_json, "w", encoding="utf-8") as handle:

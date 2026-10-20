@@ -41,10 +41,13 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 Console 2.2.3, flux engine 0.8.3, views 1.7.4. Decisions keep their stored verbs; no id changes.
 
-- **A correction imported from the NetSuite CSV is not counted twice.** When the P&L Flux reads a
-  GL exported after the GL Coding Review's CSV was imported, a booked correction whose Memo
-  (`CODING-07 | …`) is already on a journal line of the month is not applied again; the run log
-  lists it. Before, only fixes Edited Manually in NetSuite had this guard.
+- **A correction imported from the NetSuite CSV is not counted twice.** A booked correction is not
+  applied again when a journal of the month in the GL the P&L Flux reads names its description
+  and moves its accounts and departments by its amounts; each journal answers for one
+  correction, and the run log lists each by reference ID and journal. The reference ID itself is
+  not matched, since a later build can renumber the cards. Before, only fixes Edited Manually in
+  NetSuite had a guard. `tests/test_imported.py` posts two of three approved corrections into a
+  copy of the Sep 2026 GL under other reference IDs and checks only the third is applied.
 - **A coding error is the GL Coding Review's.** The P&L Flux's instructions say not to draft a
   reclass for a line the GL Coding Review's cards or drafted entries cover; without its run, a
   reclass drafted in the flux says the coding review may propose the same one. (In the mock
@@ -52,7 +55,10 @@ Console 2.2.3, flux engine 0.8.3, views 1.7.4. Decisions keep their stored verbs
 - **"No Coupa line" only when Coupa could show one.** A billing-pattern accrual now says "Coupa's
   report has no Supplier, so its PO lines could not be matched", or that no Coupa lines were
   supplied, instead of offering the absence of a line as evidence.
-- **The requester check** is listed as not run when the Coupa report has no Supplier column.
+- **The requester check** is listed as not run when the Coupa report has no Supplier column, or
+  no roster was supplied, in `run.json` (views 1.7.4) as well as the Run log.
+- **Vendors Reviewed & Cleared no longer ticks "Account matches its Coupa PO" when that check did
+  not run**: it says it was not checked, and why. Before, any bill with a Coupa link was ticked.
 - **A bill a Journal Entry already moved to the balance sheet** reads so on Vendors Reviewed &
   Cleared ("Bill 8822578887 already moved to 1505000 Capital in Process by Journal Entry
   JE1536973474623; its memo names 1510000 Lab Equipment - New"), not "Not a prepaid or capital

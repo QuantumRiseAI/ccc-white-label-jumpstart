@@ -100,8 +100,8 @@ Journal Entry added to the NetSuite CSV, or edited or recoded with a note), the 
 adjusted figure. A fix marked Edited Manually in NetSuite is applied too, and named apart, when this flux reads
 the coding run's own GL export; on a later export, which may already hold the edit, it is not applied
 and the run log says so. A correction booked through the NetSuite CSV is not applied again when
-this flux reads a later GL export that already holds it (a journal line of the month carrying the
-entry's Memo, `CODING-07 | …`); the run log lists each. Open coding findings are listed on the affected row and never applied. Say in the chat that the flux carries the corrections.
+the GL this flux reads already holds it (a journal of the month naming its description and moving
+its accounts by its amounts); the run log lists each. Open coding findings are listed on the affected row and never applied. Say in the chat that the flux carries the corrections.
 Without the GL Coding Review's run and decision record, the flux shows the ledger as posted;
 say so in the chat.
 
@@ -127,8 +127,8 @@ if it needs a change, change the script and build again.
 The UKG roster carries names, email addresses and salaries. With `--keep-names`, Payroll
 Analytics shows each department's people, titles and pay, which the accounting team already
 sees in UKG and NetSuite. Names and pay may appear in the console and the files this Project
-builds (the flux pack, the work paper, the NetSuite support file); never put them in any other
-document, and never print an email address.
+builds (the flux pack and the work paper); never put them in any other document, a note or
+the support file that go to NetSuite included, and never print an email address.
 
 If a script stops because an export is the wrong shape, ask for the export again. Never
 reshape an export or the findings. Full rules: [`WHEN-DATA-BREAKS.md`](WHEN-DATA-BREAKS.md).
@@ -489,11 +489,12 @@ Draft an entry where a movement shows the ledger is wrong and no entry in `views
 covers it.
 
 A bill on the wrong account or department is a coding error, and coding errors are the GL Coding
-Review's. With its run attached (`--coding-run`), draft no reclass for a line it covers: one its
-cards or its drafted entries move, whether decided yet or not. Its open findings are listed on the
-row; name the card in the commentary instead. Without its run, draft the reclass if the month
-needs it, and say in the entry's reason and in the chat that the GL Coding Review may propose the
-same reclass, so only one of the two is booked.
+Review's. With its run and decision record attached (`--coding-run`, `--coding-record`), the build
+shows on each account's row the corrections it booked and its open findings: draft no reclass for a
+line either covers, and name the GL Coding Review's card in the commentary instead. Without them,
+ask for them; if the month needs the reclass before they come, draft it, and say in the entry's
+reason and in the chat that the GL Coding Review may propose the same reclass, so only one of the
+two is booked.
 
 * **Current month only.** Earlier months are context. They were closed in their own month.
   If the reviewer asks you to correct a line posted in an earlier, closed period, that is an
@@ -897,7 +898,8 @@ flux runs in a Project.
   ADP (payroll), Expensify (expense reports). Adaptive Planning is not confirmed; the plan
   comes from the Excel rolling forecast.
 * **Coupa limits.** No invoice data, so no three-way match. The exports Serif has sent run from
-  Aug 2025 or Jan 2026 through the month, capped at 5,000 rows; earlier months have no Coupa data.
+  Aug 2025 or Jan 2026 through the month (the Sep 2026 one stops at Coupa's 5,000-row limit, and
+  the run says when a report does); earlier months have no Coupa data.
 * **Rules and thresholds** are in [`serif-policy-rules.md`](serif-policy-rules.md).
 
 ## Files
@@ -914,7 +916,7 @@ flux runs in a Project.
 | `netsuite_gl_detail_<month>.csv`, `netsuite_gl_detail.sql` | The month's GL from the connector, in place of the saved search export |
 | `netsuite_income_statement_by_period_<months>.csv`, `netsuite_income_statement.sql` | The Income Statement by accounting period from the connector, when the report is not supplied |
 | `netsuite_link_ids_<month>.csv`, `netsuite_link_ids.sql` | The month's NetSuite link IDs, and the query that pulls them |
-| `coupa_po_lines_<year>.csv` | Coupa PO line export for the calendar year, the accrual source |
+| `coupa_po_lines_<year>.csv` | Coupa PO line export, the months Coupa returns through the month, the accrual source |
 | `serif_rolling_forecast_<vintage>.xlsx` | The rolling forecast workbooks: the month's cut, and the one whose prior cut is the plan |
 | `netsuite_balance_sheet_*.xls` | The Balance Sheet report, for Balance Sheet Flux and the tie-outs |
 | `netsuite_income_statement_by_month_*.xls` | The Income Statement by month, which the ledger is tied to by account |

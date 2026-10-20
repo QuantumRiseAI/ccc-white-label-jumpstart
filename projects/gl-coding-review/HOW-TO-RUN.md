@@ -118,7 +118,7 @@ Serif sends these exports, uploaded as they are (link IDs, Flagship cost breakdo
    month's own export is then the only new one.
    Claude can also pull the month through the NetSuite connector with `netsuite_gl_detail.sql`
    and `netsuite_income_statement.sql`; the scripts read the saved results as they are.
-2. The Coupa PO line report with all available columns, for the calendar year, as `.csv`.
+2. The Coupa PO line report with all available columns, the months Coupa returns through the month, as `.csv`.
    First column `PO Number (Header)`. The shorter Coupa Data Pull (PO Lines) report also
    reads, but it carries no supplier or account, so the checks that join Coupa to the
    ledger find nothing on it.
@@ -408,8 +408,8 @@ text and in its Journal Entry Memo:
   names one, the entry holds it in Capital in Process and the card says the chart has no fixed
   asset account for it.
 
-The ledger has no in-service date, so the card's Placed in service says the date is not known;
-give the date in the note when you decide. A capital purchase under the $5,000 capitalization threshold is listed, not marked
+The ledger has no in-service date, so unless the line states one, the card's Placed in service
+gives the invoice date, by policy, to confirm; give the real date in the note when you decide. A capital purchase under the $5,000 capitalization threshold is listed, not marked
 Review, and says it is under the threshold.
 
 On every proposed entry a new balance sheet line (accounts 1xxxxxx to 3xxxxxx) takes the

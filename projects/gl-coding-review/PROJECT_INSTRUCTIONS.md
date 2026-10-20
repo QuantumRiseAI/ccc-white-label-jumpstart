@@ -131,8 +131,9 @@ yourself: if it needs a change, change the script and build again.
 
 The UKG roster carries names, email addresses and salaries. The scripts use it to find each
 requester's department. With `--keep-names`, names stay in the console, which the accounting
-team already sees in NetSuite and UKG. Never print an email address, and never send a name or
-a salary outside this Project.
+team already sees in NetSuite and UKG. Names and pay may appear in the console and the work
+paper; never put them in any other document, a note that goes to NetSuite included, and never
+print an email address.
 
 If a script stops because an export is the wrong shape, ask for the export again. Never
 reshape an export or the findings. Full rules: [`WHEN-DATA-BREAKS.md`](WHEN-DATA-BREAKS.md).
@@ -401,7 +402,7 @@ Serif's close entries do) is not flagged on CapEx or Prepaid: it is already book
 Each CapEx card says whether the purchase goes to **`1505000` Capital in Process** (build-out
 work, or an asset bought but not yet in service) or to its fixed asset account (an asset in
 service), and why, on the card and in its Journal Entry Memo. The ledger has no in-service
-date: unless the line states one, the card's Placed in service says the date is not known, and the reviewer gives it in the note. Office furniture and
+date: unless the line states one, the card's Placed in service gives the invoice date, by policy, for the reviewer to confirm, and the reviewer gives the real date in the note. Office furniture and
 equipment has no fixed asset account in Serif's chart; the entry holds it in Capital in
 Process, and the card says the chart has no fixed asset account for it. Never invent one.
 
@@ -856,8 +857,8 @@ runs in a Project.
    be tied to a figure in the run, tie it and say which.
 3. It never becomes a finding or a draft, never changes one, and never settles an item. If it
    bears on an item in the console, say which item, and leave the decision to the reviewer.
-4. Never print an email address. Names and pay are for the accounting team in this Project
-   only.
+4. Never print an email address. Names and pay are for the accounting team: in the console
+   and the work paper, never in any other document.
 5. Never save it as a file for the scripts to read.
 6. If the reviewer wants the same cut every month, say so in the hand-off, for Quantum Rise
    to consider as a check.
@@ -902,7 +903,8 @@ runs in a Project.
   before it), UKG (HRIS), ADP (payroll), Expensify (expense reports). Adaptive Planning is not
   confirmed; the budget comes from the Excel rolling forecast.
 * **Coupa limits.** No invoice data, so no three-way match. The ledger carries no PO number.
-  The exports Serif has sent run from Aug 2025 or Jan 2026 through the month, capped at 5,000 rows.
+  The exports Serif has sent run from Aug 2025 or Jan 2026 through the month; the Sep 2026 one stops
+  at Coupa's 5,000-row limit, and the run says when a report does.
 * **Coupa departments** are read through the department codes on the UKG roster. Serif has
   not confirmed them. Codes 1, 11, 23 and
   56 are not ledger departments.
@@ -924,7 +926,7 @@ runs in a Project.
 | `netsuite_gl_detail_<month>.csv`, `netsuite_gl_detail.sql` | The month's GL from the connector, in place of the saved search export |
 | `netsuite_income_statement_by_period_<months>.csv`, `netsuite_income_statement.sql` | The Income Statement by accounting period from the connector, when the report is not supplied |
 | `netsuite_link_ids_<month>.csv`, `netsuite_link_ids.sql` | The month's NetSuite link IDs, and the query that pulls them |
-| `coupa_po_lines_<year>.csv` | Coupa PO line export for the calendar year |
+| `coupa_po_lines_<year>.csv` | Coupa PO line export, the months Coupa returns through the month |
 | `serif_rolling_forecast_2026-08.xlsx` | The rolling forecast workbook whose prior cut is the plan |
 | `ukg_full_roster_*.csv` | UKG roster: department per person, for the requester flag. Personal data. |
 | `flagship_breakdown_<invoice>.xlsx` | A Flagship pass-through bill's cost breakdown, from Coupa: optional, for Pass-Through Bills |

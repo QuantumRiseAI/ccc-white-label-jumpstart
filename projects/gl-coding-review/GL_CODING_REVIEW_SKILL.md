@@ -112,7 +112,8 @@ Capital in Process or a fixed asset account. Every capital recommendation says w
 * **An asset in service** goes to its fixed asset account, below. The policy places it in
   service at the invoice date.
 * The ledger has no in-service date. Unless the line states one, the card's Placed in
-  service says it is not known, and the reviewer gives the date in the note.
+  service gives the invoice date, by policy, to confirm, and the reviewer gives the real date
+  in the note.
 
 | Expense account | Fixed asset account, in service |
 |---|---|

@@ -128,7 +128,7 @@ Serif sends these exports, uploaded as they are:
    month's own export is then the only new one.
    Claude can also pull the month through the NetSuite connector with `netsuite_gl_detail.sql`
    and `netsuite_income_statement.sql`; the scripts read the saved results as they are.
-2. The Coupa PO line report with all available columns, for the calendar year, as `.csv`.
+2. The Coupa PO line report with all available columns, the months Coupa returns through the month, as `.csv`.
 3. The rolling forecast workbook FP&A saved after the month closed, as `.xlsx` (the month's
    cut, for Forecast vs. Actual), and the workbook the plan comes from, if it is a different
    file (the plan stays in the Project until Serif sets a new one). Without the month's cut,
