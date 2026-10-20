@@ -35,7 +35,7 @@ GL review, that opens in any browser with no server. That is the deliverable. Th
 version is `../../consoles/serif-gl-coding-review.html`; each earlier one is tagged
 `console-v<version>` in Git. See [`../../CHANGELOG.md`](../../CHANGELOG.md).
 
-Aug 2026 reference run: 56 findings, 50 proposed Journal Entries, tie-out PASS (engine 0.2.4).
+Aug 2026 reference run: 279 findings (56 besides the 223 item account drift findings), 50 proposed Journal Entries, tie-out PASS (engine 0.2.8).
 
 ## Requirements
 

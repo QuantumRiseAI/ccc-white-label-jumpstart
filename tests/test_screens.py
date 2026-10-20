@@ -140,6 +140,23 @@ ok(len(en) == 1 and abs(sum(l["debit"] for l in en[0]["lines"]) - sum(l["credit"
 ok(sorted((m["department"], m["amount"]) for m in V._doc_match(split2[0])) == [("Finance", 3280.67), ("General G&A", 2000.0)],
    "the finding names each of its lines, with its department and amount, for the console's cards")
 
+# a billing-pattern accrual says what Coupa could show: with no Supplier in the report, nothing,
+# so "no Coupa line" is not given as evidence; and an accrual's expense line reverses nothing
+hist = {m: [bill("Triumvirate Environmental Inc", "6420000", 15_000, "Lab waste", doc="T" + m[:3], date=d)]
+        for m, d in (("Jun 2026", "2026-06-15"), ("Jul 2026", "2026-07-15"), ("Aug 2026", "2026-08-15"))}
+for m in hist:
+    for t in hist[m]:
+        t["period"] = m
+cur = [dict(bill("Someone Else", "6410000", 100, "x", doc="Z1", date="2026-09-10"), period="Sep 2026")]
+said = lambda rows: [f["evidence"]["basis"] for f in F.billing_pattern_findings(cur, hist, rows, [], LEAVES, "Sep 2026", [0])
+                     if f["title"].startswith("Triumvirate")]
+nosup, withsup = said([{"supplier": "", "period": "Sep 2026"}]), said([{"supplier": "Other Vendor", "period": "Sep 2026"}])
+ok(nosup and "no Supplier" in nosup[0] and "no Coupa line" not in nosup[0] and withsup and withsup[0].endswith("no Coupa line this period"),
+   "a billing-pattern accrual says Coupa could not be checked without a Supplier column, and no Coupa line only when it could")
+acc = F.billing_pattern_findings(cur, hist, [{"supplier": "Other Vendor", "period": "Sep 2026"}], [], LEAVES, "Sep 2026", [0])
+ea = V.entries([f for f in acc if f["title"].startswith("Triumvirate")], "Sep 2026")
+ok(ea and not any(l.get("reverses_line") for l in ea[0]["lines"]), "an accrual's lines reverse no posted line")
+
 if FAILED:
     print("%d failed" % len(FAILED))
     sys.exit(1)

@@ -108,7 +108,7 @@ In a Claude Project every uploaded file sits at the top level, so all of these a
 filenames. In the repo, `make build PERIOD=sep2026` runs the same commands from the packaged
 Project folder on the exports in `inputs/sep2026/`.
 
-The last command writes `out/sep2026/serif-pl-flux-sep2026-v<version>.html` (the console version, 2.2.2 now), one self-contained
+The last command writes `out/sep2026/serif-pl-flux-sep2026-v<version>.html` (the console version, 2.2.3 now), one self-contained
 file that opens in any browser. The filename carries the period and the console version.
 Inside, the **Run log** has a Build record listing the console, engine and ruleset versions,
 the run id, and a fingerprint for every input file, so if a figure moves between two builds
@@ -129,7 +129,10 @@ Serif sends these exports, uploaded as they are:
    Claude can also pull the month through the NetSuite connector with `netsuite_gl_detail.sql`
    and `netsuite_income_statement.sql`; the scripts read the saved results as they are.
 2. The Coupa PO line report with all available columns, for the calendar year, as `.csv`.
-3. The rolling forecast workbook FP&A saved after the month closed, as `.xlsx`.
+3. The rolling forecast workbook FP&A saved after the month closed, as `.xlsx` (the month's
+   cut, for Forecast vs. Actual), and the workbook the plan comes from, if it is a different
+   file (the plan stays in the Project until Serif sets a new one). Without the month's cut,
+   Forecast vs. Actual does not run, and Claude says so.
 4. The newest UKG roster, as `.csv`.
 5. The NetSuite Balance Sheet report with monthly columns, and the Income Statement by month,
    as `.xls`.

@@ -29,7 +29,7 @@ columns missing and the row cap (below); then the rest.
 | Export | What the month needs |
 |---|---|
 | NetSuite Custom General Ledger saved search, `.xls` (or saved as `.xlsx`), named `netsuite_gl_detail_<range>.xls`, or the connector's result for `netsuite_gl_detail.sql` (see The Month through the Connector) | One or more exports that together hold the month, the two months before it and the same month last year. Any date ranges, as long as no month is in two. |
-| Coupa PO line report, `.csv`: the export with all available columns, or the Coupa Data Pull (PO Lines) report | The export for the month's calendar year. The scripts list any column the report lacks or leaves empty under `manifest.coupa_coverage.columns_absent` in `run.json` |
+| Coupa PO line report, `.csv`: the export with all available columns, or the Coupa Data Pull (PO Lines) report | The months Coupa returns, through the month: it need not be the calendar year, and a report at Coupa's 5,000-row limit holds only part of them (the run says so). The full export is the one to ask for; the Data Pull report has no Supplier, so the checks that join Coupa to the ledger by supplier do not run on it. The scripts list any column the report lacks or leaves empty under `manifest.coupa_coverage.columns_absent` in `run.json` |
 | NetSuite Income Statement by month report, `.xls`, by accounting period (a connector query grouped by transaction date does not tie), named `netsuite_income_statement_by_month_<range>.xls`, or the connector's result for `netsuite_income_statement.sql` (see The Month through the Connector) | Through the month. The ledger is tied to it by account before the review is built |
 | Rolling forecast workbook, `.xlsx` | The plan: `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
 | UKG roster, `.csv` | The newest roster |
@@ -38,7 +38,7 @@ columns missing and the row cap (below); then the rest.
 | NetSuite's lists, `.csv`: `netsuite_ref_accounts.csv`, `netsuite_ref_departments.csv`, `netsuite_ref_programs.csv` | Kept with the Project's files and replaced only when NetSuite's accounts, departments or programs change. The import CSV then carries NetSuite's internal IDs; see Importing into NetSuite |
 
 The scripts take every month they need from the exports. If a month is missing, they say
-which; ask the reviewer for that export. Never build a file for the scripts to read; the connector's results, saved as the queries return them, are the one exception.
+which; ask the reviewer for that export. Never build a file for the scripts to read; the connector's results, saved as the queries return them, are the one exception. A reviewer may attach those results themselves (`netsuite_gl_detail_<month>.csv`, `netsuite_income_statement_by_period_<range>.csv`, `netsuite_link_ids_<month>.csv`): they are the month's exports, read as they are.
 
 If `manifest.coupa_coverage.columns_absent` in `run.json` lists columns, tell the reviewer right
 after the tie's result: name them and the checks they feed (Supplier and Account: every check that
@@ -54,7 +54,8 @@ on Serif's behalf, one line per activity. The items behind it are in a cost brea
 to the invoice in Coupa. Its FSP charges (6901xxx) are Flagship's own fee, not pass-through.
 
 `serif_sources.py passthrough` lists the month's pass-through bills and says which have a
-breakdown; it only reads the GL, so run it before your first reply. When any has none, ask the
+breakdown; it only reads the GL. Run it with the other scripts, before the first build, so the first
+reply can name them. When any has none, ask the
 reviewer once, in the same reply as the export list,
 whether they have the breakdowns: name each bill with its amount and Coupa link, and say the
 file is the Excel attached to the invoice in Coupa. It is optional. Never wait for it: run
@@ -67,8 +68,10 @@ checks each item against the capital and prepaid thresholds, its service period 
 account (parking or travel booked as consulting), and proposes the reclass. Without one, the
 card says a breakdown would show more, links to Coupa, and is decided Reviewed in Coupa; every
 other card on that bill (CapEx, Prepaid, Organization & Account) carries a Pass-through bill line, since
-one line may hold several items. A note on the bill (`check` `pass`, with its document) names
-the items the breakdown shows.
+one line may hold several items. The build lists the items a breakdown shows; write a note on the
+bill (`check` `pass`, with its document) only where its check does not settle it, as for any item.
+Pass-Through Bills has no threshold: every bill is reviewed, and a reclass the breakdown proposes is
+recommended on its merits, whatever its size.
 
 Disha is confirming with Scott whether department reclasses on these items are in scope; until
 then, propose account reclasses only. The breakdown shows each item's Flagship department beside
@@ -122,7 +125,7 @@ bonus accrual, interest) and none at this one. That says the GL was pulled befor
 closed. Say so with the tie's result, name the accounts, and ask for the GL again after close.
 The list leads the first page of the console too.
 
-The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.2.2 now). Publish it
+The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.2.3 now). Publish it
 as [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML
 yourself: if it needs a change, change the script and build again.
 
@@ -467,7 +470,9 @@ Each note is for **one item**, and it goes on that item and on no other:
   department flags on one bill do; a note without it goes on the largest of them still without
   a note.
 * `recommend`: `clear`, `entry` or `question`. On a flag, `clear` is Reject (the coding stands)
-  and `entry` is Add to NetSuite CSV. On a vendor item, `clear` is Confirm and `entry` is Recode.
+  and `entry` is Add to NetSuite CSV. On a vendor item, `clear` is Confirm and `entry` is Recode:
+  the Recode entry opens with the vendor's coding for the reviewer to fill in, so say in the note
+  where the lines belong, and draft no second entry for the same lines.
   On a line booked to the balance sheet, `clear` is Confirm (it stays) and `entry` is Recode to
   Expense. `question` sets no decision and shows no label.
 
@@ -551,8 +556,8 @@ Draft an entry where the coding is wrong and no proposed entry in `views.entries
   posted line's department, on a balance sheet account too, so it nets the original. Every
   other balance sheet line (accounts 1xxxxxx to 3xxxxxx) is new and takes the `Non-Specific`
   department; only income statement lines carry one. The build sets it on every entry.
-* Each line carries the account code and name, department, Project, Program, vendor and
-  document numbers.
+* Each line carries the account code (the build adds its name), department, Project, Program,
+  vendor and document numbers.
 * Memo, per the Data Entry Policy: `Specific description | Mon'YY`, for example
   `Long column holder recoded to lab supplies | Aug'26`. Leave out the reference ID: the build
   puts the card's in front, `CODING-07 | Long column holder recoded to lab supplies | Aug'26`.
@@ -586,7 +591,8 @@ run and why. The hand-off at the end of a session is written in the chat; see Re
 Write everything in the style [`WRITING-GUIDE.md`](WRITING-GUIDE.md) sets out: a technical
 register, sentences that carry the reasoning, claims calibrated to the evidence, and in a note
 only what the item does not already show. Read it before you write the drafts. The points below
-are the ones most often missed.
+are the ones most often missed. Its examples, and those here, come from a real
+close: take their form, never their figures; every figure you write comes from this month's run.
 
 * Write "Journal Entry" in full.
 * An account is its code and name: `6410000 Lab Supplies/Consumables`. A department is its name.
@@ -614,7 +620,10 @@ Before you run:
    writes over `run.json`. If the earlier run is gone from the chat's files, say so: compare
    against the decision record only.
 2. Use the newest NetSuite export of the month and leave the earlier one out of `--gl`, since
-   a month in two exports is refused. Name the files in the command, and say which you used.
+   a month in two exports is refused. Ask for the Income Statement exported at the same time:
+   the tie compares the GL with it, and a newer GL against the earlier Income Statement fails on
+   every account that took a posting since. Name the files in the command, and say which you
+   used.
 3. Ask for the decision record the reviewer saved after the last review (**Save decision
    record** in Settings) if it is not attached. Without it you can compare the runs, but not
    say what was decided.
@@ -893,7 +902,7 @@ runs in a Project.
   before it), UKG (HRIS), ADP (payroll), Expensify (expense reports). Adaptive Planning is not
   confirmed; the budget comes from the Excel rolling forecast.
 * **Coupa limits.** No invoice data, so no three-way match. The ledger carries no PO number.
-  The export Serif has sent covers calendar 2026 only.
+  The exports Serif has sent run from Aug 2025 or Jan 2026 through the month, capped at 5,000 rows.
 * **Coupa departments** are read through the department codes on the UKG roster. Serif has
   not confirmed them. Codes 1, 11, 23 and
   56 are not ledger departments.
@@ -934,6 +943,7 @@ Header-only templates are feeds Serif has not sent. Each one's absence turns a c
 | `accruals_log.csv` | Stopping an accrual being proposed twice |
 | `open_purchase_commitments.csv` | Commitments made outside Coupa |
 | `ebitda_addback_mapping.csv` | Add-back dimension checks |
+| `hris_headcount.csv` | Headcount by department, for the requester checks; header-only until UKG sends it |
 
 `accepted_exceptions.csv` is the one template a reviewer fills in. Each row (`vendor`, `account`,
 `reason`, `approved_by`, `approved_on`) says a vendor, optionally on one account (blank is every

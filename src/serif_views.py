@@ -56,7 +56,7 @@ from collections import defaultdict
 
 import serif_sources as sources
 
-VIEWS_VERSION = "1.7.3"
+VIEWS_VERSION = "1.7.4"
 
 # The flux engine's definition, so the two agree on what counts as P&L.
 PL_PREFIXES = ("6", "7", "8")
@@ -1497,7 +1497,8 @@ def entries(findings, period, accrual_depts=None, lookup=None):
                 line["vendor"] = vendor
                 line["document"] = ""
                 line["project"], line["program"] = pp
-                if line["account"] in posted:
+                # an accrual adds to the expense; it reverses no posted line
+                if line["account"] in posted and rule not in ("F3.ACCRUAL_RECEIPT", "F6.ACCRUAL_PATTERN"):
                     line["reverses_line"] = True
                 if line["debit"] and not line["department"]:
                     line["department"] = accrual_depts.get(f["finding_id"], "")
@@ -1772,7 +1773,10 @@ def explain(f, accounts, period):
                                          period)]
         if mm:
             why.append("The average of the last three months is %s: %s." % (mm.group(1), mm.group(2)))
-        why.append("Coupa has no line for this vendor this month.")
+        basis = ev.get("basis", "")
+        why.append("Coupa has no line for this vendor this month." if "no Coupa line this period" in basis
+                   else "The Coupa report has no Supplier column, so it could not show a PO line for this vendor." if "no Supplier" in basis
+                   else "No Coupa lines for the month were supplied to check against.")
         do = ["Ask the budget owner if the vendor did work in %s." % period,
               "If yes, choose Entry booked. It accrues %s and reverses next month." % _m(amt),
               "If no, choose Cleared."]

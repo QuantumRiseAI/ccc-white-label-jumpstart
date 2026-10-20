@@ -207,6 +207,7 @@ def exports_card(m, views, extra=None):
 CHECK_NAMES = {
     "T0.TIE_OUT": "Debits equal credits", "T0.DUPLICATE_LINE": "Duplicate postings",
     "T0.POSTING_LAG": "Posting lag", "T0.ABERRANT_POSTING_LAG": "Posting lag",
+    "V.REQUESTER": "Requester's department against the coding",
     "T1.DEPT_INCONSISTENCY": "Department against the vendor's usual coding",
     "T1.MISSING_PROJECT_CODE": "Missing project code", "T1.MEMO_FORMAT": "Memo format",
     "T1.VENDOR_NAME_VARIANTS": "Vendor name variants", "T1B.UNALLOCATED_SPEND": "Unallocated spend",

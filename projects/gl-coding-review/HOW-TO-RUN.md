@@ -92,7 +92,7 @@ In a Claude Project every uploaded file sits at the top level, so all of these a
 filenames. In the repo, `make build PERIOD=sep2026` runs the same commands from the packaged
 Project folder on the exports in `inputs/sep2026/`.
 
-The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.2.2 now), one
+The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.2.3 now), one
 self-contained file that opens in any browser. That is the deliverable.
 
 The filename carries the period and the console version, so builds of different versions do
@@ -545,8 +545,8 @@ The engine prints a load summary before any finding. Read it in this order:
    and the report says so on its own page.
 3. **Findings**, grouped by the action they call for rather than by rule.
 
-The Aug 2026 run is the reference: 56 findings (engine 0.2.7), tie-out PASS, 50 proposed Journal Entries,
-all in balance. After any change to a script, run Aug 2026 again. If its numbers move, the
+The Aug 2026 run is the reference: 279 findings (engine 0.2.8), 56 of them other than the 223 item
+account drift findings, tie-out PASS, 50 proposed Journal Entries, all in balance. After any change to a script, run Aug 2026 again. If its numbers move, the
 script changed what it finds; say so rather than explaining the new figure as though it
 were expected.
 

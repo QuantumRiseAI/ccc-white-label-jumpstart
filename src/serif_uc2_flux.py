@@ -47,7 +47,7 @@ from collections import defaultdict
 
 import serif_sources as sources
 
-ENGINE_VERSION = "0.8.2"
+ENGINE_VERSION = "0.8.3"
 RULESET_VERSION = "2026.10-uc2-flux-serif-thresholds+journal-moved"
 ENTITY = "FL87 Serif Biomedicines, Inc."
 
@@ -843,6 +843,11 @@ def billing_pattern_findings(gl_lines, history, coupa_rows, receipt_suppliers,
     last3 = periods[-3:]
     by_period = {p: bills_by_vendor(history[p]) for p in periods}
     now = bills_by_vendor(gl_lines)
+    # What "no Coupa line" can mean: a report with no Supplier could match no vendor, and no
+    # report for the month leaves nothing to check, so neither is evidence of a missing PO.
+    coupa_said = ("no Coupa line this period" if any((r.get("supplier") or "").strip() for r in coupa_rows)
+                  else "Coupa's report has no Supplier, so its PO lines could not be matched" if coupa_rows
+                  else "no Coupa lines for the month to check")
     in_coupa = {norm_vendor(r.get("supplier")) for r in coupa_rows} | {
         norm_vendor(s) for s in receipt_suppliers}
 
@@ -899,7 +904,7 @@ def billing_pattern_findings(gl_lines, history, coupa_rows, receipt_suppliers,
             {"observed": "{} billed in {} against a trailing three-month average of {} ({})".format(
                 money(current), period, money(avg), trail),
              "expected": "a bill, or an accrual, in a month the vendor normally bills",
-             "basis": "{} invoice(s) in the trailing six periods; no Coupa line this period".format(invoices)},
+             "basis": "{} invoice(s) in the trailing six periods; {}".format(invoices, coupa_said)},
             history_lines))
     return findings
 

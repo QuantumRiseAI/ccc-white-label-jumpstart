@@ -118,8 +118,11 @@ Period: [Mon YYYY] | Prior month: [Mon YYYY] | Same month last year: [Mon YYYY]
 LOADED:    [file]  [N] rows             (one row per file)
 TIE-OUT:   Dr [X] / Cr [Y] / net [Z]    [PASS or FAIL]
 NOT RUN:   [check]  needs [feed]         (one row per check)
+DEGRADED:  [check]  without [column or feed]   (one row per check run on partial input)
+COUPA:     [N] lines, [months]; at its row limit: [yes or no]
 ```
 
+The tie-out row restates the tie's result already given; keep it, so the block stands on its own.
 A failed tie-out stops the run. Report the difference and produce nothing else.
 
 ## When Something Is Off
