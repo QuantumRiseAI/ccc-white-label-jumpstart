@@ -2072,15 +2072,22 @@ def coding_corrections():
         if l.get("txn_type") == "Journal":
             g = gl_je[l.get("document_number") or ""]
             g["text"] += " " + (l.get("memo") or "") + " " + (l.get("description") or "")
-            g["moves"][((l.get("account_code") or "").strip(), l.get("department") or "")] += l.get("amount") or 0
+            g["moves"][((l.get("account_code") or "").strip(), (l.get("department") or "").strip().casefold())] += l.get("amount") or 0
     used_je = set()
-    desc_of = lambda m: (str(m or "").split(" | ")[1] if " | " in str(m or "") else str(m or "")).strip()
+    def desc_of(m):
+        """The entry's description: its Memo without the reference ID in front or the month and
+        original date after, so a Memo edited down to "Sep'26" matches nothing."""
+        parts = [p.strip() for p in str(m or "").split(" | ")]
+        if parts and re.fullmatch(r"[A-Z]+-\d{2,}", parts[0]):
+            parts = parts[1:]
+        parts = [p for p in parts if not re.fullmatch(r"[A-Z][a-z]{2}'\d\d|Original date .*", p)]
+        return parts[0] if parts and len(parts[0]) >= 8 else ""
 
     def in_gl(memo, lines):
         d = desc_of(memo)
         want = defaultdict(float)
         for l in lines:
-            want[((l.get("account") or "").strip(), l.get("department") or "")] += amt(l.get("debit"), "") - amt(l.get("credit"), "")
+            want[((l.get("account") or "").strip(), (l.get("department") or "").strip().casefold())] += amt(l.get("debit"), "") - amt(l.get("credit"), "")
         want = {k: round(v, 2) for k, v in want.items() if round(v, 2)}
         for jd, g in gl_je.items():
             if jd in used_je or not d or d not in g["text"]:
@@ -3509,7 +3516,7 @@ def coding():
         out = [("ok", "Coded as in %s and %s" % (P2[:3], PRIOR[:3])) if hist and cur <= hist else
                ("ok", "Department is the vendor's usual") if hist else ("na", "No bills in %s or %s to compare" % (P2[:3], PRIOR[:3])),
                # the PO account check ran only if the run says so; a Coupa link alone compares nothing
-               ("na", "Account against its Coupa PO not checked: " + po_off.rstrip(".")) if po_off else
+               ("na", "Account against its Coupa PO not checked: " + po_off[:1].lower() + po_off[1:].rstrip(".")) if po_off else
                ("ok", "Account matches its Coupa PO") if coupa else ("na", "No Coupa PO to compare"),
                bs_check(r),
                ("ok", "Coded as planned") if r.get("planned") else ("na", "No plan line for this vendor")]
@@ -3558,7 +3565,7 @@ def coding():
         m = re.search(r"(\$[\d,]+\.\d\d) this month is on other coding\.", why)
         if not m or abs(float(m.group(1)[1:].replace(",", "")) - abs(amt)) < 0.01:
             return why
-        return why.replace(m.group(0), "%s of the %s off plan is on this card; the rest is on the vendor's other cards."
+        return why.replace(m.group(0), "%s of the %s off plan is on this card; the rest is on its other cards and pages."
                            % (money(abs(amt), True), m.group(1)))
     for r in vrows:
         fls = sorted((f for f in r.get("flags") or [] if f.get("id") in VC_FLAGS), key=lambda f: f["id"] != "changed")
@@ -3636,7 +3643,8 @@ def coding():
         items.append(("dept", iid, " / ".join(VC_FLAGS[f["id"]] for f in fls), r["vendor"], (doc or {}).get("text") or "", amt,
                       ", ".join(a_ for a_, _ in keys), ", ".join(a_ for a_, _ in tos)))
         vc_cards.append(vcard(iid, r, "Review" if amt >= thr else "Routine",
-                              " ".join("<b>%s:</b> %s" % (VC_FLAGS[f["id"]], off_plan_said(en(f.get("why") or ""), sum(abs(cods[k]["current"]) for k, fid in keys.items() if fid == "plan"))
+                              " ".join("<b>%s:</b> %s" % (VC_FLAGS[f["id"]], off_plan_said(en(f.get("why") or ""), sum(abs(cods[k]["current"]) for k in keys
+                                                                    if k not in {(q.get("account"), q.get("department") or "") for m in f.get("match") or [] for q in m.get("not") or []}))
                                                                     if f["id"] == "plan" else en(f.get("why") or "")) for f in fls)
                               + (" The coding matches the vendor's earlier months; only the plan differs." if steady else ""),
                               (("confirm", "Confirm, Coding Stands"), ("recode", "Recode, Add to NetSuite CSV"), ("netsuite", "Edited Manually in NetSuite")),

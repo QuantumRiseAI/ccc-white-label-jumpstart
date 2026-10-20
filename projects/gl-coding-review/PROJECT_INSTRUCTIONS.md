@@ -132,8 +132,8 @@ yourself: if it needs a change, change the script and build again.
 The UKG roster carries names, email addresses and salaries. The scripts use it to find each
 requester's department. With `--keep-names`, names stay in the console, which the accounting
 team already sees in NetSuite and UKG. Names and pay may appear in the console and the work
-paper; never put them in any other document, a note that goes to NetSuite included, and never
-print an email address.
+paper; never put them in any other document, nor in a note you write, which goes to NetSuite (a
+vendor's own name from the ledger in a Memo is not one), and never print an email address.
 
 If a script stops because an export is the wrong shape, ask for the export again. Never
 reshape an export or the findings. Full rules: [`WHEN-DATA-BREAKS.md`](WHEN-DATA-BREAKS.md).

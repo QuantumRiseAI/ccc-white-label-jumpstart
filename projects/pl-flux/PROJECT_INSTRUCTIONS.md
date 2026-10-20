@@ -491,7 +491,10 @@ covers it.
 A bill on the wrong account or department is a coding error, and coding errors are the GL Coding
 Review's. With its run and decision record attached (`--coding-run`, `--coding-record`), the build
 shows on each account's row the corrections it booked and its open findings: draft no reclass for a
-line either covers, and name the GL Coding Review's card in the commentary instead. Without them,
+line either covers, and name the GL Coding Review's card in the commentary instead. A department
+reclass within an account nets to nothing on the account's row: before drafting one, read the
+coding run's department findings (`T1.DEPT_INCONSISTENCY` in its `run.json`), and draft none for a
+line one of them names. Without them,
 ask for them; if the month needs the reclass before they come, draft it, and say in the entry's
 reason and in the chat that the GL Coding Review may propose the same reclass, so only one of the
 two is booked.

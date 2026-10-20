@@ -2073,9 +2073,11 @@ def main(argv=None):
     m = run.get("manifest") or {}
     if "uc1" in str(m.get("ruleset_version", "")):
         cc = m.get("coupa_coverage") or {}
-        why = ("No Coupa export supplied." if not cc.get("supplied")
-               else "The Coupa report has no Supplier column, so no PO line ties to a vendor's bills." if "Supplier" in (cc.get("columns_absent") or [])
-               else "No UKG roster supplied, so no requester has a department." if not getattr(args, "roster", None) else "")
+        dark_req = any(t.get("id") == "requester" for t in run["views"].get("not_built") or [])
+        why = ("The Coupa report has no Supplier column, so no PO line ties to a vendor's bills." if "Supplier" in (cc.get("columns_absent") or [])
+               else "" if not dark_req
+               else "No Coupa export supplied to the schedules." if not getattr(args, "coupa", None)
+               else "No UKG roster supplied, or none of its people could be read, so no requester has a department.")
         m["rules_not_run"] = [x for x in m.get("rules_not_run") or [] if x.get("rule_id") != "V.REQUESTER"] + (
             [{"rule_id": "V.REQUESTER", "status": "not_run", "reason": why}] if why else [])
     if not args.keep_names:

@@ -44,7 +44,8 @@ Console 2.2.3, flux engine 0.8.3, views 1.7.4. Decisions keep their stored verbs
 - **A correction imported from the NetSuite CSV is not counted twice.** A booked correction is not
   applied again when a journal of the month in the GL the P&L Flux reads names its description
   and moves its accounts and departments by its amounts; each journal answers for one
-  correction, and the run log lists each by reference ID and journal. The reference ID itself is
+  correction, departments compared as NetSuite holds them, and the run log lists each by reference
+  ID and journal. The reference ID itself is
   not matched, since a later build can renumber the cards. Before, only fixes Edited Manually in
   NetSuite had a guard. `tests/test_imported.py` posts two of three approved corrections into a
   copy of the Sep 2026 GL under other reference IDs and checks only the third is applied.
