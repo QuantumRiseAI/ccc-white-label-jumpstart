@@ -1722,8 +1722,8 @@ def main(argv=None):
                 said(mv.get("F3.RECEIVED_NOT_INVOICED")), said(mv.get("F4.OPEN_COMMITMENT"))))
         cc_ = run["manifest"].get("coupa_coverage") or {}
         if cc_.get("supplied"):
-            print("COUPA  {} lines for {}, of {} in the report{}".format(
-                cc_.get("lines"), period, cc_.get("report_lines"), ", stopped at its row limit" if cc_.get("row_limit") else ""))
+            print("COUPA  {:,} lines for {}, of {:,} in the report{}".format(
+                cc_.get("lines") or 0, period, cc_.get("report_lines") or 0, ", stopped at its row limit" if cc_.get("row_limit") else ""))
         print("\nWrote " + path)
         print("Next: python3 serif_views.py " + path + ", then build_pages.py")
     return 0

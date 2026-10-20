@@ -496,8 +496,9 @@ Review's. With its run and decision record attached (`--coding-run`, `--coding-r
 shows on each account's row the corrections it booked and its open findings: draft no reclass for a
 line either covers, and name the GL Coding Review's card in the commentary instead. A department
 reclass within an account nets to nothing on the account's row: before drafting one, read the
-coding run's department findings (`T1.DEPT_INCONSISTENCY` in its `run.json`), and draft none for a
-line one of them names. Without them,
+coding run's department findings (`T1.DEPT_INCONSISTENCY` in its `run.json`) and its vendor rows'
+flags (the `vendors` table in `views.tables`, flags `changed` and `plan`, each a Coding changed or
+Coded off plan card), and draft none for a line or vendor one of them names. Without them,
 ask for them; if the month needs the reclass before they come, draft it, and say in the entry's
 reason and in the chat that the GL Coding Review may propose the same reclass, so only one of the
 two is booked.

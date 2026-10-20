@@ -1023,7 +1023,8 @@ def runlog(run, kind, also=None, read=()):
     # to the vendor's bills by supplier, so without Coupa's Supplier it finds nothing, and says so.
     cc_ = m.get("coupa_coverage") or {}
     # (views 1.7.4 records it in run.json; an earlier run gets it here)
-    if kind == "coding" and not any(x.get("rule_id") == "V.REQUESTER" for x in m.get("rules_not_run") or []) \
+    old_views = tuple(int(x) for x in re.findall(r"\d+", str(views.get("version") or "0"))[:3]) < (1, 7, 4)
+    if kind == "coding" and old_views and not any(x.get("rule_id") == "V.REQUESTER" for x in m.get("rules_not_run") or []) \
             and (not cc_.get("supplied") or "Supplier" in (cc_.get("columns_absent") or [])):
         m = dict(m, rules_not_run=list(m.get("rules_not_run") or []) + [{
             "rule_id": "V.REQUESTER", "status": "not_run",

@@ -14,6 +14,7 @@ import os
 import shutil
 import subprocess
 import sys
+import re
 import tempfile
 
 B = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -102,6 +103,6 @@ ok("2 corrections already in this GL, imported from the NetSuite CSV, not applie
    "the two imported corrections are found in the GL, under another reference ID, and not applied again")
 tail = out.split("not applied again", 1)[-1].split("\n", 1)[0]
 ok(all(D["ref"].get(i, i) in tail for i in picks[:2]) and D["ref"].get(picks[2], picks[2]) not in tail
-   and "JE9000099" not in tail and "1 booked Journal Entries" in out,
+   and "JE9000099" not in tail and re.search(r"(?<!\d)1 booked Journal Entries", out),
    "the run log names the two imported; the third, sharing a description with one of them, is booked; the decoy matches nothing")
 sys.exit(1 if fails else 0)
