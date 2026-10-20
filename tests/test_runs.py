@@ -1,16 +1,19 @@
 """The runs and consoles built by `make build`, read for what a reviewer could misread: a check
 listed as run when it could not, and an item whose id depends on the order a run lists it in
-(a numbered repeat, D-xxxxxxxx-2, which a later run could give to another item).
+(a numbered repeat, D-xxxxxxxx-2, which a later run could give to another item), and the two
+consoles disagreeing on a pass-through bill that its cost breakdown settles.
 
     python3 tests/test_runs.py
 """
 import glob
+import html
 import json
 import os
 import re
 import sys
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "out")
+VERSION = open(os.path.join(os.path.dirname(__file__), "..", "src", "build_pages.py"), encoding="utf-8").read().split('VERSION = "')[1].split('"')[0]
 fails = 0
 
 
@@ -62,7 +65,7 @@ for path in sorted(glob.glob(os.path.join(OUT, "*", "gl-coding-review", "run.jso
 # An id is what the item is, so the same item keeps its decision in every run: no card's id is a
 # numbered repeat of another's (ADJ-xxxxxxxx-2), which would follow the order a run lists them in.
 for path in sorted(glob.glob(os.path.join(OUT, "*", "*", "serif-*-v*.html"))):
-    if "-v" + open(os.path.join(os.path.dirname(__file__), "..", "src", "build_pages.py"), encoding="utf-8").read().split('VERSION = "')[1].split('"')[0] + ".html" not in path:
+    if "-v" + VERSION + ".html" not in path:
         continue
     D = data(path)
     rep = sorted(k for k in set(D.get("je") or {}) | set(D.get("ref") or {}) if re.match(r"^[A-Z]+-[0-9a-f]{8}-\d+$", k))
@@ -70,14 +73,19 @@ for path in sorted(glob.glob(os.path.join(OUT, "*", "*", "serif-*-v*.html"))):
 
 # The two consoles agree on a pass-through bill its cost breakdown settles: the GL Coding Review
 # leaves its CapEx flag to Pass-Through Bills, and the P&L Flux does not propose capitalizing it.
+# The flux proposes no capital entry under $5,000, so only coding's bills at or over it are expected
+# there. Each console names its bills on the note's data-settled; one with no note names none.
+CAPEX = 5000.0
 for month in sorted({p.split(os.sep)[-3] for p in glob.glob(os.path.join(OUT, "*", "*", "run.json"))}):
-    pages = {k: glob.glob(os.path.join(OUT, month, k, "serif-%s-%s-v*.html" % (k, month))) for k in ("gl-coding-review", "pl-flux")}
-    if not all(pages.values()):
+    pages = {k: os.path.join(OUT, month, k, "serif-%s-%s-v%s.html" % (k, month, VERSION)) for k in ("gl-coding-review", "pl-flux")}
+    if not all(os.path.exists(p) for p in pages.values()):
         continue
-    docs = []
-    for k, pat in (("gl-coding-review", r"Left to Pass-Through Bills[^<]*"), ("pl-flux", r"Not proposed: capitalizing[^<]*")):
-        t = re.search(pat, open(max(pages[k], key=os.path.getmtime), encoding="utf-8").read())
-        docs.append(sorted(re.findall(r"\b(INV\d+|\d{6,})\b", t.group(0))) if t else [])
-    ok(docs[0] == docs[1], "%s: the GL Coding Review and the P&L Flux settle the same pass-through bills by their breakdowns (%s)" % (month, ", ".join(docs[0]) or "none"))
+    got = {}
+    for k, p in pages.items():
+        t = re.search(r'data-settled="([^"]*)"', open(p, encoding="utf-8").read())
+        got[k] = json.loads(html.unescape(t.group(1))) if t else {}
+    want = {d for d, a in got["gl-coding-review"].items() if a >= CAPEX}
+    ok(want == set(got["pl-flux"]), "%s: the GL Coding Review and the P&L Flux settle the same pass-through bills by their breakdowns (%s)"
+       % (month, ", ".join(sorted(want)) or "none"))
 
 sys.exit(1 if fails else 0)

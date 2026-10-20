@@ -496,18 +496,35 @@ def _match_groups(groups, booked):
 CAPEX_THR, PREPAID_THR = 5000.0, 25000.0   # Serif's capitalization and prepaid thresholds (Mike's write-up, 12 Oct 2026)
 
 
-def breakdown_settles(rv, account, thr):
+def breakdown_settles(rv, account, thr, vendor=None):
     """Whether a pass-through bill's cost breakdown settles a capital question about its lines on
     `account`: the breakdown ties to the bill, and every item whose activity is booked to that
     account, on any of its lines, is under the threshold, so none is a capital asset. -> the
     largest such item's amount, or None when the breakdown does not settle it (no breakdown, it
     does not tie, or nothing of it is booked to the account). Both consoles ask it, so the GL
     Coding Review and the P&L Flux agree on a bill."""
-    if not rv or not rv.get("ties"):
-        return None
+    if not rv or not rv.get("ties") or (vendor is not None and vendor.strip() != (rv.get("vendor") or "").strip()):
+        return None   # no breakdown, one that does not tie, or another vendor's bill of the same number
     hits = {g["acct_no"] for g in rv.get("groups") or [] if any(x["account_code"] == account for x in g["booked"] or [])}
     on = [abs(i["amount"]) for i in rv.get("items") or [] if i["acct_no"] in hits]
     return max(on) if on and all(a < thr for a in on) else None
+
+
+def settled_note(rows, lead, thr):
+    """The sentence saying which pass-through bills their breakdowns settled. rows: (vendor,
+    document, amount, account label, largest item), one or more per bill and account; each bill
+    and account is listed once, with its amount there. The documents ride on data-settled, so a
+    test can compare the two consoles."""
+    by = {}
+    for v, d, a, ac, t in rows:
+        k = (v, d, ac)
+        by[k] = (by[k][0] + a, max(by[k][1], t)) if k in by else (a, t)
+    if not by:
+        return ""
+    items = ["%s %s, %s on %s, whose largest item there is %s" % (e(v), e(d), money(a, True), e(ac), money(t, True)) for (v, d, ac), (a, t) in by.items()]
+    return ('<p class="note" data-settled="%s">%s %s. %s cost breakdown ties to the bill and puts no item on that account at or over the %s CapEx '
+            'threshold, so nothing on it is a capital asset.</p>' % (e(json.dumps({d: round(a, 2) for (v, d, ac), (a, t) in by.items()})), lead,
+                                                                     "; ".join(items), "Its" if len(by) == 1 else "Each one's", money(thr)))
 
 
 def pt_reviews(thr_capex, thr_prepaid):
@@ -515,7 +532,8 @@ def pt_reviews(thr_capex, thr_prepaid):
     against its breakdown: (bills, breakdowns, {document: review})."""
     bills = SS.passthrough_bills(by_period, PERIOD)
     bds = SS.read_flagship_breakdowns(A.flagship_breakdown)
-    return bills, bds, {b["document"]: review_breakdown(b, bds[b["document"]], thr_capex, thr_prepaid, PERIOD) for b in bills if b["document"] in bds}
+    return bills, bds, {b["document"]: dict(review_breakdown(b, bds[b["document"]], thr_capex, thr_prepaid, PERIOD), vendor=b["vendor"])
+                        for b in bills if b["document"] in bds}
 
 
 def review_breakdown(bill, bd, thr_capex, thr_prepaid, period):
@@ -2135,16 +2153,21 @@ def flux():
     if rev_pt:
         keep_ = []
         for x in ent:
-            f_ = next((f for f in PLR.get("findings") or [] if f["finding_id"] == x.get("finding_id")), {})
+            f_ = F.get(x.get("finding_id")) or {}
             t_ = (f_.get("transactions") or [{}])[0]
-            top_ = breakdown_settles(rev_pt.get(str(t_.get("document_number") or "")), t_.get("account_code"), CAPEX_THR) \
-                if f_.get("rule_id") == "F10.CAPITALIZE" else None
+            top_ = breakdown_settles(rev_pt.get(str(t_.get("document_number") or "")), t_.get("account_code"), CAPEX_THR,
+                                     t_.get("vendor_or_name") or "") if f_.get("rule_id") == "F10.CAPITALIZE" else None
             if top_ is None:
                 keep_.append(x)
             else:
-                pt_left.append(((t_.get("vendor_or_name") or "").strip(), t_.get("document_number"), abs(t_.get("amount") or 0),
+                pt_left.append(((t_.get("vendor_or_name") or "").strip(), t_.get("document_number"), abs(f_.get("amount_at_risk") or t_.get("amount") or 0),
                                 "%s %s" % (t_.get("account_code"), acct_name(t_.get("account_code"))), top_))
         ent = keep_
+        for v_, d_, a_, ac_, t_ in pt_left:   # Claude drafts from the run, which still holds it: say so
+            print("Not proposed, its cost breakdown settles it: capitalizing %s %s, %s on %s (finding %s)" % (
+                v_, d_, "${:,.2f}".format(a_), ac_, next((x["finding_id"] for x in V.get("entries") or [] if x not in ent
+                                              and (F.get(x.get("finding_id")) or {}).get("rule_id") == "F10.CAPITALIZE"
+                                              and str(((F.get(x["finding_id"]) or {}).get("transactions") or [{}])[0].get("document_number")) == str(d_)), "")))
     used_com, used_bud = set(), set()
     mt = next((t for t in V["tables"] if t["id"] == "model_tie"), {"sections": []})
     revs = [r for s in mt["sections"] for r in s["rows"]]
@@ -2645,11 +2668,8 @@ def flux():
          + ("; %s in Section B" % count(len(revs), "forecast revision") if revs else "")),
         ("P&amp;L Impact if All Added to CSV", fav(impact, ("&#9660; " if impact > 0 else "&#9650; ") + short(abs(impact))), "Favorable" if impact > 0 else "Unfavorable")])
         + '<div class="card"><div class="ch">NetSuite Journal Entries<button class="pill solid r" data-export>Export to NetSuite, CSV</button></div></div><h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section A: Accounting Adjustments</h3>'
-        + ('<p class="note">Not proposed: capitalizing %s. %s a pass-through bill whose cost breakdown ties to it and puts no item on the account '
-           'at or over the %s CapEx threshold, so none is a capital asset; the GL Coding Review reviews it on Pass-Through Bills.</p>'
-           % ("; ".join("%s %s, %s on %s, its largest item %s" % (e(v), e(d), money(a, True), e(ac), money(t, True)) for v, d, a, ac, t in pt_left),
-              "It is" if len(pt_left) == 1 else "Each is", money(CAPEX_THR))
-           if pt_left else "") + "".join(cards_a)
+        + settled_note(pt_left, "Capitalizing these is not proposed, and Pass-Through Bills on the GL Coding Review reviews them:" if len(pt_left) > 1
+                       else "Capitalizing this is not proposed, and Pass-Through Bills on the GL Coding Review reviews it:", CAPEX_THR) + "".join(cards_a)
         + '<h3 style="margin:var(--spacing-md) 0 var(--spacing-xs)">Section B: Forecast / Budget Revisions</h3>'
         + ("".join(cards_b) or '<p class="note">%s</p>' % ("No forecast revisions in %s." % PERIOD if any("forecast" in (i.get("roles") or []) for i in M.get("inputs") or [])
                                                           else "Not run for %s: no forecast was supplied." % PERIOD))
@@ -3041,7 +3061,7 @@ def coding():
             # the threshold: nothing there is capital, and Pass-Through Bills reviews the bill
             # item by item. A breakdown that does not tie, or puts nothing on the account,
             # leaves the flag.
-            top_ = breakdown_settles(PT_REV.get(str((r["doc"] or {}).get("document") or "")), r["from_account"], THR["thr_capex"]) if sec_id == "capital" else None
+            top_ = breakdown_settles(PT_REV.get(str((r["doc"] or {}).get("document") or "")), r["from_account"], THR["thr_capex"], r["vendor"]) if sec_id == "capital" else None
             if top_ is not None:
                 pt_settled.append((r["vendor"], r["doc"]["document"], r["amount"], "%s %s" % (r["from_account"], acct_name(r["from_account"])), top_))
                 continue
@@ -3567,10 +3587,7 @@ def coding():
         if booked_:
             what.append("%d booked to a %s account (%s): %s" % (len(booked_), acct, prefix, money(booked_amt(booked_), True)))
         return hero(title + ", " + PERIOD, "", [("Decided", live("done", pid), ". ".join(what) or "Nothing flagged in " + PERIOD)])
-    pt_note = ('<p class="note">Left to Pass-Through Bills, whose cost breakdown ties to the bill and puts no item on the flagged account at or '
-               'over the %s CapEx threshold, so none is a capital asset: %s.</p>'
-               % (money(THR["thr_capex"]), "; ".join("%s %s, %s on %s, its largest item %s" % (e(v), e(d), money(a, True), e(acct), money(top, True))
-                                                     for v, d, a, acct, top in pt_settled))) if pt_settled else ""
+    pt_note = settled_note(pt_settled, "Pass-Through Bills reviews", THR["thr_capex"])
     pages.append(page("capex", screen_hero("CapEx Flags", "capex", "capex", cap_cards, cap_booked, "Fixed Assets") + pt_note + two_way("Capital", cap_cards, cap_booked, "capex", "Fixed Assets")))
     pages.append(page("prepaid", screen_hero("Prepaid Flags", "prepaid", "prepaid", pre_cards, pre_booked, "Prepaid") + two_way("Prepaid", pre_cards, pre_booked, "prepaid", "Prepaid")))
     exc_html = ""

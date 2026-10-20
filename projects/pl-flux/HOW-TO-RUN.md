@@ -88,9 +88,9 @@ plan line on Actual vs. Budget, notes on adjustments and the executive summary. 
 each draft against the run; one it leaves out is printed and listed in the Run log under
 **Drafts Left Out**. The format is in `PROJECT_INSTRUCTIONS.md`.
 
-Leave out `--balance-sheet` or `--netsuite-ref` (or `--netsuite-ids`) when its file is absent: a
-pattern that matches no file stops the command in zsh; in bash an unmatched `--netsuite-ref` is
-ignored without a word. Leave the flag out. Without the Balance Sheet, Balance Sheet Flux
+Leave out `--balance-sheet`, `--flagship-breakdown` or `--netsuite-ref` (or `--netsuite-ids`) when
+its file is absent: a pattern that matches no file stops the command in zsh; in bash an unmatched
+`--netsuite-ref` or `--flagship-breakdown` is ignored without a word. Leave the flag out. Without the Balance Sheet, Balance Sheet Flux
 and the tie-outs to it do not run, and Claude says so in the chat.
 
 `serif_views.py` adds the schedules to the run artifact. It reads each input, lays it out

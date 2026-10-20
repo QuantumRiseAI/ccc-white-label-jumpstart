@@ -50,7 +50,12 @@ Console 2.2.2. Decisions keep their stored verbs; no id changes.
   not one. One function, `breakdown_settles`, decides for both consoles.
 - The P&L Flux's build commands pass `--flagship-breakdown` (left out when there is none), and its
   monthly exports list the breakdowns as optional; `tools/build.sh` passes them to both builds.
-- `tests/test_runs.py` checks that both consoles settle the same bills each month.
+- The build prints each capitalize it leaves out, with its finding, since `run.json` still lists
+  it: the instructions tell Claude to write no note for it and leave it out of the summary's count.
+- Both notes are one sentence pattern, listing each bill and account once with the bill's amount
+  there (not one GL line's), and a breakdown settles only its own vendor's bill.
+- `tests/test_runs.py` checks that both consoles settle the same bills each month (the flux only
+  those at or over $5,000, as it proposes nothing capital below that).
 
 ## 2.2.1: checks that could not run say so, and ids that hold across runs (SERIF-175)
 

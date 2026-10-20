@@ -462,6 +462,9 @@ or undercuts the entry. The recommendation goes in `recommend`, not in the note.
   `--flagship-breakdown`, the build settles a capitalize adjustment on that bill itself, as the GL
   Coding Review does: when the breakdown ties to the bill and puts no item on the account at or over
   the $5,000 capitalization threshold, the adjustment is not proposed, and Adjustments says so.
+  The build prints each one ("Not proposed, its cost breakdown settles it: …", with its finding),
+  but `run.json` still lists it under `views.entries`: write no note for it, and leave it out of
+  the summary's count of proposed entries.
   Otherwise read it with `serif_sources.read_flagship_breakdowns` to settle a prepaid adjustment,
   or a capital one it does not settle, and cite it in the note. A bill that a Journal Entry in the month already
   moves off its account, with a memo naming the bill's document number, is not proposed: the
