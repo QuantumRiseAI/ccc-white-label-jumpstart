@@ -83,10 +83,25 @@ M = (PLR if A.flux_run else GLR)["manifest"]
 SLUG = M["period"].replace(" ", "").lower()
 if A.drafts and not A.only:
     sys.exit("Pass --only with --drafts: drafts belong to one console.")
-RAW_DRAFTS = json.load(open(A.drafts, encoding="utf-8")) if A.drafts else {}
-CODING_DRAFTS = json.load(open(A.coding_drafts, encoding="utf-8")) if A.coding_drafts else {}
 if A.coding_drafts and not A.coding_record:
     sys.exit("Pass --coding-drafts with --coding-record.")
+
+
+def read_drafts(path, flag):
+    """A drafts file as an object, or a plain error naming the flag and the file."""
+    if not path:
+        return {}
+    try:
+        drafts = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError) as ex:
+        sys.exit("%s cannot be read as JSON (%s): %s" % (flag, os.path.abspath(path), ex))
+    if not isinstance(drafts, dict):
+        sys.exit("%s must hold a JSON object, such as {\"commentary\": {}}: %s" % (flag, os.path.abspath(path)))
+    return drafts
+
+
+RAW_DRAFTS = read_drafts(A.drafts, "--drafts")
+CODING_DRAFTS = read_drafts(A.coding_drafts, "--coding-drafts")
 o = A.out or os.path.dirname(os.path.abspath(A.flux_run or A.coding_run))
 OUTS = {"flux": o, "coding": o}
 
