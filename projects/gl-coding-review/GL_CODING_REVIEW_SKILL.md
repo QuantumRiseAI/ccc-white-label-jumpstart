@@ -53,6 +53,16 @@ Same Item, Different Accounts. A Journal Entry Claude drafted goes to the page i
 belongs to: CapEx for a debit to 15xxxxx, Prepaid for 13xxxxx, and otherwise Organization &
 Account, vs. Vendor History.
 
+**Account fit** is no script: it is Claude's reading of every vendor line in `run.json` against
+its own account, run after the three scripts. It finds what the checks above cannot: a
+miscoding the vendor repeats, which the vendor history reads as its usual coding (Fisher
+Scientific's lab reagents on `6607000 Facility Repairs & Maintenance`, Aug and Sep 2026). Only a
+line whose item clearly cannot belong on its account gets an entry, marked `"fit": true` in
+`drafts.json`; an item that could sit on more than one account gets none. Each entry is a card on
+Organization & Account, vs. Vendor History, tagged **Account fit**, as CODING-NN, whatever
+account it debits. The build leaves one out (Drafts Left Out) when it takes off a line another
+card moves, names no line of the month, or moves a department, Project or Program.
+
 The threshold that decides what needs a look is the reviewer's, in dollars, one per screen:
 CapEx $5,000 (Serif's capitalization threshold), Prepaid $25,000 (Serif's prepaid threshold),
 and $2,500 for the account recodes on Organization & Account and drafted entries. Department flags
@@ -134,6 +144,14 @@ will begin, using the space.
   consumables. `6504000 CMC` holds external chemistry, manufacturing and controls work.
   `6501100 Synthesis Costs` and `6501000 Sequencing Costs` hold outsourced synthesis and
   sequencing. `6415000 Lab Non-Capital Equipment` holds equipment under capital treatment.
+* **Account fit** reads the line against its account's name. The Facilities accounts
+  (66xxxxx) hold the building: rent, parking, utilities, `6605000 Cleaning`, `6607000 Facility
+  Repairs & Maintenance` for repairs and upkeep. `6416000 Lab Non-Capital Software` and `6816000
+  Office Non-Cap Software` hold software and cloud services. `1530000 Computers & Software` holds
+  computers and software in service, `1510000 Lab Equipment - New` lab equipment. Reagents on a
+  Facilities account, cloud services on one, cleaning supplies on a software account, or a
+  centrifuge on a software or computer account cannot fit. Lab instrument software on `6816000`
+  rather than `6416000` can: either is defensible, and that is Serif's choice.
 * **Repairs and maintenance** raise a capital question: a repair is expense, a replacement
   unit or a new instrument may be an asset. A service contract on the account is a prepaid
   question once it reaches $25,000.

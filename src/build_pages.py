@@ -36,7 +36,7 @@ sys.path.insert(0, HERE)
 import serif_sources as SS  # noqa: E402
 import serif_design as DS   # noqa: E402
 
-VERSION = "2.2.3"
+VERSION = "2.3.0"
 ap = argparse.ArgumentParser(description="Build the GL Coding Review and P&L Flux consoles.")
 ap.add_argument("--only", choices=("coding", "flux"), help="build one console; both by default")
 ap.add_argument("--coding-run", help="the GL Coding Review run.json, after serif_views.py --keep-names")
@@ -382,7 +382,8 @@ def draft(key, note, target, item=None, v=None, label=""):
 
 
 def drafted_entries(fids_ok=None):
-    """Drafted Journal Entries: each must balance and every line name an account."""
+    """Drafted Journal Entries: each must balance and every line name an account. `fit`
+    marks an entry from Claude's reading of the lines against their accounts (account fit)."""
     out = []
     for i, x in enumerate(RAW_DRAFTS.get("entries") or [], 1):
         lines = [{"account": txt(l.get("account")), "department": txt(l.get("department")), "vendor": txt(l.get("vendor") or x.get("vendor")),
@@ -394,7 +395,8 @@ def drafted_entries(fids_ok=None):
             SKIPPED.append("Journal Entry %d (%s): does not balance or has a line with no account" % (i, txt(x.get("memo"))[:60]))
             continue
         out.append({"entry_id": "SERIF-DRAFT-%d" % i, "finding_id": "draft-%d" % i, "kind": "Draft", "date": txt(x.get("date")),
-                    "memo": txt(x.get("memo")), "reverses": txt(x.get("reverses")), "support": txt(x.get("reason")), "lines": lines, "debits": dr, "credits": cr})
+                    "memo": txt(x.get("memo")), "reverses": txt(x.get("reverses")), "support": txt(x.get("reason")), "lines": lines, "debits": dr, "credits": cr,
+                    "fit": x.get("fit") is True})
     return out
 
 
@@ -3045,7 +3047,8 @@ def coding():
         i = next((i for r in vrows if r["vendor"] == vname for i in (r.get("detail") or {}).get("items") or [] if i["document"] == d), None)
         return (i["type"] + " " + d) if i else d
 
-    def card(iid, vendor, amount, hi, cur, rec, doc, extra, why, pol, actions, lines="", more="", flag=True, thr=None, tamt=None, counted=False):
+    def card(iid, vendor, amount, hi, cur, rec, doc, extra, why, pol, actions, lines="", more="", flag=True, thr=None, tamt=None, counted=False, badge=""):
+        """badge: a tag beside the vendor, shown folded too, for where the item came from (Account fit)."""
         dl = doc_links(doc["document"]) if doc else ""
         note_item(iid, vendor, [doc["document"]] if doc else [])
         if doc:
@@ -3076,12 +3079,12 @@ def coding():
         if thr:
             hi = over(thr, amount if tamt is None else tamt)
         tag = ('<span class="tag hi" data-rev%s>Review</span>' % ("" if hi else " hidden") if thr else '<span class="tag hi">Review</span>' if hi else "")
-        return ('<div class="item%s" data-item="%s" data-amt="%s"%s%s><div class="ih">{ref:%s}<b>%s</b><span class="stp">Pending</span><span class="mono">%s</span>%s</div><div class="ib"><div class="kv">'
+        return ('<div class="item%s" data-item="%s" data-amt="%s"%s%s><div class="ih">{ref:%s}<b>%s</b>%s<span class="stp">Pending</span><span class="mono">%s</span>%s</div><div class="ib"><div class="kv">'
                 '<div><div class="l">Current coding</div><div class="x">%s</div></div><div><div class="l">Proposed recode</div><div class="x">%s</div></div>'
                 '<div><div class="l">Document / item</div><div class="x">%s%s</div></div>%s</div>%s%s%s%s<div class="acts">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note" hidden></textarea></div></div></div>'
                 % (" hi" if hi else "", iid, round(amount or 0, 2), " data-flag" if flag or counted else "",
                    (' data-thr="%s"' % thr + (' data-tamt="%s"' % round(tamt, 2) if tamt is not None else "")) if thr else "",
-                   iid, e(vendor), money(amount, True), tag, cur, rec,
+                   iid, e(vendor), ('<span class="tag ink">%s</span>' % e(badge)) if badge else "", money(amount, True), tag, cur, rec,
                    (e(doc["type"] + " " + doc["document"]) + "<small>" + e(doc["text"]) + "</small>") if doc else "&ndash;", dl, extra,
                    ('<div class="why">' + facts(why) + "</div>") if why else "", ('<div class="pol">' + e(facts(pol)) + "</div>") if pol else "", more, lines,
                    acts(iid, vendor, actions), iid))
@@ -3266,16 +3269,17 @@ def coding():
     # An entry Claude drafted is shown, decided and numbered like the category its change belongs
     # to: to a fixed asset account (15xxxxx) CapEx, to a prepaid account (13xxxxx) Prepaid, else an
     # account or department recode. Its id keeps DR-, so a decision already saved carries over;
-    # that Claude drafted it is in the Audit Log and the work paper, not on the card.
-    drafted = drafted_entries()
-    for x in drafted:
+    # that Claude drafted it is in the Audit Log and the work paper, not on the card. An account
+    # fit entry is the exception: always an account recode, tagged Account fit, so the reviewer
+    # knows it is Claude's reading of the lines and not a check. It is carded after Same item, below.
+    def drafted_card(x):
         iid = sid("DR", x["memo"], x["debits"])
         je[iid] = {"id": x["entry_id"], "date": x["date"], "memo": x["memo"], "lines": je_lines(x["lines"]), "reverses": x.get("reverses")}
         vs = sorted({l["vendor"] for l in x["lines"] if l["vendor"]})
         vname = ", ".join(vs) or x["memo"] or "Drafted Journal Entry"
         crl, drl = [l for l in x["lines"] if l["credit"]], [l for l in x["lines"] if l["debit"]]
         to = {l["account"][:2] for l in drl}
-        cat = "capex" if "15" in to else "prepaid" if "13" in to else "dept"
+        cat = "dept" if x["fit"] else "capex" if "15" in to else "prepaid" if "13" in to else "dept"
         DRAFT_CAT[iid] = {"capex": "CAPEX", "prepaid": "PREPAID", "dept": "DEPT"}[cat]
         docs = sorted({d for l in x["lines"] for d in l["documents"]})
         doc = next((i for r in vrows if r["vendor"] == vname for i in (r.get("detail") or {}).get("items") or [] if i["document"] in docs), None)
@@ -3290,9 +3294,13 @@ def coding():
                   "", e(x["support"]), "", DRAFT_ACTS,
                   lines_html(vname, docs=set(docs) or None, codings={(l["account"], l["department"]) for l in crl} or None),
                   je_editor(iid, je[iid]["lines"]) + history(vname),
-                  thr={"capex": "thr_capex", "prepaid": "thr_prepaid"}.get(cat, "thr"))
+                  thr={"capex": "thr_capex", "prepaid": "thr_prepaid"}.get(cat, "thr"), badge="Account fit" if x["fit"] else "")
         (cap_cards if cat == "capex" else pre_cards if cat == "prepaid" else dcards).append(c_)
         ORG_TAB[iid] = "hist"
+    drafted = drafted_entries()
+    for x in drafted:
+        if not x["fit"]:
+            drafted_card(x)
     ents = {x["finding_id"]: x for x in V.get("entries") or []}
     drift = [f for f in GLR["findings"] if f["rule_id"] == "T4.ITEM_ACCOUNT_DRIFT"]
     COVER = ("T1.DEPT_INCONSISTENCY", "T4.PO_ACCOUNT_MISMATCH")
@@ -3391,6 +3399,56 @@ def coding():
                            "", why, "",
                            (("approve", "Add to NetSuite CSV"), ("netsuite", "Edited Manually in NetSuite"), ("reject", "Reject")),
                            lines_html(vname, docs={l["document_number"] for l in ls}), je_editor(iid, je[iid]["lines"]) + history(vname), thr="thr"))
+
+    # Account fit: entries Claude drafted from reading every line's description against its
+    # account, so a miscoding the vendor repeats, which the vendor history takes for its usual
+    # coding, is still found. Each moves accounts only, and only lines this month's GL holds on the
+    # account and department it takes them off. A line another card already moves (a CapEx or
+    # Prepaid flag, a department or Coupa account flag, an accepted exception, Same item, a
+    # pass-through bill) is left to that card: two entries reversing one line would book it twice.
+    # A Coding changed or off plan card gives up the codings, as it does for any drafted entry.
+    at = lambda doc, acct, dept: (str(doc), acct, dept or BS_DEPARTMENT)
+    in_gl = {at(l["document_number"], l["account_code"], l.get("department")) for l in gl_now}
+    on_card = {}
+    for b in PT_BILLS:
+        on_card.update({at(b["document"], l["account_code"], l.get("department")): "a pass-through bill" for l in b["lines"]})
+    for sec_id, what in (("capital", "a CapEx flag"), ("prepaid", "a Prepaid flag")):
+        for r in screen[sec_id]:
+            on_card.update({at((r["doc"] or {}).get("document") or "", r["from_account"], d_): what for d_ in r.get("depts") or {r["department"]: 0}})
+    for f in dfind:
+        what = "an accepted exception" if f in excepted else "a department or Coupa account flag"
+        on_card.update({at(t["document_number"], t.get("account_code"), t.get("department")): what
+                        for t in [f.get("transaction") or {}] + (f.get("transactions") or []) if t.get("document_number")})
+        on_card.update({at(d_, l["account"], l.get("department")): what for l in (ents.get(f["finding_id"]) or {}).get("lines", [])
+                        if l.get("reverses_line") or l.get("credit") for d_ in l.get("documents") or []})
+    on_card.update({at(l["document_number"], l["account_code"], l.get("department")): "a Same item card" for ls in flips.values() for l in ls})
+
+    def fit_left_out(x):
+        """Why an account fit entry is left out, or None."""
+        # Both sides keep each line's department, Project and Program. The build puts a new balance
+        # sheet line on Non-Specific, so an entry with one is held to its Projects and Programs.
+        pl_only, net = all(PNL(l["account"]) for l in x["lines"]), defaultdict(float)
+        for l in x["lines"]:
+            net[(l["department"] if pl_only else "", l["project"], l["program"])] += l["debit"] - l["credit"]
+        if any(round(v, 2) for v in net.values()):
+            return "it moves a department, Project or Program as well as the account"
+        for l in [l for l in x["lines"] if l["reverses_line"]] or [l for l in x["lines"] if l["credit"]]:
+            where = "%s / %s" % (l["account"], l["department"] or BS_DEPARTMENT)
+            if not l["documents"]:
+                return "its line on %s names no document" % where
+            for d_ in l["documents"]:
+                if at(d_, l["account"], l["department"]) not in in_gl:
+                    return "document %s has no line on %s in %s" % (d_, where, PERIOD)
+                if at(d_, l["account"], l["department"]) in on_card:
+                    return "document %s on %s is already on %s" % (d_, where, on_card[at(d_, l["account"], l["department"])])
+        return None
+    for x in [x for x in drafted if x["fit"]]:
+        why_out = fit_left_out(x)
+        if why_out:
+            SKIPPED.append("Journal Entry %s (%s): account fit, but %s" % (x["entry_id"].rsplit("-", 1)[1], x["memo"][:60], why_out))
+            drafted.remove(x)
+        else:
+            drafted_card(x)
 
     # Reviewed & Cleared and New This Period: by department, then account
     def coding_of(r):
@@ -3899,13 +3957,15 @@ function workPaper(){
   const F = fixesOf(), td = (v, c) => '<td' + (c ? ' class="' + c + '"' : '') + '>' + esc(v) + '</td>';
   const usd = v => (Number(v) || 0).toLocaleString('en-US', {style: 'currency', currency: 'USD'});
   const pageOf = x => { const p = x.closest('.page'), b = p && $('.tb.pg[data-p="' + p.id.slice(2) + '"]'); return b ? navText(b).trim() : ''; };
+  // where a drafted entry came from, as its card's tag says (", account fit")
+  const badge = x => { const t = x.querySelector(':scope > .ih > .tag.ink'); return t ? ', ' + t.textContent.toLowerCase() : ''; };
   const change = id => { if (!DATA.je[id]) return ''; const j = jeOf(id); if (jeNoop(j)) return '';
     const side = k => Array.from(new Set(j.lines.filter(l => Number(l[k])).map(l => (l.account || '') + (l.department ? ' / ' + l.department : '')))).join(', ');
     return side('credit') + ' → ' + side('debit'); };
   const items = $$('[data-item]'), open = items.filter(x => !decided(x.dataset.item)), fx = Object.values(F), rc = fx.filter(f => f.path === 'Reclass');
   const dec = items.filter(x => S.dec[x.dataset.item]).map(x => { const id = x.dataset.item, d = S.dec[id], f = F[id] || {};
     return '<tr>' + td(refOf(id), 'm') + td(pageOf(x)) + td(x.querySelector('.ih b').textContent) + td(usd(x.dataset.amt), 'n') + td(LABEL[d.v] || d.v)
-      + td(f.path ? f.path + (id.indexOf('DR-') === 0 ? ', drafted by Claude' : '') + (f.in_import ? ', in the import' : f.held ? ', held: ' + f.held : '') : '') + td((DATA.docs || {})[id] || '') + td(f.external_id || '', 'm') + td(change(id))
+      + td(f.path ? f.path + (id.indexOf('DR-') === 0 ? badge(x) + ', drafted by Claude' : '') + (f.in_import ? ', in the import' : f.held ? ', held: ' + f.held : '') : '') + td((DATA.docs || {})[id] || '') + td(f.external_id || '', 'm') + td(change(id))
       + td(S.notes[id] || '') + td(d.by_uid ? Shared.name(d.by_uid) : '') + td(String(d.at || '').slice(0, 16).replace('T', ' '), 'm') + '</tr>'; });
   const lines = [];
   Object.keys(DATA.je).filter(jeReady).forEach(id => { const j = jeOf(id);
