@@ -64,12 +64,15 @@ The build ties the ledger to the Income Statement as the first command does, and
 account does not tie; `--allow-tie-differences` builds anyway, with the differences at the top
 of the Overview. Without `--income-statement` the Overview says the ledger was not tied.
 
-In the Claude Project, Claude then writes `drafts.json` and builds again with
+In the Claude Project, Claude then reads every vendor line in the run against its account
+(**account fit**), writes `drafts.json` and builds again with
 `--drafts drafts.json`. Each note in it names one item (its vendor, its check and, for a bill,
 the document number) and goes on that item only, so an item carries one short draft at most,
-and only where its check does not settle it. The build checks each draft against the run: a note
-no item fits, or a Journal Entry that does not balance, is printed and listed in the Run log
-under **Drafts Left Out**. An older
+and only where its check does not settle it. A Journal Entry marked `"fit": true` moves lines
+whose item clearly cannot belong on their account, a miscoding no check raises when the vendor
+repeats it. The build checks each draft against the run: a note
+no item fits, a Journal Entry that does not balance, or an account fit entry that does not hold
+(below), is printed and listed in the Run log under **Drafts Left Out**. An older
 `drafts.json` keyed by vendor (`vendors`) still loads when it has no `notes`. The format is in
 `PROJECT_INSTRUCTIONS.md`.
 
@@ -92,7 +95,7 @@ In a Claude Project every uploaded file sits at the top level, so all of these a
 filenames. In the repo, `make build PERIOD=sep2026` runs the same commands from the packaged
 Project folder on the exports in `inputs/sep2026/`.
 
-The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.2.3 now), one
+The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.3.0 now), one
 self-contained file that opens in any browser. That is the deliverable.
 
 The filename carries the period and the console version, so builds of different versions do
@@ -166,7 +169,7 @@ decision record each time you ask for a rerun or a hand-off.
 
 | Ask | What Claude does |
 |---|---|
-| `Run the GL coding review for Sep 2026.` | The first run of the close: lists the exports, runs the scripts, drafts, publishes the console |
+| `Run the GL coding review for Sep 2026.` | The first run of the close: lists the exports, runs the scripts, reads every line for account fit, drafts, publishes the console |
 | `Run it again. Reviewed as of 20 Sep.` | Runs on the newest exports and says what is new since that review |
 | `Redraft the note on CODING-04.` | Rewrites Claude's draft on that one item, builds the console again and publishes it |
 | `Draft the questions email.` | One email per owner department, from the questions in your notes in the decision record (the cards carry none), for you to send |
@@ -338,7 +341,8 @@ each with what is left on it. Run log and Settings are the icons at the right.
 * **Review**: CapEx Flags, Prepaid Flags, Organization & Account, and Pass-Through Bills.
   * **Organization & Account** holds a **Coding Inconsistencies** box with four tabs, by what
     the coding disagrees with: **vs. Vendor History** (Department flags, Coding changed vendors,
-    and Claude's drafted account or department recodes), **vs. Coupa PO** (account flags against
+    and Claude's drafted account or department recodes, account fit entries among them),
+    **vs. Coupa PO** (account flags against
     the Coupa PO; when that check did not run, the tab shows a dash and the run's reason),
     **vs. Forecast** (Coded off plan vendors) and **Same Item, Different Accounts**. Each item is
     tagged with what its entry changes: Account, Department, or Account and department. A
@@ -387,6 +391,25 @@ PREPAID-NN on Prepaid Flags, and any other is CODING-NN on Organization & Accoun
 History. It is numbered where its page lists it, so a draft added later in the close can move
 the IDs after it. Its External ID stays `SERIF-DRAFT-N`, and the work paper's decision
 Path says ", drafted by Claude".
+
+An **account fit** entry is the exception. Claude reads every vendor line in the run, the vendors
+no check raised included, and drafts one only where a line's item clearly cannot belong on its
+account, whatever the vendor's history or the Coupa PO says: lab reagents on a Facilities account,
+as Fisher Scientific's were in Aug and Sep 2026 ($13,351.98 on `6607000 Facility Repairs &
+Maintenance` in September, raised by no check). An item that could sit on more than one account,
+such as lab instrument software on `6816000 Office Non-Cap Software` rather than `6416000 Lab
+Non-Capital Software`, gets none. The entry credits the lines' account and debits the one they
+belong on, keeping each line's department, Project and Program. Its card is always CODING-NN on
+Organization & Account, under vs. Vendor History, and carries an **Account fit** tag beside the
+vendor, folded or open, so the reviewer knows it is Claude's reading of the lines and not a check
+(drafted entries otherwise carry no marker). It stays Pending until the reviewer chooses Add to
+NetSuite CSV, Edited Manually in NetSuite or Reject; nothing reaches NetSuite without that choice.
+Its item id keeps `DR-`, so a saved decision carries over to the next build of the same entry,
+and the work paper's Path says ", account fit, drafted by Claude". The build leaves an account
+fit entry out when it takes off a line another card already moves (a CapEx or Prepaid flag, a
+department or Coupa account flag, an accepted exception, Same item, a pass-through bill), names
+no document or one with no line on that account and department in the month, or moves a
+department, Project or Program as well as the account.
 
 ### CapEx and Prepaid, Both Directions
 
@@ -514,7 +537,8 @@ CapEx and Prepaid thresholds existed keeps its one threshold and takes these def
 - **Exports this month:** each export the month needs and the file supplied for it.
 - **What each check found:** every check, what it found and whether it ran.
 - **Drafts Left Out:** any of Claude's drafts the build could not place, such as a note no item
-  fits or a Journal Entry that does not balance.
+  fits, a Journal Entry that does not balance, or an account fit entry on a line another card
+  moves, and why.
 - **Estimated cost per close run:** one run through the API on Claude Sonnet 5.5 at medium
   effort, at list price. A run in the Claude Project is covered by the Claude seat.
 - **Inputs** and the **Build record:** the files, their fingerprints and the versions that

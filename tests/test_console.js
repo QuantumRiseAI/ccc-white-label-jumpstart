@@ -3,14 +3,14 @@
 // record and the work paper), then shared mode on a mocked Artifact db:
 // two reviewers, attribution, a conflict, a read-only viewer, downloads, and a rerun
 // bringing in the earlier run's decisions. Needs Playwright with Chromium.
-//   node tests/test_console.js [folder holding the two aug2026 v2.2.3 consoles]   (or: make test)
+//   node tests/test_console.js [folder holding the two aug2026 v2.3.0 consoles]   (or: make test)
 // With no folder, it tests consoles/.
 let chromium; try { ({ chromium } = require('playwright')); }
 catch (e) { ({ chromium } = require(process.env.PLAYWRIGHT || '/Users/anniebritton/.npm/_npx/520e866687cefe78/node_modules/playwright')); }
 const fs = require('fs'), path = require('path'), os = require('os');
 const B = path.resolve(__dirname, '..') + '/';
 const DIR = process.argv[2];
-const FILES = DIR ? {gl: path.join(DIR, 'serif-gl-coding-review-aug2026-v2.2.3.html'), pl: path.join(DIR, 'serif-pl-flux-aug2026-v2.2.3.html')}
+const FILES = DIR ? {gl: path.join(DIR, 'serif-gl-coding-review-aug2026-v2.3.0.html'), pl: path.join(DIR, 'serif-pl-flux-aug2026-v2.3.0.html')}
   : {gl: B + 'consoles/serif-gl-coding-review.html', pl: B + 'consoles/serif-pl-flux.html'};
 let fails = 0;
 const ok = (c, m) => { console.log((c ? '  PASS ' : '  FAIL ') + m); if (!c) fails++; };
@@ -339,6 +339,36 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
           && Object.keys(mine).every(i => !mine[i].startsWith('CODING-') ? withDraft[i] === mine[i]
             : withDraft[i] === mine[i] ? nr(mine[i]) < nr(withDraft[added[0]]) : nr(withDraft[i]) === nr(mine[i]) + 1 && nr(mine[i]) >= nr(withDraft[added[0]])),
           'gl: a drafted account recode takes CODING-NN where its page lists it; the cards after it move up one and no other ID changes');
+        // CCC-237: an account fit entry, Claude's reading of a line no check raised, is a CODING card tagged Account fit, undecided,
+        // with the flag's three decisions; one taking off a line another card's entry moves, or naming no line of the month, is left out
+        const R = JSON.parse(fs.readFileSync(run, 'utf8')), rows = R.views.tables.find(t => t.id === 'vendors').sections.flatMap(s => s.rows);
+        const free = rows.filter(r => !(r.flags || []).length).flatMap(r => (r.detail || {}).items || [])
+          .find(i => /^6/.test(i.account) && ['6410000', '6415000', '6420000'].indexOf(i.account) < 0 && i.amount > 0 && i.department);
+        const taken = (R.views.entries || []).flatMap(x => x.lines).find(l => l.reverses_line && (l.documents || []).length && l.credit > 0);
+        if (free && taken){
+          const fit = (memo, l, amt, docs) => ({memo, fit: true, reason: 'Test: the item cannot belong on its account.', vendor: l.vendor, lines: [
+            {account: '6420000', department: l.department, project: l.project, program: l.program, debit: amt, documents: docs},
+            {account: l.account, department: l.department, project: l.project, program: l.program, credit: amt, documents: docs, reverses_line: true}]});
+          const fd = path.join(tmp, 'fit.json'), outF = path.join(tmp, 'fit');
+          fs.writeFileSync(fd, JSON.stringify({entries: [fit('Fit test, read from the line', free, free.amount, [free.document]),
+            fit('Fit test, on another card', taken, taken.credit, taken.documents), fit('Fit test, no such line', free, 10, ['NO-SUCH-DOC'])]}));
+          const r = cp.spawnSync('python3', ['build_pages.py', '--only', 'coding', '--coding-run', run, '--gl', ...GL, '--out', outF, '--drafts', fd], {cwd: DG, encoding: 'utf8'});
+          const h = r.status ? '' : fs.readFileSync(path.join(outF, fs.readdirSync(outF).find(f => /^serif-gl-coding-review-.*\.html$/.test(f))), 'utf8');
+          const D = h ? JSON.parse(h.match(/window\.DATA=(.*?);<\/script>/s)[1]) : {ref: {}, je: {}};
+          const fc = await b.newContext(), fp = await fc.newPage();
+          if (h){ await fp.goto('file://' + path.join(outF, fs.readdirSync(outF).find(f => /^serif-gl-coding-review-.*\.html$/.test(f)))); await fp.waitForTimeout(500); }
+          const card = await fp.evaluate(() => $$('[data-item^="DR-"]').map(x => ({id: x.dataset.item, page: x.closest('.page').id, pane: (x.closest('[data-pane]') || {dataset: {}}).dataset.pane,
+            tag: [...x.querySelectorAll(':scope > .ih > .tag.ink')].map(t => t.textContent), vendor: x.querySelector('.ih b').textContent, status: x.querySelector('.stp').textContent,
+            acts: [...x.querySelectorAll('[data-d]')].map(b => b.dataset.v), decided: !!S.dec[x.dataset.item]}))).catch(() => []);
+          await fc.close();
+          const c = card.length === 1 && card[0];
+          ok(c && c.page === 'p-dept' && c.pane === 'org-hist' && /^CODING-\d{2,}$/.test(D.ref[c.id]) && c.tag.join() === 'Account fit' && c.vendor === free.vendor
+             && /^(Pending|Review)$/.test(c.status) && !c.decided && c.acts.join() === 'approve,netsuite,reject' && D.je[c.id].lines.some(l => l.account === '6420000' && Number(l.debit) === free.amount),
+             'gl: an account fit entry is a CODING card on Organization & Account, tagged Account fit, undecided, offering Add, Edited Manually and Reject (' + JSON.stringify(card) + ')');
+          ok(/Fit test, on another card\): account fit, but document \S+ on \d{7} \/ [^:]+ is already on a department or Coupa account flag/.test(r.stdout)
+             && /Fit test, no such line\): account fit, but document NO-SUCH-DOC has no line on/.test(r.stdout) && /Drafts Left Out/.test(h),
+             'gl: an account fit entry taking off a line another card moves, or naming no line of the month, is left out and listed');
+        } else console.log('  SKIP gl: account fit (no unflagged vendor line or proposed entry in this month)');
         // SERIF-162: a note goes on the one item it names (vendor, check, document) and on no other; a note no item fits is listed
         const cx0 = await p.evaluate(() => { const x = $('#p-capex [data-item^="C-"]'); return x && {id: x.dataset.item, vendor: x.querySelector('.ih b').textContent,
           doc: (DATA.docs[x.dataset.item] || '').split(' ').pop()}; });
@@ -501,7 +531,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     // the run log
     await p.evaluate(() => show('runlog'));
     ok(await p.locator('#p-runlog h3', {hasText: 'What each check found'}).count() === 1, k + ': run log shows each check');
-    ok(await p.locator('#p-runlog td', {hasText: '2.2.3'}).count() >= 1, k + ': build record names 2.2.3');
+    ok(await p.locator('#p-runlog td', {hasText: '2.3.0'}).count() >= 1, k + ': build record names 2.3.0');
     // the decision record: save, then load into a clean browser
     await p.evaluate(() => show('settings'));
     const [rd] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('[data-recsave]')]);

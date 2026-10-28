@@ -37,6 +37,62 @@ serif-pl-flux-aug2026-v1.8.2.html
 
 ---
 
+## 2.3.0: account fit, a miscoding repeated two months running (CCC-237)
+
+Console 2.3.0. Engine, ruleset and views unchanged. Decisions keep their stored verbs; no id
+changes.
+
+The vendor-history check flags a coding only when the vendor did not use it in the two months
+before or the same month last year, so a miscoding the vendor repeats looks like its usual
+coding. In Sep 2026, $13,351.98 of Fisher Scientific lab reagents and assay kits sat on 6607000
+Facility Repairs & Maintenance and no check flagged them; in Aug 2026 the same miscoding was
+caught only because their Coupa POs were approved against 6410000 Lab Supplies/Consumables.
+Claude found the September lines by reading them in the mock Project run. That reading is now a
+check in its own right.
+
+- **Account fit, in the GL Coding Review Project.** After the three scripts and before it writes
+  `drafts.json`, Claude reads every vendor line in `run.json` (1,471 in Sep 2026), the vendors
+  no check raised and those on Vendors Reviewed & Cleared included, and compares each line's
+  description with its account. Only a line whose item clearly cannot belong on its account,
+  whatever the vendor's history or the PO says, gets a Journal Entry: lab reagents or assay kits
+  on a Facilities account, cloud services on a Facilities account, cleaning supplies on a
+  software account, lab equipment on a software or computer account. An item that could sit on
+  more than one account gets none: lab instrument software on 6816000 Office Non-Cap Software
+  rather than 6416000 Lab Non-Capital Software is Serif's choice, not an error. The entry goes in
+  `entries` marked `"fit": true`; it credits the lines' account and debits the one they belong
+  on, both sides keeping each line's department, Project and Program, and its reason says what
+  was bought and why the account does not fit. Lines another item already covers are left out
+  (in September, Fisher's General R&D lines on 6607000, which had a Coding changed card). In the
+  chat Claude says how many lines it read and what it drafted. The vendor lines in `run.json` are
+  the month's P&L lines, so a bill booked to a fixed asset or prepaid account is not read; it
+  keeps its card on CapEx or Prepaid Flags.
+- **An Account fit card** (reverses SERIF-158 for these cards): each entry is a card on
+  Organization & Account, under vs. Vendor History, as CODING-NN whatever account it debits,
+  with an **Account fit** tag beside the vendor, folded or open, so the reviewer knows the item
+  comes from Claude's reading of the lines and not from a check. Other drafted entries still
+  carry no marker. The card stays Pending until the reviewer chooses Add to NetSuite CSV,
+  Edited Manually in NetSuite or Reject; nothing reaches NetSuite without that choice. Its item
+  id keeps `DR-`, so a saved decision carries over to the next build of the same entry. The work
+  paper's decision Path reads ", account fit, drafted by Claude".
+- **The build checks each account fit entry against the month.** It is left out, printed and
+  listed under Drafts Left Out with the reason, when it takes off a line another card already
+  moves (a CapEx or Prepaid flag, a department or Coupa account flag, an accepted exception, Same
+  item, a pass-through bill), since two entries reversing one line would book it twice; when a
+  line it takes off names no document, or one with no line on that account and department in the
+  month; or when it moves a department, Project or Program as well as the account. A Coding
+  changed or off plan card gives up a coding the entry moves, as it does for any drafted entry.
+- **Later runs keep drafted entries as they were.** A Journal Entry's card id comes from its Memo
+  and amount, so the instructions keep each one drafted earlier in the close, account fit or
+  not, word for word, and put lines new since then in an entry of their own.
+- **Instructions**: `PROJECT_INSTRUCTIONS.md` has an Account Fit section (what to read, the
+  examples and the case not to flag, the entry, what the reviewer sees); the Run the month
+  recipe and the chat's report include it. `GL_CODING_REVIEW_SKILL.md` and `HOW-TO-RUN.md`
+  describe the check and how to read an account by its name.
+- **Tests**: `tests/test_console.js` builds Aug 2026 with an account fit entry on a line no check
+  raised, which is a CODING card tagged Account fit, undecided, offering the three decisions,
+  and with two that are left out, one on a line a department flag's entry moves and one naming
+  no line of the month.
+
 ## 2.2.3: fixes from the Sep 2026 mock Project runs
 
 Console 2.2.3, flux engine 0.8.4, views 1.7.4. Decisions keep their stored verbs; no id changes.

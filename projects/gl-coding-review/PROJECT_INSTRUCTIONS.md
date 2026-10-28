@@ -7,7 +7,8 @@ The scripts find and lay out. You explain and write.
 Five commands run in order, from the tie to the build, and produce a review console, one HTML file, laid out as the
 controller's August GL review. The reviewer works the console. You write what the reviewer needs around it: a short note on
 each item its check does not settle (what was bought, whether the coding fits, or what the
-lines do not show), and the Journal Entries no rule proposed. Every figure you use comes from
+lines do not show), and the Journal Entries no rule proposed, among them one for each line
+whose item plainly cannot belong on its account (Account Fit). Every figure you use comes from
 the run.
 
 Never compute findings, totals or variances yourself. A number you add up by hand does not
@@ -125,7 +126,7 @@ bonus accrual, interest) and none at this one. That says the GL was pulled befor
 closed. Say so with the tie's result, name the accounts, and ask for the GL again after close.
 The list leads the first page of the console too.
 
-The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.2.3 now). Publish it
+The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.3.0 now). Publish it
 as [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML
 yourself: if it needs a change, change the script and build again.
 
@@ -298,13 +299,14 @@ section's pages open in a bar under the header.
     fixed-asset or prepaid accounts, each with **Confirm, Stays on Balance Sheet**, **Recode to
     Expense, Add to NetSuite CSV** and **Edited Manually in NetSuite**;
   * **Organization & Account**: department and account recodes, each with its proposed Journal
-    Entry, and any Journal Entry you drafted that changes an account or department;
+    Entry, and any Journal Entry you drafted that changes an account or department, an account
+    fit entry tagged **Account fit**;
   * **Pass-Through Bills**: each Flagship pass-through bill, reviewed against its cost breakdown
     when one was supplied (see Flagship Pass-Through Bills).
   Organization & Account holds its items in a **Coding Inconsistencies** box, one tab for what
   the coding disagrees with:
     * **vs. Vendor History**: Department flags (`T1.DEPT_INCONSISTENCY`), Coding changed
-      vendors, and drafted account or department recodes;
+      vendors, and drafted account or department recodes, account fit entries among them;
     * **vs. Coupa PO**: account flags against the Coupa PO (`T4.PO_ACCOUNT_MISMATCH`, and
       `T4.ITEM_ACCOUNT_DRIFT` at or over the threshold). When the PO check did not run, the tab
       shows a dash and the run's reason;
@@ -357,7 +359,8 @@ saying what its items are, and with every card folded to its header; a card open
 Every flag and vendor card starts with its reference ID, numbered in the order its page lists
 the cards, across the page's tabs, so CODING-63 sits between CODING-62 and CODING-64 (CAPEX-01,
 FA-01, PREPAID-01, PPD-01, CODING-01 for every item on Organization & Account, PASS-01,
-CLEAR-01, NEW-01; a Journal Entry you drafted takes the ID of its category), and the Memo of its
+CLEAR-01, NEW-01; a Journal Entry you drafted takes the ID of its category, and an account fit
+entry is CODING), and the Memo of its
 Journal Entry starts with the same ID, so the entry in NetSuite ties back to the card. Every
 proposed entry's Memo ends with the close month, `| Mon'YY`, as the Data Entry Policy requires;
 the build adds it where a Memo lacks it. Use the ID
@@ -406,6 +409,99 @@ date: unless the line states one, the card's Placed in service gives the invoice
 equipment has no fixed asset account in Serif's chart; the entry holds it in Capital in
 Process, and the card says the chart has no fixed asset account for it. Never invent one.
 
+## Account Fit
+
+Every check compares a line's coding with something else: the vendor's earlier months, its Coupa
+PO, the plan. The vendor history flags a coding only when the vendor did not use it in the two
+months before or the same month last year, so a miscoding the vendor repeats looks like its usual
+coding. In Sep 2026, $13,351.98 of Fisher Scientific lab reagents and assay kits sat on
+`6607000 Facility Repairs & Maintenance` and no check raised them; in Aug 2026 the same coding
+was caught only because their Coupa POs were approved against `6410000 Lab
+Supplies/Consumables`. Account fit is your reading of each line against its own account, a
+check in its own right. Run it in every run of the close, after the three scripts and before you
+write `drafts.json`.
+
+**Read every vendor line.** Every row of the `vendors` table in `views.tables`, in every section,
+the vendors no check raised and those on Vendors Reviewed & Cleared included, and every line in
+its `detail.items`: description (`text`), account, department, Project, Program, document and
+amount. List them with code, by account and then vendor, and read each account's lines together;
+a line that does not belong stands out among the account's own. Count them with code: the count
+is the rows' `detail.count` added up (1,471 in Sep 2026). These are the month's P&L lines,
+expense reports aside; a bill booked to a fixed asset or prepaid account is not among them, and
+has its own card on CapEx or Prepaid Flags. A line with no description says nothing to compare;
+leave it.
+
+**Only an obvious mismatch.** Draft an entry only where the description names an item that
+clearly cannot belong on its account, whatever the vendor's history or the PO says: one any
+accountant would recode on reading the line. If the item could reasonably sit on more than one
+account, draft nothing: which defensible account to use is Serif's choice, not an error. If the
+description does not say what was bought, draft nothing. When in doubt, leave it. The kind of
+mistake this check is for:
+
+| On the line | Posted to | Belongs on |
+|---|---|---|
+| Lab reagents or assay kits (Fisher Scientific, Aug and Sep 2026) | A Facilities account (66xxxxx) | `6410000 Lab Supplies/Consumables` |
+| Cloud services (AWS, Google Cloud) | A Facilities account | `6416000 Lab Non-Capital Software` or `6816000 Office Non-Cap Software`, as the vendor's other lines are |
+| Cleaning supplies | `6816000 Office Non-Cap Software` or `6416000 Lab Non-Capital Software` | `6605000 Cleaning` |
+| Lab equipment, such as a centrifuge | `6816000 Office Non-Cap Software` or `1530000 Computers & Software` | `6415000 Lab Non-Capital Equipment`; from `1530000`, `1510000 Lab Equipment - New` |
+
+Not a mismatch: lab instrument software on `6816000 Office Non-Cap Software` rather than `6416000
+Lab Non-Capital Software`. Either account can be defended, so it is Serif's choice; draft
+nothing.
+
+**What you draft.** One Journal Entry per vendor, account the lines are on and account they
+belong on, in `entries`, marked `"fit": true`:
+
+* It credits the lines' account and debits the one they belong on, one pair of lines for each
+  department, Project and Program, totalled with code from `detail.items`. Both sides keep the
+  line's department, Project and Program. Mark the credit `"reverses_line": true`, and give each
+  line its documents.
+* `reason`: what was bought and why the account does not fit, in one or two sentences, in the
+  style of the writing guide.
+* `memo`: `Specific description | Mon'YY`.
+* Leave out a line another item already covers: a CapEx or Prepaid flag on its bill (`flags`
+  `capital` and `prepaid`, by document), a department or Coupa account flag on it or an accepted
+  exception (`findings`, by document), Same item, a pass-through bill, or a Coding changed card
+  on its account and department (`flags` `changed`, by `match`). A Coded off plan card whose
+  coding the vendor used before moves nothing ("only the plan differs"): read its lines like any
+  other.
+* An expense line whose item is a capital asset or a prepaid is a CapEx or Prepaid question,
+  not account fit: draft it as What You Write, 4, says, without `fit`.
+
+```json
+{"memo": "Lab reagents recoded from facility repairs to lab supplies | Sep'26", "fit": true,
+ "reason": "Lab reagents and assay kits (plant cholesterol, PathScan STAT1 ELISA kits, an Amplex Red uric acid assay, a LEGENDplex panel, pHrodo dye) are lab consumables; 6607000 Facility Repairs & Maintenance holds repairs and upkeep of the building, which none of these lines is.",
+ "vendor": "Fisher Scientific",
+ "lines": [
+   {"account": "6410000", "department": "Chemistry", "project": "00 Non-Specific", "program": "00 Non-Specific",
+    "debit": 9115.85, "documents": ["1659297"]},
+   {"account": "6607000", "department": "Chemistry", "project": "00 Non-Specific", "program": "00 Non-Specific",
+    "credit": 9115.85, "documents": ["1659297"], "reverses_line": true}
+ ]}
+```
+
+In Sep 2026 this entry moved $13,351.98 on Chemistry, Platform and Biology, a pair of lines for
+each; Fisher's General R&D lines on `6607000` already had a Coding changed card, so it left them
+out.
+
+**What the reviewer sees.** Each entry is a card on Organization & Account, under vs. Vendor
+History, built like any drafted entry, numbered CODING-NN where the page lists it, and tagged
+**Account fit** beside the vendor, so the reviewer knows the item comes from your reading of the
+lines and not from a check. It stays Pending until the reviewer chooses **Add to NetSuite CSV**,
+**Edited Manually in NetSuite** or **Reject**; nothing reaches NetSuite without that choice. Its
+item id keeps `DR-` and comes from its Memo and amount, so a saved decision carries over to the
+next build of the same entry. The work paper's Path says ", account fit, drafted by Claude".
+
+The build leaves out an account fit entry, and lists it under Drafts Left Out, when it takes off a
+line another card moves, names no document, names one with no line on that account and
+department in the month, or moves a department, Project or Program as well as the account. Fix
+it and build again. A Coding changed or off plan card gives up a coding an entry moves, as for any
+drafted entry.
+
+In the chat, say how many lines you read and what you drafted from them: each entry by vendor,
+accounts and amount, or that no line was clearly miscoded. Lines you did not read are a check
+that did not run on them: say which.
+
 ## What You Write
 
 Your drafts go into the console, each beside the one item it belongs to, marked "Draft" with a
@@ -416,7 +512,8 @@ onto the item and sets that decision; Edit copies the note to change it.
 Nothing you write counts as reviewed until the reviewer accepts or edits it. The reviewer reads
 these between decisions: write for a quick call, not a report.
 
-After the three scripts run, write `drafts.json` and build the console again with it:
+After the three scripts run and you have read the lines for account fit, write `drafts.json`
+and build the console again with it:
 
 ```sh
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
@@ -574,7 +671,8 @@ Draft marker on the card. It goes
 to the page its change belongs to and takes that category's reference ID: a debit to a fixed
 asset account (15xxxxx) goes on CapEx Flags as CAPEX-NN, a debit to a prepaid account (13xxxxx)
 on Prepaid Flags as PREPAID-NN, and any other on Organization & Account, under vs. Vendor
-History, as CODING-NN. It is numbered where its page lists it, like every other card, so an
+History, as CODING-NN; an account fit entry always goes there, tagged Account fit (see Account
+Fit). It is numbered where its page lists it, like every other card, so an
 entry drafted later in the close can move the IDs after it; name cards by vendor as well as ID
 in a later chat. Its External ID is `SERIF-DRAFT-1` and on;
 its item id keeps `DR-`. The work paper's decision Path adds ", drafted by Claude". It offers
@@ -584,8 +682,8 @@ CSV on Export.
 ### 5. In the Chat
 
 Do not write a `summary`. The Overview opens on the figures and the Review Checklist, which the
-reviewer works from. Say in the chat what you drafted, and name every check that did not
-run and why. The hand-off at the end of a session is written in the chat; see Requests.
+reviewer works from. Say in the chat what you drafted, how many lines you read for account fit,
+and name every check that did not run and why. The hand-off at the end of a session is written in the chat; see Requests.
 
 ### How to Write
 
@@ -665,6 +763,10 @@ In shared mode, republish to this month's artifact, then tell the reviewer to us
 the earlier run's decisions** in Settings in place of loading the record.
 
 Write drafts for what is new, changed or still open; leave out what the record has decided.
+Journal Entries are the exception: keep each one drafted earlier in the close, account fit or
+not, with its Memo and lines as they were. Its card's id comes from its Memo and amount, so it
+keeps its decision; an entry rewritten is a new item. Read the lines for account fit again, and
+put lines new since the earlier run in an entry of their own.
 A note names its item by vendor, `check` and `document`, so it finds the same item in the new
 run; a note whose item is no longer raised is left out and listed under Drafts Left Out. Where
 the reviewer did not use your earlier note, write it again for this run if the item still
@@ -684,7 +786,7 @@ keyed by item id:
 
 Item ids start `C-` and `P-` for CapEx and Prepaid flags, `CB-` and `PB-` for bills booked to
 fixed-asset and prepaid accounts, `D-` for Organization & Account, `DR-` for your drafted entries
-(on the page of their category), `VC-` for Coding changed or off plan, `R-` and `N-` for Vendors
+(on the page of their category; an account fit entry on Organization & Account), `VC-` for Coding changed or off plan, `R-` and `N-` for Vendors
 Reviewed & Cleared and New Vendors This Period, and `PT-` for Pass-Through Bills. Notes are the reviewer's own words.
 
 ## Requests
@@ -693,8 +795,9 @@ The reviewer asks for these in the close's chat. Each is a fixed recipe: do its 
 order, and nothing the reviewer did not ask for. Match the request, not the exact words.
 
 **Run the month.** "Run the GL coding review for Sep 2026." The first run of the close: Each
-Month, Run It, then What You Write: a note only on an item its check does not settle, one
-note to an item, then any Journal Entry no rule proposed. Build with `--drafts` and publish.
+Month, Run It, Account Fit, then What You Write: a note only on an item its check does not
+settle, one note to an item, then any Journal Entry no rule proposed, the account fit entries
+among them. Build with `--drafts` and publish.
 
 **Redraft a note.** "Redraft the note on CODING-04." "Recommend Reject on CAPEX-02."
 
