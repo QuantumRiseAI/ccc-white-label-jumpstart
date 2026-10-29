@@ -45,7 +45,7 @@ State plainly what the data shows, and qualify what it only suggests. Use "sugge
 and say "the lines do not show" when the deciding fact is missing. Do not round a qualified
 finding up to a certain one, and do not hide a missing fact behind a vague word.
 
-> Mirai Bio last billed in June 2026, so the estimate rests on a single invoice, and Journal
+> The partnered-research vendor last billed in June 2026, so the estimate rests on a single invoice, and Journal
 > Entry JE1536973474570 already accrues $256,478.53 of open purchase orders to 6508000
 > Partnered Research, which may already include this vendor.
 
@@ -105,5 +105,5 @@ appears in the console or the run.
 | Before | After |
 |---|---|
 | Four contracted FTEs for lipid synthesis in August 2026, with the chemicals they used. 6501100 Synthesis Costs on Chemistry fits outsourced synthesis; only the plan's 6509000 differs. | Jubilant billed four contracted chemists for lipid synthesis in August, along with the chemicals they used, which fits 6501100 Synthesis Costs on Chemistry as in earlier months; the forecast, which planned the spend on 6509000 Other External Research, is what differs. |
-| Non-capital equipment of $5,280.67 on pass-through bill INV19096, which has no breakdown. The line does not show whether it is one item over the $5,000 threshold or several smaller ones that stay expense. | Flagship billed this amount as a single lump-sum line of non-capital equipment without a cost breakdown, so it is not possible to tell whether the line holds one item above the $5,000 capitalization threshold or several smaller items that would remain expense. |
+| Non-capital equipment of $5,280.67 on pass-through bill INV19096, which has no breakdown. The line does not show whether it is one item over the $5,000 threshold or several smaller ones that stay expense. | Plurality billed this amount as a single lump-sum line of non-capital equipment without a cost breakdown, so it is not possible to tell whether the line holds one item above the $5,000 capitalization threshold or several smaller items that would remain expense. |
 | Billing-pattern estimate of $307,614.51 against a trailing average driven by Jul's $918,269.10. Sep billed $60,681.87, so the average overstates a normal month. Reject. | The $307,614.51 is a billing-pattern estimate inflated by a single July bill run of $918,269.10, while Life Technologies billed $60,681.87 in September, more than in any month from March through June; this suggests that no September invoice is missing. |

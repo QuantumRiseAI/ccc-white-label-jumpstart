@@ -1,8 +1,8 @@
-# Lens Module Review: Serif Dataset
+# Lens Module Review: Unity Dataset
 
 **Prepared:** 2026-09-22 · **Status:** DRAFT, internal
 
-Review of the Rapid Diagnostic Lens module output for Serif.
+Review of the Rapid Diagnostic Lens module output for Unity.
 The arithmetic holds and the gap list is right.
 The weaknesses are the evidence selection, the framing of the coverage score, and the absence of
 any analysis that reads supplied files against each other.
@@ -60,7 +60,7 @@ or a stated selection rule.
 
 ### 2. The Coverage Score Reads as a Verdict on the Data Estate
 
-`Data coverage 30/100 · low` scores a nine-file bundle, not Serif's systems.
+`Data coverage 30/100 · low` scores a nine-file bundle, not Unity's systems.
 The finding text handles this carefully, but a score sitting beside a conditional go/no-go will not be
 read as carefully as it was written.
 A client sees that number and concludes their data is poor, when the accurate reading is that they sent
@@ -115,7 +115,7 @@ On the workbook side the line describes itself as a reclass from labs to CMC, ca
 purchase order, and sits on a line number inserted out of sequence.
 Somebody staged that entry in the model and never booked it in the ledger.
 
-Whether that was deliberate is Serif's question to answer.
+Whether that was deliberate is Unity's question to answer.
 Either way it attaches a specific dollar figure to a specific decision, it is the highest-value item in
 the bundle, and it required no feeds beyond the two files Lens already had.
 
@@ -143,7 +143,7 @@ Precision without discrimination.
 Which period, which departments, what the artifact looks like, who reviews it, and what counts as done
 all go unstated.
 The contrast with the data-corrections section is stark, because that section is properly actionable:
-"Export NetSuite AP invoices (full lines) for the entity FL87 with the exact columns listed; include
+"Export NetSuite AP invoices (full lines) for the entity PL87 with the exact columns listed; include
 historic 12 months at minimum" is something a controller can act on the same day.
 
 **The sequence carries no dependencies or owners.**
@@ -152,7 +152,7 @@ The calendar is unconditioned.
 Nothing reads "Phase 2 starts three weeks after the vendor master lands."
 
 **No use case addresses what is actually broken.**
-The unbooked reclass and the stale account mapping both sit in the files Serif sent, and both will
+The unbooked reclass and the stale account mapping both sit in the files Unity sent, and both will
 corrupt any agent built on top of them, including the two Lens wants to build first.
 Neither appears as a use case.
 Use case five, the canonical chart-of-accounts and vendor master build, comes closest, scores lowest at

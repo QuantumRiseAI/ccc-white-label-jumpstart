@@ -61,7 +61,7 @@ treatment.
 | Abcam on Platform: "no allocation to the other 2 departments?" | $7,004.50 Platform, $520.50 Biology | T1 compares a vendor to its own history; Abcam is consistent with itself |
 | Boston BioProducts on General R&D: "nothing should be General R&D, this is Production" | $21,891.19 General R&D in July (August is all Production, $20,820) | No engine finding on Boston in the August run; the spend is July's |
 | Beckman Coulter Vi-Cell service contract: "capex or R&D expense?" | $7,540.00 | No rule reads a service-contract term; the Agilent TapeStation contract (8/19/2026 to 8/18/2027, $4,572) was caught for department only, not for the prepaid question |
-| Flagship Pioneering Labs: "missing an accrual" | $962 vs $9,229 prior month | F6 accrual pattern fired for three other vendors, not this one; cause not investigated |
+| Plurality Group Labs: "missing an accrual" | $962 vs $9,229 prior month | F6 accrual pattern fired for three other vendors, not this one; cause not investigated |
 | Chemistry Salaries: "dropped a lot" | $17,903.67 vs $22,087.00 in July | F1 states Salaries up $15,379.58 across the company; no department-level variance on payroll accounts |
 | Insurance & Benefits negative in five departments, all three months | Jul to Sep | No sign check on an expense account by department |
 | "No vendor bills went to prepaids or PP&E?" | | Coding review has no prepaid or capitalization rule; flux has F9 (1 finding) and F10 (3) |
@@ -86,7 +86,7 @@ treatment.
 3. **Roll T1 up by vendor and pair, and add a floor.** One finding per vendor and department pair instead of one per line, and drop pairs
    under $1,000 to the ratification worksheet. The 34 findings group into 15 vendor and department pairs, 10 after the floor.
 4. **Missing recurring line.** If an account and department posted in each of the prior two months and posts nothing (or less than half)
-   this month, raise an accrual question. Covers Flagship and the September bonus gaps. Extend F6 or add F6b. It cannot cover Chemistry temp
+   this month, raise an accrual question. Covers Plurality and the September bonus gaps. Extend F6 or add F6b. It cannot cover Chemistry temp
    labor, which has no earlier lines.
 5. **Department-level variance on payroll accounts.** F1 compares the account in total; a department that drops 19% (Chemistry Salaries)
    is invisible. Add a department cut for Salaries, Bonus and Payroll Taxes.

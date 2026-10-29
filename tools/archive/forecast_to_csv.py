@@ -30,7 +30,7 @@ Files produced:
       Un-aggregated lines for each vintage, keeping vendor, PO number and
       description, which is what makes a variance explainable.
   unmapped_forecast_accounts.csv
-      Planning categories with no ledger account, for Serif to complete.
+      Planning categories with no ledger account, for the client to complete.
 
 Stdlib only, so it runs in the same places the engines do.
 

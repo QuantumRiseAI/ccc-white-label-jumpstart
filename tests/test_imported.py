@@ -29,7 +29,7 @@ def ok(cond, msg):
 
 
 GLRUN, FLRUN = (os.path.join(B, "out", "sep2026", k, "run.json") for k in ("gl-coding-review", "pl-flux"))
-CON = os.path.join(B, "out", "sep2026", "gl-coding-review", "serif-gl-coding-review-sep2026-v%s.html" % VERSION)
+CON = os.path.join(B, "out", "sep2026", "gl-coding-review", "gl-coding-review-sep2026-v%s.html" % VERSION)
 I = os.path.join(B, "inputs", "sep2026")
 SEP = glob.glob(os.path.join(I, "netsuite_gl_detail_sep2026.csv"))
 if not (os.path.exists(GLRUN) and os.path.exists(FLRUN) and os.path.exists(CON) and SEP):
@@ -56,9 +56,9 @@ if not vc or not pair:
     print("  SKIP imported corrections (Sep 2026 has no vendor card, or no two department cards alike in description)")
     sys.exit(0)
 picks = [vc, pair[1], pair[0]]          # posted: the first two; applied: the third
-tmp = tempfile.mkdtemp(prefix="serif-imported-")
+tmp = tempfile.mkdtemp(prefix="wl-imported-")
 atexit.register(shutil.rmtree, tmp, True)   # it holds a copy of the GL, with names
-rec = {"kind": "serif-decision-record", "console_kind": "coding", "format": 3, "period": "Sep 2026",
+rec = {"kind": "decision-record", "console_kind": "coding", "format": 3, "period": "Sep 2026",
        "run_id": json.load(open(GLRUN))["manifest"]["run_id"], "dec": {i: {"v": "approve"} for i in picks},
        "notes": {picks[0]: "Imported test note"}, "je": {}, "jh": {}}
 json.dump(rec, open(os.path.join(tmp, "rec.json"), "w"))

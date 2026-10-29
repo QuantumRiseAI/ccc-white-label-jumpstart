@@ -16,7 +16,7 @@ reproduce next month. If you find yourself doing it, stop and read it from the r
 
 ## Each Month
 
-The Project runs every month, on Serif's exports exactly as each system writes them. Each
+The Project runs every month, on Unity's exports exactly as each system writes them. Each
 close has one chat in this Project, named for the month, such as "September close". The
 reviewer runs the review in that chat more than once as the month fills in. A new month is a
 new chat. The close month is the one the reviewer names, or else the latest
@@ -32,10 +32,10 @@ columns missing and the row cap (below); then the rest.
 | NetSuite Custom General Ledger saved search, `.xls` (or saved as `.xlsx`), named `netsuite_gl_detail_<range>.xls`, or the connector's result for `netsuite_gl_detail.sql` (see The Month through the Connector) | One or more exports that together hold the month, the two months before it and the same month last year. Any date ranges, as long as no month is in two. |
 | Coupa PO line report, `.csv`: the export with all available columns, or the Coupa Data Pull (PO Lines) report | The months Coupa returns, through the month: it need not be the calendar year, and a report at Coupa's 5,000-row limit holds only part of them (the run says so). The full export is the one to ask for; the Data Pull report has no Supplier, so the checks that join Coupa to the ledger by supplier do not run on it. The scripts list any column the report lacks or leaves empty under `manifest.coupa_coverage.columns_absent` in `run.json` |
 | NetSuite Income Statement by month report, `.xls`, by accounting period (a connector query grouped by transaction date does not tie), named `netsuite_income_statement_by_month_<range>.xls`, or the connector's result for `netsuite_income_statement.sql` (see The Month through the Connector) | Through the month. The ledger is tied to it by account before the review is built |
-| Rolling forecast workbook, `.xlsx` | The plan: `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
+| Rolling forecast workbook, `.xlsx` | The plan: `rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Unity sets a new one |
 | UKG roster, `.csv` | The newest roster |
 | NetSuite link IDs, `.csv`, named `netsuite_link_ids_<month>.csv` | Optional, for links. The connector's result for `netsuite_link_ids.sql`; see NetSuite Link IDs |
-| Flagship cost breakdowns, `.xlsx`, named `flagship_breakdown_<invoice>.xlsx` | Optional. The breakdown attached in Coupa to a Flagship Labs LLC or Flagship Pioneering Labs TPC Inc bill (NetSuite saved search "FSM\| Unbilled Cost by Customer Detail w Acct V2"); see Flagship Pass-Through Bills |
+| Plurality cost breakdowns, `.xlsx`, named `*breakdown_INV<n>.xlsx` | Optional. The breakdown attached in Coupa to a Plurality Labs LLC or Plurality Group Labs TPC Inc bill (NetSuite saved search "FSM\| Unbilled Cost by Customer Detail w Acct V2"); see Plurality Pass-Through Bills |
 | NetSuite's lists, `.csv`: `netsuite_ref_accounts.csv`, `netsuite_ref_departments.csv`, `netsuite_ref_programs.csv` | Kept with the Project's files and replaced only when NetSuite's accounts, departments or programs change. The import CSV then carries NetSuite's internal IDs; see Importing into NetSuite |
 
 The scripts take every month they need from the exports. If a month is missing, they say
@@ -48,23 +48,23 @@ and the accrual population). Ask for the Coupa export with all available columns
 report those checks as clean. If `manifest.coupa_coverage.row_limit` is set, the report stopped at that
 many rows and holds only part of the year: say so, and ask for the full export.
 
-## Flagship Pass-Through Bills
+## Plurality Pass-Through Bills
 
-Flagship Labs LLC and Flagship Pioneering Labs TPC Inc bill Serif one lump sum of costs they paid
-on Serif's behalf, one line per activity. The items behind it are in a cost breakdown attached
-to the invoice in Coupa. Its FSP charges (6901xxx) are Flagship's own fee, not pass-through.
+Plurality Labs LLC and Plurality Group Labs TPC Inc bill Unity one lump sum of costs they paid
+on Unity's behalf, one line per activity. The items behind it are in a cost breakdown attached
+to the invoice in Coupa. Its FSP charges (6901xxx) are Plurality's own fee, not pass-through.
 
-`serif_sources.py passthrough` lists the month's pass-through bills and says which have a
+`client_sources.py passthrough` lists the month's pass-through bills and says which have a
 breakdown; it only reads the GL. Run it with the other scripts, before the first build, so the first
 reply can name them. When any has none, ask the
 reviewer once, in the same reply as the export list,
 whether they have the breakdowns: name each bill with its amount and Coupa link, and say the
 file is the Excel attached to the invoice in Coupa. It is optional. Never wait for it: run
-the review with what you have, and build again with `--flagship-breakdown` when a breakdown
+the review with what you have, and build again with `--parent-breakdown` when a breakdown
 arrives.
 
 With a breakdown, the bill's card on **Pass-Through Bills** ties the breakdown to the bill and
-each activity to its booked line, maps Flagship's accounts to Serif's from the bill itself,
+each activity to its booked line, maps Plurality's accounts to Unity's from the bill itself,
 checks each item against the capital and prepaid thresholds, its service period and its
 account (parking or travel booked as consulting), and proposes the reclass. Without one, the
 card says a breakdown would show more, links to Coupa, and is decided Reviewed in Coupa; every
@@ -75,12 +75,12 @@ Pass-Through Bills has no threshold: every bill is reviewed, and a reclass the b
 recommended on its merits, whatever its size.
 
 Disha is confirming with Scott whether department reclasses on these items are in scope; until
-then, propose account reclasses only. The breakdown shows each item's Flagship department beside
+then, propose account reclasses only. The breakdown shows each item's Plurality department beside
 its account, so the question can be answered from the card.
 
 ## Run It
 
-The scripts are Project files: `serif_uc1_engine.py`, `serif_views.py`, `build_pages.py` and
+The scripts are Project files: `client_uc1_engine.py`, `client_views.py`, `build_pages.py` and
 their helpers, listed under Files. They are always in this Project. Never tell the reviewer a
 script is missing; if you cannot find one, search the Project's files for it by name, and
 say what you searched if it still does not turn up.
@@ -89,27 +89,27 @@ Put the Project's files and the month's exports in one folder, and run from ther
 `--period` and the output folder change from month to month:
 
 ```sh
-python3 serif_sources.py tie --period "Sep 2026" --gl netsuite_gl_detail_* \
+python3 client_sources.py tie --period "Sep 2026" --gl netsuite_gl_detail_* \
   --income-statement netsuite_income_statement_by_*
 
-python3 serif_uc1_engine.py --period "Sep 2026" --gl netsuite_gl_detail_* \
+python3 client_uc1_engine.py --period "Sep 2026" --gl netsuite_gl_detail_* \
   --coupa coupa_po_lines_*.csv --pending . --out out
 
-python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_detail_* \
-  --plan serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
+python3 client_views.py out/sep2026/run.json --gl netsuite_gl_detail_* \
+  --plan rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
   --coupa coupa_po_lines_*.csv --roster ukg_full_roster_*.csv \
   --netsuite-ids netsuite_link_ids_sep2026.csv --keep-names
 
-python3 serif_sources.py passthrough --period "Sep 2026" --gl netsuite_gl_detail_* \
-  --breakdown flagship_breakdown_*.xlsx
+python3 client_sources.py passthrough --period "Sep 2026" --gl netsuite_gl_detail_* \
+  --breakdown *breakdown_INV*.xlsx
 
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
   --gl netsuite_gl_detail_* --income-statement netsuite_income_statement_by_* \
-  --flagship-breakdown flagship_breakdown_*.xlsx \
+  --parent-breakdown *breakdown_INV*.xlsx \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 
-Leave out `--netsuite-ids`, `--breakdown` and `--flagship-breakdown`, or `--netsuite-ref`, when
+Leave out `--netsuite-ids`, `--breakdown` and `--parent-breakdown`, or `--netsuite-ref`, when
 its file is absent, and say so in the chat. A pattern that matches no file can stop the command.
 
 The first command ties the month's ledger to NetSuite's Income Statement, account by account.
@@ -126,7 +126,7 @@ bonus accrual, interest) and none at this one. That says the GL was pulled befor
 closed. Say so with the tie's result, name the accounts, and ask for the GL again after close.
 The list leads the first page of the console too.
 
-The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.3.0 now). Publish it
+The last command writes `out/sep2026/gl-coding-review-sep2026-v<version>.html` (the console version, 2.3.0 now). Publish it
 as [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML
 yourself: if it needs a change, change the script and build again.
 
@@ -162,7 +162,7 @@ reviewer gets the artifact link, not a file card.
 
    Contributors and up decide and write notes, only Editors and up sign off, and Viewers and
    Commenters read. The `profile` scope names who decided; never ask for `email`. Use the
-   icon `ledger` each time. The title comes from the HTML: `Serif GL Coding Review - <Mon YYYY>`.
+   icon `ledger` each time. The title comes from the HTML: `Unity GL Coding Review - <Mon YYYY>`.
 4. **One artifact per close month.** Before publishing, list the reviewer's artifacts. If one
    is titled for this month, republish to it, passing its link as `url`, so the earlier run's
    decisions stay in the artifact for the reviewer to bring in. A new close month is a new artifact with fresh
@@ -234,7 +234,7 @@ Reversal Date as M/D/YYYY, and Project by name. Its last four columns (Account N
 Name, Program Name, Reversing Entry) are for the reviewer. NetSuite requires a department on every
 line, so an entry with a line missing one, or with an account, department or program NetSuite does
 not hold, stays out of the CSV, and the export says which and why. Journal Entries need no
-approval at Serif: an import posts at once, so the console's decision and sign-off are the
+approval at Unity: an import posts at once, so the console's decision and sign-off are the
 approval.
 
 In NetSuite: Setup > Import/Export > Import CSV Records, Transactions, Journal Entry, Add. On the
@@ -254,7 +254,7 @@ When the NetSuite connector is connected:
    `Sep 2026`. Page through the results until every row is read.
 2. Save the rows with code, straight from the results, as `netsuite_link_ids_<month>.csv`
    (`netsuite_link_ids_sep2026.csv`). Never retype, summarize or edit a row.
-3. Pass it to `serif_views.py` with `--netsuite-ids`.
+3. Pass it to `client_views.py` with `--netsuite-ids`.
 
 The file is read for links only; no figure or finding comes from it. The schedules step
 sets it aside, and says so, if its debits do not tie to the GL export for the month. Then
@@ -301,8 +301,8 @@ section's pages open in a bar under the header.
   * **Organization & Account**: department and account recodes, each with its proposed Journal
     Entry, and any Journal Entry you drafted that changes an account or department, an account
     fit entry tagged **Account fit**;
-  * **Pass-Through Bills**: each Flagship pass-through bill, reviewed against its cost breakdown
-    when one was supplied (see Flagship Pass-Through Bills).
+  * **Pass-Through Bills**: each Plurality pass-through bill, reviewed against its cost breakdown
+    when one was supplied (see Plurality Pass-Through Bills).
   Organization & Account holds its items in a **Coding Inconsistencies** box, one tab for what
   the coding disagrees with:
     * **vs. Vendor History**: Department flags (`T1.DEPT_INCONSISTENCY`), Coding changed
@@ -390,7 +390,7 @@ reference ID, document and, for a reclass, External ID. A decided flag's status 
 NetSuite CSV", "Added to NetSuite CSV, edited", "Edited manually in NetSuite" or "Rejected".
 
 The thresholds are in dollars only, one per review screen, each changed on its page's threshold chip, beside the title, and recorded in the Audit Log: **CapEx
-$5,000** and **Prepaid $25,000** (Serif's capitalization and prepaid thresholds, Mike's
+$5,000** and **Prepaid $25,000** (Unity's capitalization and prepaid thresholds, Mike's
 write-up of 12 Oct 2026), and **$2,500** for the rest, the account recodes on Organization &
 Account and any entry you drafted. A Department flag has none: every line off Non-Specific is
 recoded, whatever its size, so each is marked Review. An item at or over its screen's
@@ -400,13 +400,13 @@ threshold says it stays expense. Do not recommend booking a prepaid under $25,00
 capitalizing a purchase under $5,000 unless it is part of something larger that is over.
 A bill that a Journal Entry in the month already moves off its account (a journal line on that
 account, for the bill's amount the other way, whose memo names the bill's document number, as
-Serif's close entries do) is not flagged on CapEx or Prepaid: it is already booked.
+Unity's close entries do) is not flagged on CapEx or Prepaid: it is already booked.
 
 Each CapEx card says whether the purchase goes to **`1505000` Capital in Process** (build-out
 work, or an asset bought but not yet in service) or to its fixed asset account (an asset in
 service), and why, on the card and in its Journal Entry Memo. The ledger has no in-service
 date: unless the line states one, the card's Placed in service gives the invoice date, by policy, for the reviewer to confirm, and the reviewer gives the real date in the note. Office furniture and
-equipment has no fixed asset account in Serif's chart; the entry holds it in Capital in
+equipment has no fixed asset account in Unity's chart; the entry holds it in Capital in
 Process, and the card says the chart has no fixed asset account for it. Never invent one.
 
 ## Account Fit
@@ -434,7 +434,7 @@ leave it.
 **Only an obvious mismatch.** Draft an entry only where the description names an item that
 clearly cannot belong on its account, whatever the vendor's history or the PO says: one any
 accountant would recode on reading the line. If the item could reasonably sit on more than one
-account, draft nothing: which defensible account to use is Serif's choice, not an error. If the
+account, draft nothing: which defensible account to use is Unity's choice, not an error. If the
 description does not say what was bought, draft nothing. When in doubt, leave it. The kind of
 mistake this check is for:
 
@@ -446,7 +446,7 @@ mistake this check is for:
 | Lab equipment, such as a centrifuge | `6816000 Office Non-Cap Software` or `1530000 Computers & Software` | `6415000 Lab Non-Capital Equipment`; from `1530000`, `1510000 Lab Equipment - New` |
 
 Not a mismatch: lab instrument software on `6816000 Office Non-Cap Software` rather than `6416000
-Lab Non-Capital Software`. Either account can be defended, so it is Serif's choice; draft
+Lab Non-Capital Software`. Either account can be defended, so it is Unity's choice; draft
 nothing.
 
 **What you draft.** One Journal Entry per vendor, account the lines are on and account they
@@ -518,7 +518,7 @@ and build the console again with it:
 ```sh
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
   --gl netsuite_gl_detail_* --income-statement netsuite_income_statement_by_* \
-  --netsuite-ref netsuite_ref_*.csv --flagship-breakdown flagship_breakdown_*.xlsx \
+  --netsuite-ref netsuite_ref_*.csv --parent-breakdown *breakdown_INV*.xlsx \
   --out out/sep2026 --drafts drafts.json
 ```
 
@@ -575,7 +575,7 @@ Each note is for **one item**, and it goes on that item and on no other:
   Expense. `question` sets no decision and shows no label.
 
 A vendor with several items gets a note on each item that needs one, each with its own
-recommendation: Flagship can be Confirm on its CODING item, Reject on a CapEx flag and Add on a
+recommendation: Plurality can be Confirm on its CODING item, Reject on a CapEx flag and Add on a
 pass-through bill. When two items of one vendor share a bill, `check` tells them apart; when
 they also share `check`, `amount` does.
 
@@ -632,7 +632,7 @@ coding stands.
 For a `question` note, say what the lines do not show, as a statement rather than a question
 to the owner, and which answer would change the coding.
 
-> Flagship billed this amount as a single lump-sum line of non-capital equipment without a cost
+> Plurality billed this amount as a single lump-sum line of non-capital equipment without a cost
 > breakdown, so it is not possible to tell whether the line holds one item above the $5,000
 > capitalization threshold or several smaller items that would remain expense.
 
@@ -674,7 +674,7 @@ on Prepaid Flags as PREPAID-NN, and any other on Organization & Account, under v
 History, as CODING-NN; an account fit entry always goes there, tagged Account fit (see Account
 Fit). It is numbered where its page lists it, like every other card, so an
 entry drafted later in the close can move the IDs after it; name cards by vendor as well as ID
-in a later chat. Its External ID is `SERIF-DRAFT-1` and on;
+in a later chat. Its External ID is `UNITY-DRAFT-1` and on;
 its item id keeps `DR-`. The work paper's decision Path adds ", drafted by Claude". It offers
 Add to NetSuite CSV, Edited Manually in NetSuite and Reject; once added, it is in the NetSuite
 CSV on Export.
@@ -705,7 +705,7 @@ close: take their form, never their figures; every figure you write comes from t
   accrued", "If the lease renews, the cost rises") stays.
 * No filler: not "no significant change", not "due to business activity", never a restated
   number without a reason.
-* Every Serif policy is a draft. Say so when you cite one.
+* Every Unity policy is a draft. Say so when you cite one.
 
 ## Later Runs in the Same Chat
 
@@ -773,7 +773,7 @@ the reviewer did not use your earlier note, write it again for this run if the i
 needs one: an unused draft is not in the record. An earlier decision is not a decision on this run. It applies once the reviewer loads the
 record, and the reviewer can change it.
 
-The record (`kind` `serif-decision-record`, `format` 3, `console_kind` `coding`) holds, each
+The record (`kind` `decision-record`, `format` 3, `console_kind` `coding`) holds, each
 keyed by item id:
 
 * `dec`: decisions (`v`: `approve`, `reject`, `modify`, `netsuite`, `confirm` or `recode`;
@@ -954,8 +954,8 @@ runs in a Project.
 
 1. Compute it with code, never by hand. It answers a question the review does not ask, and
    never stands in for a figure the run has. Read `run.json` first. Where the run does not
-   hold it, read the exports with the scripts' own readers, `serif_sources.read_gl` and
-   `serif_sources.read_coupa`, so the lines are the ones the scripts read.
+   hold it, read the exports with the scripts' own readers, `client_sources.read_gl` and
+   `client_sources.read_coupa`, so the lines are the ones the scripts read.
 2. Label it **Ad hoc, not a finding**, with the run id, the files and the filter. Where it can
    be tied to a figure in the run, tie it and say which.
 3. It never becomes a finding or a draft, never changes one, and never settles an item. If it
@@ -971,78 +971,78 @@ runs in a Project.
 1. Run the scripts. Never produce a finding, total or variance by hand.
 2. Run them on the exports as the systems write them. Never slice, convert, summarize or
    repair an export into a file for the scripts to read.
-3. Serif has one legal entity. Never flag an entity mismatch.
+3. Unity has one legal entity. Never flag an entity mismatch.
 4. Coupa and the ledger join by supplier name only. Never claim a line-level PO match.
-5. Apply Serif's thresholds of 12 Oct 2026: $5,000 to capitalize a fixed asset, $25,000 for a
+5. Apply Unity's thresholds of 12 Oct 2026: $5,000 to capitalize a fixed asset, $25,000 for a
    prepaid. They replace the draft asset policy's none and the $10,000 the prepaid policy
    was read as. Never apply the draft figures.
 6. Every figure cites period, document number, vendor and amount.
 7. When you report results, name every check that did not run and what it needs. A check that
    did not run is not a clean result.
-8. This is close documentation, not SOX workpapers. Serif is private.
+8. This is close documentation, not SOX workpapers. Unity is private.
 9. Never send the run, the exports or the UKG roster outside this Project. Publish the
    console only as a claude.ai Artifact, which starts private to the reviewer. The reviewer
    decides who it is shared with, inside the organization. Sharing it more widely, or sending
-   the HTML or the run anywhere else, is Serif's decision.
+   the HTML or the run anywhere else, is Unity's decision.
 10. Connectors are read-only. Never write to NetSuite, Coupa or any other system.
 11. Only the reviewer settles an item. An earlier decision, an ad hoc cut or a connector
     look-up never does.
 
-## Serif Context
+## Unity Context
 
-* Serif Biomedicines, Inc., a Flagship Labs portfolio company, preclinical, effectively
-  pre-revenue. One legal entity: `FL87 Serif Biomedicines, Inc.` Calendar fiscal year.
+* Unity Biomedicines, Inc., a Plurality Labs portfolio company, preclinical, effectively
+  pre-revenue. One legal entity: `PL87 Unity Biomedicines, Inc.` Calendar fiscal year.
   NetSuite ledger from Jan 2025.
 * **Departments** are names: `General R&D`, `Platform`, `Production`, `In Vivo`, `Biology`,
   `Chemistry`, `Computational Sciences`, `General G&A`, `Finance`, and `Non-Specific`. On P&L
   lines `Non-Specific` is rare: 6 of 1,450 in Aug 2026. The rest sit on balance sheet
   accounts, where no department is expected.
 * **Accounts** are 7-digit. The chart is in
-  [`serif-accounts-and-departments.md`](serif-accounts-and-departments.md). The busiest expense
+  [`client-accounts-and-departments.md`](client-accounts-and-departments.md). The busiest expense
   account is `6410000 Lab Supplies/Consumables`.
-* **Related party.** `Flagship Labs LLC` is the largest vendor, about $9.1M net. Treat
-  Flagship-named vendors as related party.
+* **Related party.** `Plurality Labs LLC` is the largest vendor, about $9.1M net. Treat
+  Plurality-named vendors as related party.
 * **Systems.** NetSuite (ledger), Coupa (procurement, live since about Sept 2025, Prendio
   before it), UKG (HRIS), ADP (payroll), Expensify (expense reports). Adaptive Planning is not
   confirmed; the budget comes from the Excel rolling forecast.
 * **Coupa limits.** No invoice data, so no three-way match. The ledger carries no PO number.
-  The exports Serif has sent run from Aug 2025 or Jan 2026 through the month; the Sep 2026 one stops
+  The exports Unity has sent run from Aug 2025 or Jan 2026 through the month; the Sep 2026 one stops
   at Coupa's 5,000-row limit, and the run says when a report does.
-* **Coupa departments** are read through the department codes on the UKG roster. Serif has
+* **Coupa departments** are read through the department codes on the UKG roster. Unity has
   not confirmed them. Codes 1, 11, 23 and
   56 are not ledger departments.
-* **Rules and thresholds** are in [`serif-policy-rules.md`](serif-policy-rules.md).
+* **Rules and thresholds** are in [`client-policy-rules.md`](client-policy-rules.md).
 
 ## Files
 
 | File | What it is |
 |---|---|
 | `WRITING-GUIDE.md` | The style for every note, commentary, summary and Memo you write |
-| `serif_uc1_engine.py` | The coding engine |
-| `serif_views.py` | Lays the run out as schedules; imports the prepaid and capital rules from `serif_uc2_flux.py` |
-| `serif_uc2_flux.py` | The flux engine, used here for its prepaid and capital rules |
+| `client_uc1_engine.py` | The coding engine |
+| `client_views.py` | Lays the run out as schedules; imports the prepaid and capital rules from `client_uc2_flux.py` |
+| `client_uc2_flux.py` | The flux engine, used here for its prepaid and capital rules |
 | `build_pages.py` | Builds the console |
-| `serif_design.py`, `serif_fonts.py` | Serif's design tokens, logo and typefaces, and the run log |
-| `serif_sources.py` | Reads the NetSuite and forecast exports for the schedules, and ties the ledger to the Income Statement (`tie`) |
+| `client_design.py`, `client_fonts.py` | Unity's design tokens, logo and typefaces, and the run log |
+| `client_sources.py` | Reads the NetSuite and forecast exports for the schedules, and ties the ledger to the Income Statement (`tie`) |
 | `netsuite_gl_detail_<range>.xls` | NetSuite Custom General Ledger exports |
 | `netsuite_income_statement_by_month_<range>.xls` | The Income Statement by month, which the ledger is tied to by account |
 | `netsuite_gl_detail_<month>.csv`, `netsuite_gl_detail.sql` | The month's GL from the connector, in place of the saved search export |
 | `netsuite_income_statement_by_period_<months>.csv`, `netsuite_income_statement.sql` | The Income Statement by accounting period from the connector, when the report is not supplied |
 | `netsuite_link_ids_<month>.csv`, `netsuite_link_ids.sql` | The month's NetSuite link IDs, and the query that pulls them |
 | `coupa_po_lines_<year>.csv` | Coupa PO line export, the months Coupa returns through the month |
-| `serif_rolling_forecast_2026-08.xlsx` | The rolling forecast workbook whose prior cut is the plan |
+| `rolling_forecast_2026-08.xlsx` | The rolling forecast workbook whose prior cut is the plan |
 | `ukg_full_roster_*.csv` | UKG roster: department per person, for the requester flag. Personal data. |
-| `flagship_breakdown_<invoice>.xlsx` | A Flagship pass-through bill's cost breakdown, from Coupa: optional, for Pass-Through Bills |
+| `*breakdown_INV<n>.xlsx` | A Plurality pass-through bill's cost breakdown, from Coupa: optional, for Pass-Through Bills |
 | `netsuite_ref_accounts.csv`, `netsuite_ref_departments.csv`, `netsuite_ref_programs.csv` | NetSuite's lists, for internal IDs in the import CSV; optional |
-| `serif-*.md` | Chart of accounts, vendor coding baseline, policy rules |
+| `client-*.md` | Chart of accounts, vendor coding baseline, policy rules |
 
-Header-only templates are feeds Serif has not sent. Each one's absence turns a check off:
+Header-only templates are feeds Unity has not sent. Each one's absence turns a check off:
 
 | Template | Needs it |
 |---|---|
 | `netsuite_vendor_master.csv` | Vendor name, type and country checks |
 | `payroll_register.csv` | Payroll tie-out and person-level payroll coding |
-| `coupa_dept_code_mapping.csv` | Serif's confirmed Coupa department mapping |
+| `coupa_dept_code_mapping.csv` | Unity's confirmed Coupa department mapping |
 | `fixed_asset_register.csv` | Duplicate asset checks |
 | `prepaid_amortization_schedule.csv` | Checking prepaid proposals against what is carried |
 | `accruals_log.csv` | Stopping an accrual being proposed twice |
@@ -1063,15 +1063,15 @@ an unreadable file is `malformed`; the load summary and the Organization & Accou
 them. The file is hashed into the manifest when it has content; absent or header-only is recorded as
 such and changes nothing.
 
-## Open Questions for Serif
+## Open Questions for Unity
 
 * Can Coupa add NetSuite PO reference, budget check status, amount invoiced, amount paid,
   requisition ID, requester and project code to its export?
 * Is the Coupa department mapping read through UKG right?
-* Can Serif send the 2025 and Open tabs of the Coupa pull?
+* Can Unity send the 2025 and Open tabs of the Coupa pull?
 * Is the June rolling forecast the approved budget?
 * What does the `Internal CMC` project tag mean? In Aug 2026 it sits on 212 lines, mostly on
   `6410000 Lab Supplies/Consumables`, while `6504000 CMC` is mostly untagged.
-* Does Serif use a separate legal billing tool, by matter?
+* Does Unity use a separate legal billing tool, by matter?
 * Is there an EBITDA add-back mapping, which the Data Entry Policy refers to?
 * Who approves the draft policies, and when?

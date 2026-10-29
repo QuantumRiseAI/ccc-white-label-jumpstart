@@ -1,5 +1,5 @@
 """The ledger tied to NetSuite's Income Statement by account, before a console is built
-(SERIF-146). Synthetic files first; then, when the Aug 2026 exports and a build are on
+(CCC-146). Synthetic files first; then, when the Aug 2026 exports and a build are on
 disk, a console build on an Income Statement that does not tie.
 
     python3 tests/test_tie.py      (after `make build PERIOD=aug2026` for the build checks)
@@ -14,7 +14,7 @@ from xml.sax.saxutils import escape
 
 B = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, os.path.join(B, "src"))
-import serif_sources as S  # noqa: E402
+import client_sources as S  # noqa: E402
 
 FAILED = []
 
@@ -34,7 +34,7 @@ def spreadsheetml(rows):
 
 
 # An Income Statement by month: income shown positive, expense positive, headings blank.
-IS_ROWS = [["Serif Biomedicines, Inc."], ["Income Statement"], ["Financial Row", "Jul 2026", "Aug 2026"], ["", "", ""],
+IS_ROWS = [["Unity Biomedicines, Inc."], ["Income Statement"], ["Financial Row", "Jul 2026", "Aug 2026"], ["", "", ""],
            ["Ordinary Income/Expense", "", ""], ["Income", "", ""], ["4000000 - Revenue", "", ""],
            ["4001003 - Revenue - Cost Reimbursement", "0", "0"], ["Total - 4000000 - Revenue", "0", "0"], ["Total - Income", "0", "0"],
            ["Expense", "", ""], ["6400000 - Lab Expenses", "", ""], ["6410000 - Lab Supplies/Consumables", "100.50", "200.00"],
@@ -80,7 +80,7 @@ with tempfile.TemporaryDirectory() as d:
     open(glx, "w").write(spreadsheetml([["Custom General Ledger"], head,
         row(lab, "Jul 2026", "100.50", ""), row(intr, "Jul 2026", "", "40.00"), row(ap, "Jul 2026", "", "60.50"),
         row(lab, "Aug 2026", "200.00", ""), row(intr, "Aug 2026", "", "25.00"), row(ap, "Aug 2026", "", "175.00")]))
-    run = lambda *a: subprocess.run([sys.executable, os.path.join(B, "src", "serif_sources.py"), "tie", "--period", "Aug 2026", "--gl", glx,
+    run = lambda *a: subprocess.run([sys.executable, os.path.join(B, "src", "client_sources.py"), "tie", "--period", "Aug 2026", "--gl", glx,
                                      "--income-statement", *a], capture_output=True, text=True)
     r = run(isx, "--prior")
     ok(r.returncode == 0 and "Aug 2026 and Jul 2026, 3 accounts, every account ties" in r.stdout, "exits 0 and says it ties")
@@ -105,7 +105,7 @@ if not (real_is and os.path.exists(RUN) and os.path.isdir(DIST)):
     print("  SKIP the console build checks: run `make build PERIOD=aug2026` first")
 else:
     print("The console build")
-    for name in ("serif-gl-coding-review.html", "serif-pl-flux.html"):
+    for name in ("gl-coding-review.html", "pl-flux.html"):
         html = open(os.path.join(B, "consoles", name), encoding="utf-8").read()
         ok('data-tie="pass"' in html and html.index('data-tie="pass"') < html.index('id="p-', html.index('id="p-ov"') + 1),
            name + ": the tie leads the first page and passes")

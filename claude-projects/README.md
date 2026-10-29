@@ -28,7 +28,7 @@ Every file here is a relative symlink to its one copy in the repo (`src/`, `proj
 date. Do not edit them by hand.
 
 NetSuite's three lists in `upload/` (`netsuite_ref_accounts.csv`, `netsuite_ref_departments.csv`,
-`netsuite_ref_programs.csv`) are Serif's data, so the repo holds only the links. They point to
+`netsuite_ref_programs.csv`) are client data, so the repo holds only the links. They point to
 `inputs/reference/`, which links to the engagement's OneDrive,
 `7-technical-documentation/3-data/netsuite reference/`. Without that link set up, those three show
 as broken: point `inputs/` at the OneDrive data first (the repo README, In Git, says how).

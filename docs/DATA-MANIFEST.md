@@ -4,9 +4,9 @@ Every file in this package, where it came from, and what is still missing.
 
 Generated 2026-09-16 by Quantum Rise.
 
-## Real Serif Data
+## Real Unity Data
 
-All originals are Serif exports, unmodified in content.
+All originals are Unity exports, unmodified in content.
 They were renamed for consistency and kept in `data/real/` in OneDrive (not in Git). A close's
 exports for the build go in `inputs/<period>/`.
 Original names are recorded here so provenance survives the rename.
@@ -19,15 +19,15 @@ Original names are recorded here so provenance survives the rename.
 | `netsuite_income_statement_by_dept_jan-aug2026.xls` | `IncomeStatement-116.xls` | P&L by department, YTD Aug 2026 |
 | `netsuite_income_statement_by_dept_jan-jul2026.xls` | `IncomeStatement631.xls` | P&L by department, YTD Jul 2026 |
 | `netsuite_income_statement_by_dept_jan-jun2026.xls` | `IncomeStatement-681.xls` | P&L by department, YTD Jun 2026 |
-| `serif_rolling_forecast_2026-08.xlsx` | `2026-08 Serif Rolling Forecast.xlsx` | 55-sheet rolling forecast workbook |
-| `serif_5yr_pl_reforecast_jun2026_dataroom.pptx` | `5 Year P&L_(Jun_Reforecast)_(Dataroom_Update)ii_AO_(20260622).pptx` | Board reforecast deck |
-| `serif_bod_forecast_jun2026_draft.pptx` | `Serif 2026.06-BOD_Forecast_(20260420.Draft.Review.w.Jake)_(4.Justine+Avak).pptx` | Board forecast deck |
+| `rolling_forecast_2026-08.xlsx` | `2026-08 Rolling Forecast.xlsx` | 55-sheet rolling forecast workbook |
+| `client_5yr_pl_reforecast_jun2026_dataroom.pptx` | `5 Year P&L_(Jun_Reforecast)_(Dataroom_Update)ii_AO_(20260622).pptx` | Board reforecast deck |
+| `client_bod_forecast_jun2026_draft.pptx` | `Unity 2026.06-BOD_Forecast_(20260420.Draft.Review.w.Jake)_(4.Justine+Avak).pptx` | Board forecast deck |
 | `ukg_full_roster_hrbp_2026-09-24.csv` | `Full Roster_HRBP a7fafe039.csv` | UKG full employee roster, 72 active employees, 32 columns including department, supervisor and job title |
-| `netsuite_link_ids_aug2026.csv` | `netsuite_link_ids_aug2026.csv` | NetSuite SuiteQL result from `netsuite_link_ids.sql`, run through the NetSuite connector in Serif's Claude instance on 2026-09-30: 3,264 posting lines of Aug 2026 with internal IDs, Coupa invoice addresses and Coupa PO numbers. Ties to the GL export ($14,467,758.34 each side). Used for console links only; in `monthly-inputs/aug2026/` |
+| `netsuite_link_ids_aug2026.csv` | `netsuite_link_ids_aug2026.csv` | NetSuite SuiteQL result from `netsuite_link_ids.sql`, run through the NetSuite connector in Unity's Claude instance on 2026-09-30: 3,264 posting lines of Aug 2026 with internal IDs, Coupa invoice addresses and Coupa PO numbers. Ties to the GL export ($14,467,758.34 each side). Used for console links only; in `monthly-inputs/aug2026/` |
 
 The UKG roster carries employee personal data (names, email addresses, gender, salary). It is a
 client-confidential HR record: keep it out of any repository and out of any deliverable. It sits
-in the two Serif Claude Projects, on Serif's own Claude instance, because the schedules need it. `serif_views.py` reads it
+in the two Unity Claude Projects, on Unity's own Claude instance, because the schedules need it. `client_views.py` reads it
 only to resolve a person to a department, and writes no name, email address or salary.
 
 UKG's `Department Code` is Coupa's department code with a letter prefix (`L9` is Coupa `9`), so
@@ -40,7 +40,7 @@ Any loader must parse them as XML.
 ### Derived
 
 Neither engine reads these. Both read the exports in `data/real/` directly, through
-`serif_sources.py` and the coding engine's own readers. `data/real/derived/` holds the
+`client_sources.py` and the coding engine's own readers. `data/real/derived/` holds the
 per-period CSVs the tools in `tools/` produced, for reference.
 
 From the GL export, via `tools/netsuite_gl_to_csv.py`:
@@ -120,28 +120,28 @@ Originals are unchanged.
 
 | Copy | Original | GL Coding | P&L Flux |
 |---|---|---|---|
-| `serif-data-entry-policy-DRAFT.docx` | `DRAFT_Serif_Data_Entry_Policy_Sample.docx` | Yes, core rulebook | Yes |
-| `serif-finance-threshold-policy-DRAFT.docx` | `DRAFT_Serif_Finance_Threshold_Policy.docx` | Yes | Yes |
-| `serif-accrued-expense-policy-DRAFT.docx` | `DRAFT_Serif_Consolidated_Accrual_Policy.docx` | Yes | Yes, core policy |
-| `serif-prepaid-expense-policy-DRAFT.docx` | `DRAFT_Serif_Prepaid_Policy_Sample.docx` | Yes | Yes |
-| `serif-tangible-intangible-asset-policy-DRAFT.docx` | `DRAFT_Serif_Fixed_Asset_Policy_Sample.docx` | Yes | Yes |
-| `serif-intercompany-policy-DRAFT.docx` | `DRAFT_Serif_Intercompany_Policy.docx` | Yes | No |
-| `serif-severance-accounting-policy-DRAFT.docx` | `DRAFT_Serif Severance_Accounting_Policy.docx` | No | Yes |
-| `serif-ebitda-addback-dimension-DRAFT.xlsx` | `DRAFT Serif Potential EBITA Addbacks that Track.xlsx` | Yes | Yes |
+| `client-data-entry-policy-DRAFT.docx` | `DRAFT_Unity_Data_Entry_Policy_Sample.docx` | Yes, core rulebook | Yes |
+| `client-finance-threshold-policy-DRAFT.docx` | `DRAFT_Unity_Finance_Threshold_Policy.docx` | Yes | Yes |
+| `client-accrued-expense-policy-DRAFT.docx` | `DRAFT_Unity_Consolidated_Accrual_Policy.docx` | Yes | Yes, core policy |
+| `client-prepaid-expense-policy-DRAFT.docx` | `DRAFT_Unity_Prepaid_Policy_Sample.docx` | Yes | Yes |
+| `client-tangible-intangible-asset-policy-DRAFT.docx` | `DRAFT_Unity_Fixed_Asset_Policy_Sample.docx` | Yes | Yes |
+| `client-intercompany-policy-DRAFT.docx` | `DRAFT_Unity_Intercompany_Policy.docx` | Yes | No |
+| `client-severance-accounting-policy-DRAFT.docx` | `DRAFT_Unity Severance_Accounting_Policy.docx` | No | Yes |
+| `client-ebitda-addback-dimension-DRAFT.xlsx` | `DRAFT Unity Potential EBITA Addbacks that Track.xlsx` | Yes | Yes |
 
 ### Excluded, and Why
 
-* `DRAFT_Global_Treasury_Cash_Management_Hedging_Policy_v1.docx`, **this is not a Serif document.**
+* `DRAFT_Global_Treasury_Cash_Management_Hedging_Policy_v1.docx`, **this is not a Unity document.**
   It names CrossCountry Consulting as the company, Investcorp as the PE sponsor, Sage Intacct as the
   system of record, and roughly 35 cost centers.
-  It is CCC's own treasury policy, filed in the Serif policy folder.
+  It is CCC's own treasury policy, filed in the Unity policy folder.
   Excluded from both agents. Worth raising with CCC, since its presence here suggests the policy
-  pack was assembled from a template set rather than from Serif's actual documents.
-* `DRAFT_Serif Foreign_Currency_Conclusion.docx`, a functional currency memo whose only analyzed
+  pack was assembled from a template set rather than from Unity's actual documents.
+* `DRAFT_Unity Foreign_Currency_Conclusion.docx`, a functional currency memo whose only analyzed
   entity is India.
-  Serif's export shows one US subsidiary and no India entity.
+  Unity's export shows one US subsidiary and no India entity.
   Excluded pending confirmation of what it belongs to.
-  Revisit if a foreign entity appears; Serif does post to FX accounts `8231000` and `8232000`.
+  Revisit if a foreign entity appears; Unity does post to FX accounts `8231000` and `8232000`.
 
 ## Correction to the Coupa Department Code Template
 
@@ -154,7 +154,7 @@ Two of those are wrong.
   Finance 409A valuation coded to `6340000`.
 
 The corrected code set is `13, 73, 9, 55, 40, 2, 15, 23, 5`, verified against all 9,571 lines. The
-template now carries each code's CY2026 line count, spend, and most-used GL accounts so Serif has
+template now carries each code's CY2026 line count, spend, and most-used GL accounts so Unity has
 context to answer with.
 
 Note that the parser behind the derived files had this right, its `coupa_dept_code` column is
@@ -169,7 +169,7 @@ See [`../templates/README.md`](../templates/README.md) for per-file detail.
 Ranked by impact:
 
 * **Budget by account, department, month.** ~~The single largest gap.~~
-  **Resolved 2026-09-18.** Extracted from `serif_rolling_forecast_2026-08.xlsx` by
+  **Resolved 2026-09-18.** Extracted from `rolling_forecast_2026-08.xlsx` by
   `tools/forecast_to_csv.py`, which reads the `EXT$_R&D`, `EXT$_G&A`, `LAB` and `OH` line-item tabs.
   The workbook carries both the August and the June vintage side by side, and the feed uses **June**,
   because August's closed months hold the posted actuals rather than a forecast.
@@ -185,19 +185,19 @@ Ranked by impact:
   schedule and the Coupa department mapping. It is not loaded into `hris_headcount.csv`, whose
   template asks for salary, and neither engine reads it. The payroll register is still pending.
 * **Vendor master**, degrades coding confidence; the most-used-coding baseline is the fallback.
-* **External research unbilled WIP**, Serif's largest accrual exposure given the volume in
+* **External research unbilled WIP**, Unity's largest accrual exposure given the volume in
   sequencing, synthesis, in vivo, and CMC.
 * **Accruals log**, needed to prevent duplicate accrual proposals.
 * **Prepaid schedule and fixed asset register**, needed for continuity and duplicate detection.
-* **Open purchase commitments**, only if Serif has a procurement system, which is unconfirmed.
+* **Open purchase commitments**, only if Unity has a procurement system, which is unconfirmed.
 * **EBITDA add-back mapping**, the Data Entry Policy points at this file; it is a live control
   document, not optional.
 
-## Systems: What Serif Actually Runs
+## Systems: What Unity Actually Runs
 
 Absence from the general ledger is not absence from the company. A procurement system sits
 upstream of the ledger and leaves no vendor record in it, so the ledger alone cannot establish
-which systems Serif runs.
+which systems Unity runs.
 
 | System | Status | Evidence |
 |---|---|---|
@@ -207,19 +207,19 @@ which systems Serif runs.
 | **Coupa** | **Confirmed, live since ~Sept 2025** | Client confirmation, with a 9,571-line PO export for calendar 2026 |
 | **Prendio** | **Confirmed, Coupa's predecessor** | Client confirmation: used before Coupa; only a limited set of POs was migrated manually, under a different PO numbering convention |
 | **UKG** | **Confirmed, this is the HRIS** | Client confirmation. Roster export received 2026-09-24 |
-| Adaptive Planning | Absent from the ledger, **unconfirmed with Serif** | No vendor; budget appears to live in the Excel rolling forecast |
+| Adaptive Planning | Absent from the ledger, **unconfirmed with Unity** | No vendor; budget appears to live in the Excel rolling forecast |
 
 **A system being invisible in the general ledger is not evidence it is not in use.** The Adaptive
-Planning row rests on exactly that weak inference and should be put to Serif directly rather than
+Planning row rests on exactly that weak inference and should be put to Unity directly rather than
 carried forward.
 
-[`../SERIF_REAL_DATA_GAPS.md`](../SERIF_REAL_DATA_GAPS.md) is **superseded** by this manifest and
+[`../REAL_DATA_GAPS.md`](../REAL_DATA_GAPS.md) is **superseded** by this manifest and
 carries a banner saying so.
 
 ## Coupa PO Data: Received 2026-09-16
 
 Source: `Coupa_Data_Pull_(PO_Lines)_(20260916-1000).csv`, a custom Coupa report built with all
-available columns and supplied by Serif on 2026-09-16.
+available columns and supplied by Unity on 2026-09-16.
 
 | File | What it is |
 |---|---|
@@ -227,7 +227,7 @@ available columns and supplied by Serif on 2026-09-16.
 | `data/real/derived/coupa_po_lines_<period>.csv` | Normalized per-period slices, 9 periods Jan–Sep 2026 |
 | `gl-coding-review/data/real/coupa_po_lines_{aug,jul}2026.csv` | The two periods the GL agent uses |
 
-Produced with `packages/coupa_extract` in the `ccc-serif-jumpstarts` repo:
+Produced with `packages/coupa_extract` in the `ccc-client-jumpstarts` repo:
 
 ```sh
 py -m coupa_extract data/real/coupa_po_lines_2026.csv --out data/real/derived
@@ -238,7 +238,7 @@ py -m coupa_extract data/real/coupa_po_lines_2026.csv --out data/real/derived
 Coupa's `Account` field (`97-6410000-9--4`) carries the **NetSuite GL account a requisition was
 approved against**. That is a *normative* coding expectation, recorded before anyone coded the
 bill, categorically stronger evidence than the vendor coding baseline, which only records what
-Serif habitually does. Comparing the two on Aug 2026 finds 61 suppliers in agreement and **10 in
+Unity habitually does. Comparing the two on Aug 2026 finds 61 suppliers in agreement and **10 in
 disagreement**, including New England BioLabs (GL `6501100` Synthesis vs Coupa-approved `6410000`
 Lab Supplies across 44 GL lines).
 
@@ -250,12 +250,12 @@ Lab Supplies across 44 GL lines).
   numbers appear among the GL document numbers. Every comparison is at **supplier** level.
 * **Coupa went live ~Sept 2025**, with Prendio before it and a partial manual migration. Absence of
   a PO before that date proves nothing about off-PO spend.
-* **Department codes are mapped through UKG, not confirmed by Serif.** UKG's department codes
+* **Department codes are mapped through UKG, not confirmed by Unity.** UKG's department codes
   are Coupa's with a letter prefix, which resolves all nine: 2 General G&A, 5 Finance, 9 General
   R&D, 13 Platform, 15 In Vivo, 23 "502 Finance - Fund", 40 Chemistry, 55 Biology, 73
   Production. Inference from the ledger alone had put 13 and 73 both at Platform; UKG puts 73 at
   Production. Code 23 names no ledger department. The file is
-  `derived/coupa_dept_code_mapping_from_ukg.csv`; the template for Serif to confirm is still
+  `derived/coupa_dept_code_mapping_from_ukg.csv`; the template for Unity to confirm is still
   `data/pending/coupa_dept_code_mapping.csv`.
 * **`Department` and `Period` columns are empty** on all 9,571 rows.
 * **Open commitment is derived**, not read: order still `Issued`, not cancelled, not fully
@@ -281,21 +281,21 @@ coding against. Neither is currently used by either engine.
 
 ### Projects Are Not Used
 
-Serif does not use project coding. Project-dimension tests are therefore recorded as **not
+Unity does not use project coding. Project-dimension tests are therefore recorded as **not
 applicable** in both consoles rather than suppressed silently or filled with a placeholder
 value. The rule logic covers the dimension and will apply with no change if projects are
 adopted later.
 
 ### Journal Entry Import Template
 
-NetSuite's journal-entry import format is per-tenant. Serif's own CSV template has not
+NetSuite's journal-entry import format is per-tenant. Unity's own CSV template has not
 been supplied, so the NetSuite CSV uses a generic column order: External ID, Date, Account,
 Department, Debit, Credit, Memo. Adopting the real template is a change to `exportCSV()` in
 `build_pages.py` and nothing else.
 
 ### Columns CCC asked for that this export does not contain
 
-The PO Register field list requested from Serif is not fully covered by the "all available
+The PO Register field list requested from Unity is not fully covered by the "all available
 columns" report. Each missing column keeps a test dark:
 
 | Column | What stays unavailable |
@@ -322,7 +322,7 @@ behind one key and the normalization docstring lists `Requester` flatly among ab
 Both overstate the gap.
 
 Worth raising on the next call: the remaining columns may be available as additional Coupa report
-fields, or may require broader Coupa reporting access, which Serif has requested internally.
+fields, or may require broader Coupa reporting access, which Unity has requested internally.
 
 ## Filename Cleanup in the Synthetic Package
 
@@ -330,7 +330,7 @@ Download-artifact suffixes were removed from `../synthetic-jumpstarts/`:
 
 * `Flux/Instrutions and Skills/` renamed to `Instructions and Skills/`, typo corrected
 * `PROJECT_INSTRUCTIONS (16).md` and `GL_CODING_REVIEW_SKILL (2).md`, suffixes dropped
-* `serif_econtroller_command_center (3).html` and `serif-gl-coding-review (3).html`, suffixes dropped
+* `client_econtroller_command_center (3).html` and `gl-coding-review (3).html`, suffixes dropped
 * Twelve `… (1).csv` duplicates, removed where byte-identical to their twin, renamed otherwise
 
 One pair was not identical and both were kept:

@@ -1,18 +1,18 @@
-# Serif Jumpstarts: Deployment Options
+# Unity Jumpstarts: Deployment Options
 
 **Purpose:** Internal decision doc.
-Where the two Jumpstarts can run, what each option costs us, and what to take into the Flagship IT
+Where the two Jumpstarts can run, what each option costs us, and what to take into the Plurality IT
 conversation.
 
-**Prepared:** 2026-09-17 · **Status:** DRAFT, updated after Flagship IT replied
+**Prepared:** 2026-09-17 · **Status:** DRAFT, updated after Plurality IT replied
 
 ---
 
-## Where Flagship IT Landed
+## Where Plurality IT Landed
 
 Asked on 2026-09-17 to choose between a local app, Vercel and Azure.
 The answer was that **local is easiest and preferred**, and that Vercel access could be provided to
-the Serif or fsplabs accounts, but that data segregation between companies is not yet ready.
+the Unity or Plurality accounts, but that data segregation between companies is not yet ready.
 
 Two things follow.
 
@@ -22,7 +22,7 @@ Two things follow.
   becomes available.
 
 Their reservation was specific to sharing a platform across companies, not to hosting as such.
-That is worth carrying into the Claude question too: if Flagship is still separating company data,
+That is worth carrying into the Claude question too: if Plurality is still separating company data,
 it is worth confirming whose Claude organization Scott sits in and how it is structured.
 
 ## What Is Already Proven
@@ -97,7 +97,7 @@ Worth running before this goes near a client.
 
 ### 3. Packaged Local App
 
-**Selected as the target by Flagship IT.**
+**Selected as the target by Plurality IT.**
 Scott runs it on his own machine, nothing hosted, nothing for their team to support.
 
 The binding constraint is that Scott does not have Python, so the runtime has to come with it.
@@ -140,7 +140,7 @@ Vercel, Azure Static Web Apps or SharePoint all serve this equally well.
 * **Effort:** low to moderate
 * **Status:** not started
 
-### 5. Hosted App in Flagship's Tenant
+### 5. Hosted App in Plurality's Tenant
 
 The engine runs as a scheduled job, decisions persist in a database, single sign-on at the front.
 
@@ -151,18 +151,18 @@ The engine runs as a scheduled job, decisions persist in a database, single sign
 * **Status:** not started
 
 Vercel and Azure are both viable.
-Our lean is Azure, or whatever sits in Flagship's own tenant behind their existing identity
+Our lean is Azure, or whatever sits in Plurality's own tenant behind their existing identity
 provider, because the output contains real financial detail and keeping it inside their tenancy
 avoids a third-party data question entirely.
-If Vercel is already established at Flagship with SAML and audit logging in place, that reasoning
+If Vercel is already established at Plurality with SAML and audit logging in place, that reasoning
 weakens and we are equally happy there.
 
-Note that Vercel is multi-tenant SaaS, so Flagship has a Vercel **account** and **teams** rather
+Note that Vercel is multi-tenant SaaS, so Plurality has a Vercel **account** and **teams** rather
 than an instance.
 The control question underneath option 4 or 5 on Vercel is which plan tier they are on, since SAML
 single sign-on and audit logs come with Enterprise and mostly do not with Pro.
 
-### 6. Hand the Code to Flagship
+### 6. Hand the Code to Plurality
 
 We write it, their team deploys and runs it in their own environment.
 
@@ -188,7 +188,7 @@ it is something they normally do rather than offering to hand over the work outr
 
 ## Recommendation
 
-Flagship IT has chosen local, so the sequence is now:
+Plurality IT has chosen local, so the sequence is now:
 
 1. **Claude Projects this week.**
    Validated, zero dependencies, and the fastest way to put real output in front of Scott while the
@@ -199,7 +199,7 @@ Flagship IT has chosen local, so the sequence is now:
    application, in which case begin the code signing process first because it is the long-lead
    item.
 3. **Revisit hosted later.**
-   Not refused, deferred until Flagship's data segregation work is done.
+   Not refused, deferred until Plurality's data segregation work is done.
    Shared decisions across reviewers remains the one capability only a hosted app provides, and
    nobody has asked for it yet.
 
@@ -214,7 +214,7 @@ Still open:
 
 * Which platform is Scott on, and does the deliverable need to present as an application or simply
   work?
-* Whose Claude organization is Scott in, Flagship's or Serif's, and who administers it?
+* Whose Claude organization is Scott in, Plurality's or Unity's, and who administers it?
   Relevant both for pushing a plugin and because their segregation concern may apply there too.
 * Is there an internal pattern for distributing a desktop tool that we should conform to, and does
   a signed download need an endpoint exception logged?
@@ -227,6 +227,6 @@ Still open:
 The engine records `source_dir` for every input, which on a local run embeds the full path,
 including the operator's user folder and the client folder structure.
 That path travels inside the HTML.
-It is harmless to Flagship, who own the data, but it is the same class of leak as the personal names
+It is harmless to Plurality, who own the data, but it is the same class of leak as the personal names
 already scrubbed from the codebase, and it is worth reducing to a basename before anything goes to a
 wider audience.

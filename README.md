@@ -1,6 +1,6 @@
-# Serif Jumpstarts: Real Data Build
+# Unity Jumpstarts: Real Data Build
 
-Two Claude Project agents adapted from the CrossCountry CrossCore AI Jumpstart to run on Serif
+Two Claude Project agents adapted from the CrossCountry CrossCore AI Jumpstart to run on Unity
 Biomedicines' actual NetSuite ledger instead of the synthetic dataset.
 
 * Built: 2026-09-16 by Quantum Rise, last updated 2026-10-06 (Console 2.0.0)
@@ -26,7 +26,7 @@ same item gets investigated twice. Coding Review first means fewer reclassificat
 ## Layout
 
 ```
-serif-jumpstarts/
+ccc-white-label-jumpstart/
 ├── README.md
 ├── CHANGELOG.md               every console, engine and views version
 ├── Makefile                   make package | make build PERIOD=aug2026 | make test
@@ -35,14 +35,14 @@ serif-jumpstarts/
 ├── projects/                  what is particular to each Claude Project
 │   ├── gl-coding-review/      its instructions, how-to, skill and vendor baseline
 │   ├── pl-flux/               its instructions, how-to, skill and status
-│   └── shared/                docs both Projects carry: Serif context, data rules, NetSuite
+│   └── shared/                docs both Projects carry: Unity context, data rules, NetSuite
 ├── templates/                 header-only feed templates the engines read when present
 ├── consoles/                  the current console for each Project; earlier versions are in Git history
-├── design-system/             Serif's tokens, open fonts and brand references
+├── design-system/             the client's tokens, open fonts and design references
 ├── docs/                      the data manifest, internal notes, and spec/ (Chris's August reports)
 ├── tests/                     test_console.js, the console tests
 ├── tools/                     build.sh, package.py, compare_runs.py, bundle_engine.py, cost-model/
-├── inputs/<period>/           Serif's exports for a close, as each system wrote them (not in Git)
+├── inputs/<period>/           Unity's exports for a close, as each system wrote them (not in Git)
 └── out/                       build output: dist/ (the Project folders) and <period>/ (not in Git)
 ```
 
@@ -60,7 +60,7 @@ neither engine reads a sliced or derived file.
 
 ### The Console
 
-Console 2.0.0 is laid out as Chris's August reports, in Serif's design: the GL review as
+Console 2.0.0 is laid out as Chris's August reports, in Unity's design: the GL review as
 Overview, Review, Transparency and Documentation; the flux pack as Executive Overview,
 Analysis and Close Workflow. `build_pages.py` builds it from the run, in each Project. Each
 proposed Journal Entry is filled in and editable, every vendor card shows its last three
@@ -68,13 +68,13 @@ months, and the NetSuite CSV takes the entries as edited. Published as a claude.
 the console is shared by everyone with access. The decision record, the run log and Claude's
 drafts work as they did in 1.8.
 
-`consoles/` holds one file per Project, `serif-gl-coding-review.html` and `serif-pl-flux.html`,
+`consoles/` holds one file per Project, `gl-coding-review.html` and `pl-flux.html`,
 and each console version is a commit to them, tagged `console-v<version>`: v1.8.3 to v1.8.8,
 then v2.0.0. To see or diff a past version, use the tag:
 
 ```sh
 git tag -l 'console-v*'
-git show console-v1.8.8:consoles/serif-pl-flux.html > serif-pl-flux-v1.8.8.html
+git show console-v1.8.8:consoles/pl-flux.html > pl-flux-v1.8.8.html
 ```
 
 The 1.8 generator, `build_report.py`, and its tests are in the history before 2.0.0 (the
@@ -98,7 +98,7 @@ commit `console-v<version>`.
 
 ### In Git
 
-The repo is private. `.gitignore` leaves out Serif's data: `inputs/`, `out/` (the runs and
+The repo is private. `.gitignore` leaves out Unity's data: `inputs/`, `out/` (the runs and
 local builds), the local `data/` and `status/` folders, and everything in `references/` but
 its README. Chris's two August reports are kept in `docs/spec/`. The consoles in `consoles/`
 are committed, every version: they carry the ledger, names and pay, for the accounting team. To rebuild a
@@ -107,7 +107,7 @@ way is to link into the engagement's OneDrive data, `7-technical-documentation/3
 the repo root (`.gitignore` leaves out `inputs` whether it is a folder or a link):
 
 ```sh
-D="$HOME/Library/CloudStorage/OneDrive-QuantumRise/Clients - Active - Documents/Serif Biomedicines (CCC)/1-Serif-FDE-Support/7-technical-documentation/3-data"
+D="$HOME/Library/CloudStorage/OneDrive-QuantumRise/Clients - Active - Documents/<client folder>/7-technical-documentation/3-data"
 mkdir -p inputs
 ln -s "$D/2026-08 exports" inputs/aug2026
 ln -s "$D/2026-09 exports" inputs/sep2026
@@ -125,8 +125,8 @@ Configure once:
 
 Step by step, including updating a Project that is already set up, in [`claude-projects/README.md`](claude-projects/README.md).
 
-1. Create a Claude Project named `Serif Biomedicines, GL Coding Review` or
-   `Serif Biomedicines, P&L Flux`.
+1. Create a Claude Project named `Unity Biomedicines, GL Coding Review` or
+   `Unity Biomedicines, P&L Flux`.
 2. Paste `PROJECT_INSTRUCTIONS.md` from `claude-projects/<Project>/` into the Project
    Instructions field. It is instructions, not an upload.
 3. Open `claude-projects/<Project>/upload/`, select every file and drag them into the Project.
@@ -150,22 +150,22 @@ The synthetic package described a company that does not exist.
 Reading the real GL export made that unmistakable.
 
 * **Entities**, synthetic assumed a US and an EU entity with cross-entity miscoding as the top
-  severity class. Serif has exactly one subsidiary, `FL87 Serif Biomedicines, Inc.`, across all
+  severity class. Unity has exactly one subsidiary, `PL87 Unity Biomedicines, Inc.`, across all
   44,013 lines. The entire entity test is removed.
-* **Chart of accounts**, synthetic used invented 4-digit accounts. Serif uses 7-digit hierarchical
+* **Chart of accounts**, synthetic used invented 4-digit accounts. Unity uses 7-digit hierarchical
   NetSuite account paths with 139 leaf accounts.
-* **Departments**, synthetic used numeric 200/300/400. Serif uses ten department names, and 42% of
+* **Departments**, synthetic used numeric 200/300/400. Unity uses ten department names, and 42% of
   lines sit in `Non-Specific`.
 * **Source systems**: Coupa (since about Sept 2025, Prendio before it), UKG as the HRIS, ADP
   and Expensify. Adaptive Planning is unconfirmed.
-* **Vendors**, the synthetic vendor table was largely fictional. Serif's real top vendors are
-  Flagship Labs LLC, Fisher Scientific, Mirai Bio, New England BioLabs, and Aldevron. Corporate
-  counsel is K&L Gates, not Cooley or Gunderson.
+* **Vendors**, the synthetic vendor table was largely fictional. Unity's real top vendors are
+  Plurality Labs LLC, Fisher Scientific, a partnered-research vendor, New England BioLabs, and
+  Aldevron. Corporate counsel is K&L Gates, not Cooley or Gunderson.
 * **Business narrative**, the synthetic P&L Flux agent hard-coded an IRB dosing pause, a VP Legal
   hire, a Series B, and a $62.4K CRO accrual. All fictional. All removed.
-* **Thresholds**, synthetic invented $25K and $50K materiality and a $5K PP&E threshold. Serif's
+* **Thresholds**, synthetic invented $25K and $50K materiality and a $5K PP&E threshold. Unity's
   own draft policies set $10,000 pre-close, $100,000 quarterly post-close, $5,000 accrual, $10,000
-  prepaid, and **no fixed asset threshold at all**, deliberately. On 12 Oct 2026 Serif set its own
+  prepaid, and **no fixed asset threshold at all**, deliberately. On 12 Oct 2026 Unity set its own
   (Mike's write-up): **$5,000** PP&E capitalization and **$25,000** prepaid, which the engines and
   the GL Coding Review's CapEx and Prepaid screens now apply.
 
@@ -174,11 +174,11 @@ The change log is [`CHANGELOG.md`](CHANGELOG.md).
 ## Two Additions Driven by the Real Data
 
 * **Unallocated spend review**, in GL Coding. `Non-Specific` carries 18,391 of 44,013 lines. This is
-  Serif's largest actual coding-quality issue and has no synthetic analogue.
+  Unity's largest actual coding-quality issue and has no synthetic analogue.
 * **Receipt-based accrual completeness**, in both agents. Coupa records goods receipts, so accruals
   are identified from what was received but not yet invoiced, roughly **$110K for Aug 2026** and
   **$402K for calendar 2026 to date**. A billing-pattern method (trailing three-month average, per
-  Serif's Accrued Expense Policy) is the fallback for suppliers and periods Coupa does not reach.
+  Unity's Accrued Expense Policy) is the fallback for suppliers and periods Coupa does not reach.
   Open PO commitments, ordered but *not* received, about $1.37M in Aug 2026, are reported as a
   disclosure and never accrued.
 
@@ -191,8 +191,8 @@ Real and working now:
 * Coupa PO lines for calendar 2026, 9,571 lines, $21.1M, read as Coupa wrote them
 * The rolling forecast workbook, read for the plan and for Forecast vs. Actual
 * Reported income statements and balance sheets for cross-checking
-* Serif's real chart of accounts, department list, and how its top vendors are actually coded
-* Serif's draft accounting policies as the threshold source
+* Unity's real chart of accounts, department list, and how its top vendors are actually coded
+* Unity's draft accounting policies as the threshold source
 
 Not yet available, with placeholders in `templates/`:
 
@@ -202,7 +202,7 @@ Not yet available, with placeholders in `templates/`:
 * Vendor master, fixed asset register, prepaid schedule, accruals log
 * Coupa invoice-level data, without which there is no three-way match
 * The 2025 and Open tabs of the Coupa pull; only calendar 2026 arrived
-* Serif's confirmation of the Coupa department code mapping, which is now read through UKG's
+* Unity's confirmation of the Coupa department code mapping, which is now read through UKG's
   department codes
 * External research unbilled WIP detail
 * The EBITDA add-back mapping the Data Entry Policy refers to
@@ -215,17 +215,17 @@ Nothing is fabricated to fill a gap.
 
 * All policies in `references/` are DRAFT and unapproved. Every threshold in both agents
   rests on unapproved documents.
-* The vendor coding baseline is descriptive. It records what Serif does, which is not necessarily
-  what Serif should do. It is evidence, not policy.
-* The Treasury policy found in the Serif policy folder is CrossCountry Consulting's own policy, not
-  Serif's. It is excluded from both agents. See [`docs/DATA-MANIFEST.md`](docs/DATA-MANIFEST.md).
+* The vendor coding baseline is descriptive. It records what Unity does, which is not necessarily
+  what Unity should do. It is evidence, not policy.
+* The Treasury policy found in the Unity policy folder is CrossCountry Consulting's own policy, not
+  Unity's. It is excluded from both agents. See [`docs/DATA-MANIFEST.md`](docs/DATA-MANIFEST.md).
 * Accrual estimates are pattern-derived and need controller confirmation before anything posts.
 * IRC §174 output is preliminary and needs tax counsel sign-off.
 
 ## Related
 
 * [`docs/DATA-MANIFEST.md`](docs/DATA-MANIFEST.md), file origins, name mapping, and the full gap list
-* [`docs/SERIF_REAL_DATA_GAPS.md`](docs/SERIF_REAL_DATA_GAPS.md), the earlier gap analysis prepared for
+* [`docs/REAL_DATA_GAPS.md`](docs/REAL_DATA_GAPS.md), the earlier gap analysis prepared for
   the latest client confirmation, now superseded by the manifest.
 * `synthetic-jumpstarts/`, the original CCC mock package, kept beside this folder in OneDrive
   for reference

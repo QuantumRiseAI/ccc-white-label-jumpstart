@@ -1,4 +1,4 @@
-# Serif GL Coding Review: Claude Project
+# Unity GL Coding Review: Claude Project
 
 What this Project carries that the other does not: [`PROJECT_INSTRUCTIONS.md`](PROJECT_INSTRUCTIONS.md),
 [`HOW-TO-RUN.md`](HOW-TO-RUN.md) and the files beside them. The scripts are in `../../src/`, the
@@ -10,7 +10,7 @@ docs both Projects carry in `../shared/`, and the feed templates in `../../templ
 Follow [`claude-projects/README.md`](../../claude-projects/README.md): paste
 `claude-projects/GL Coding Review/PROJECT_INSTRUCTIONS.md` into the Project's Instructions field, and
 drag in every file in `claude-projects/GL Coding Review/upload/`. The header-only
-templates look empty on purpose: their presence is how the agent reports a feed Serif has not
+templates look empty on purpose: their presence is how the agent reports a feed Unity has not
 sent.
 
 ## Each Month
@@ -22,17 +22,17 @@ Add the month's exports, as the systems write them:
 | `netsuite_gl_detail_<range>.xls` | NetSuite Custom General Ledger saved search. Together the exports hold the month, the two before it and the same month last year. |
 | `coupa_po_lines_<year>.csv` | Coupa PO line report with all available columns, the months Coupa returns through the month |
 | `netsuite_income_statement_by_month_<range>.xls` | NetSuite Income Statement by month, through the month. The ledger is tied to it by account before the review is built. |
-| `serif_rolling_forecast_2026-08.xlsx` | The workbook whose prior cut is the plan, until Serif sets a new one |
+| `rolling_forecast_2026-08.xlsx` | The workbook whose prior cut is the plan, until Unity sets a new one |
 | `ukg_full_roster_hrbp_<date>.csv` | The newest UKG roster |
 
 Then say: *"Run the GL coding review for Sep 2026."*
 
 ## What Comes Out
 
-`serif-gl-coding-review-<period>-v2.0.0.html`, in the Project or in
+`gl-coding-review-<period>-v2.0.0.html`, in the Project or in
 `out/<period>/gl-coding-review/`: one self-contained file, laid out as the controller's August
 GL review, that opens in any browser with no server. That is the deliverable. The current
-version is `../../consoles/serif-gl-coding-review.html`; each earlier one is tagged
+version is `../../consoles/gl-coding-review.html`; each earlier one is tagged
 `console-v<version>` in Git. See [`../../CHANGELOG.md`](../../CHANGELOG.md).
 
 Aug 2026 reference run: 279 findings (56 besides the 223 item account drift findings), 50 proposed Journal Entries, tie-out PASS (engine 0.2.8).

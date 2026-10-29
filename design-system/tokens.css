@@ -1,69 +1,58 @@
 /*
-  Serif Biomedicines design tokens
-  Two sources. The Serif Brand Guide on Brandpad (brandpad.io/serif, updated May 2026)
-  is primary: it sets the palette, the typefaces and their use, and the logo colors.
-  Values marked "brand" come from it. Everything else is from serifbiomedicines.com
-  (Tailwind v4 @theme layer, September 2026), verbatim from the production
-  stylesheet unless marked "derived". Where the two disagree, the brand guide wins.
-  Fluid values scale linearly between a 320px and 1920px viewport.
+  Unity Biomedicines design tokens: "Clinical teal".
+  The machine-readable source for the consoles. src/client_design.py carries the
+  same values (TOKENS) inline, so a generated page needs no external file.
+  Include fonts-open/fonts.css before this file.
+  Every text pair below clears WCAG 2.2 AA (4.5:1); marks clear 3:1.
 */
-
 :root {
-  /* ---------- Typefaces (brand) ----------
-     Denim (Displaay Type Foundry) and Eliza (Camelot Typefaces) are licensed fonts.
-     Do not redistribute the woff2 files. License them or use the fallbacks below.
-     Figtree and PT Serif are the open substitutes in fonts-open/. After them come
-     the alternatives the brand guide names: Helvetica or Arial for Denim, Georgia
-     for Eliza. */
-  --font-sans: "Denim", "Figtree", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-serif: "Eliza", "PT Serif", Georgia, "Times New Roman", serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  /* ---------- Palette ---------- */
+  --color-white: #ffffff;
+  --color-light-gray: #eef3f5;  /* cool-gray page ground */
+  --color-hairline: #d8e1e6;    /* rules and table lines on white */
+  --color-surface-2: #dfe8ec;   /* secondary ground, group rows */
+  --color-dark-gray: #0f2e36;   /* ink; 14.0:1 on white, 12.5:1 on the page */
+  --color-mid-gray: #4a5f68;    /* secondary text; 6.7:1 on white, 6.0:1 on the page */
+  --color-warm-gray: #9cc0c8;   /* secondary text on the rail; 5.3:1 on teal-deep */
+  --color-inactive: #7d9199;    /* inactive, placeholders (not body text) */
 
-  /* ---------- Brand palette (brand) ----------
-     "Floods of Dark and Light Gray should dominate most layouts."
-     "Red should be used sparingly as a highlight or call to action color." */
-  --color-dark-gray: #2e2d29;   /* PMS Black 2C: text, inverse surface, logo */
-  --color-mid-gray: #525046;    /* PMS 4230C: secondary text, secondary surface */
-  --color-warm-gray: #ada990;   /* PMS 7535C: rules, placeholders, inactive text */
-  --color-light-gray: #e5e5e5;  /* PMS 427C: page ground */
-  --color-red: #ff3d00;         /* PMS 2028C: the accent */
-  --color-white: #fff;          /* stark surface, logo on dark grounds */
+  --color-teal: #0b6e75;        /* primary: actions and links; white on it 6.0:1 */
+  --color-teal-hover: #095a61;
+  --color-teal-tint: #e6f3f4;   /* selected and draft grounds; teal text on it 5.3:1 */
+  --color-teal-deep: #0b3d47;   /* the header rail and heroes */
+  --color-teal-mid: #0f4c57;    /* the sub-navigation bar under the rail */
+  --color-cyan: #0e9fac;        /* accent: focus rings, small marks, chart highlights only (3.2:1) */
+  --color-cyan-light: #5fd4dd;  /* accent on the dark rail: monogram atoms, wordmark tag */
 
-  /* ---------- Site palette ----------
-     The site's grey ramp. gray-1, gray-5, gray-9 and red-3 are brand colors under
-     their site names. The rest are site tints outside the brand palette: use them
-     only for the jobs named here. */
-  --color-black: #121110;   /* defined, effectively unused; text uses gray-9 */
-  --color-gray-1: var(--color-light-gray);
-  --color-gray-2: #d6d6d4;  /* start colour of the "ink-in" text reveal; hairline on stark */
-  --color-gray-3: #c7c6bd;  /* hairline S-outline decoration stroke */
-  --color-gray-4: #bdbaa6;  /* stone: secondary surface, hero S outline */
-  --color-gray-5: var(--color-warm-gray);
-  --color-gray-7: #706d60;  /* site secondary text; the brand uses Mid Gray */
-  --color-gray-9: var(--color-dark-gray);
-  --color-red-3: var(--color-red);
-  --color-red-4: #c72e00;   /* derived use: Red darkened for text, 5.50:1 on white */
+  /* Status: hue-separated from the teal so none reads as the brand color */
+  --color-ok: #1e7a4a;          /* green, 5.3:1 on white */
+  --color-warn: #a15c00;        /* amber, 5.2:1 on white */
+  --color-error: #b42318;       /* red, 6.6:1 on white; white on it 6.6:1 */
+  --color-red-text: var(--color-error);
+  --color-error-on-dark: #ffb4a8; /* error figures on the rail, about 6:1 */
 
-  --color-hairline: var(--color-gray-2);  /* derived name */
-  --color-red-text: var(--color-red-4);   /* derived name: Red when it is text */
-
-  /* ---------- Semantic colour (the site's own vocabulary) ---------- */
-  --color-vivid: var(--color-red-3);
+  /* ---------- Semantic roles ---------- */
+  --color-red: var(--color-cyan);   /* legacy slot name: the accent */
+  --color-vivid: var(--color-cyan);
   --color-stark: var(--color-white);
-  --color-ghost: var(--color-gray-5);
-  --color-neutral: var(--color-gray-1);
+  --color-accent-text: var(--color-teal);
+  --color-bg-primary: var(--color-light-gray);
+  --color-bg-secondary: var(--color-surface-2);
+  --color-bg-inverse: var(--color-teal-deep);
+  --color-fg-primary: var(--color-dark-gray);
+  --color-fg-secondary: var(--color-mid-gray);
+  --color-fg-inactive: var(--color-inactive);
+  --color-fg-inverse: #e6f0f2;
+  --color-action: var(--color-teal);
+  --color-action-hover: var(--color-teal-hover);
+  --color-action-tint: var(--color-teal-tint);
+  --state-over: var(--color-error);
+  --state-under: var(--color-fg-secondary);
 
-  --color-bg-primary: var(--color-gray-1);
-  --color-bg-secondary: var(--color-warm-gray);  /* brand; the site uses gray-4 */
-  --color-bg-inverse: var(--color-gray-9);
-  --color-bg-scrim: color-mix(in srgb, var(--color-gray-9), transparent 10%); /* #2e2d29e6 */
+  /* ---------- Type ---------- */
+  --font-sans: "Figtree", "Hanken Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
-  --color-fg-primary: var(--color-gray-9);
-  --color-fg-secondary: var(--color-mid-gray);  /* brand; the site uses gray-7 */
-  --color-fg-inactive: var(--color-gray-5);
-  --color-fg-inverse: var(--color-gray-1);
-
-  /* ---------- Fluid type scale (Utopia-style clamp) ---------- */
   --text--2: 12.5px;
   --text--1: clamp(0.8889rem, 0.8867rem + 0.0111vw, 0.9rem);
   --text-0: clamp(1rem, 0.975rem + 0.125vw, 1.125rem);
@@ -71,14 +60,8 @@
   --text-2: clamp(1.2656rem, 1.1672rem + 0.4922vw, 1.7578rem);
   --text-3: clamp(1.4238rem, 1.2691rem + 0.7734vw, 2.1973rem);
   --text-4: clamp(1.6018rem, 1.3729rem + 1.1448vw, 2.7466rem);
-  --text-5: clamp(1.802rem, 1.4758rem + 1.6312vw, 3.4332rem);
-  --text-6: clamp(2.0273rem, 1.5744rem + 2.2642vw, 4.2915rem);
-  --text-8: clamp(2.5658rem, 1.7378rem + 4.1397vw, 6.7055rem);
-  /* steps 7 is not defined in production */
 
-  /* ---------- Fluid space scale ---------- */
-  --spacing: 0.25rem; /* Tailwind unit; numeric utilities like mt-4 use this */
-  --spacing-4xs: clamp(0.125rem, 0.125rem + 0vw, 0.125rem);
+  /* ---------- Space ---------- */
   --spacing-3xs: clamp(0.25rem, 0.2375rem + 0.0625vw, 0.3125rem);
   --spacing-2xs: clamp(0.5rem, 0.4875rem + 0.0625vw, 0.5625rem);
   --spacing-xs: clamp(0.75rem, 0.725rem + 0.125vw, 0.875rem);
@@ -86,219 +69,67 @@
   --spacing-md: clamp(1.5rem, 1.4625rem + 0.1875vw, 1.6875rem);
   --spacing-lg: clamp(2rem, 1.95rem + 0.25vw, 2.25rem);
   --spacing-xl: clamp(3rem, 2.925rem + 0.375vw, 3.375rem);
-  --spacing-2xl: clamp(4rem, 3.9rem + 0.5vw, 4.5rem);
-
-  /* Fluid pairs: small on phones, dramatically larger on desktop */
-  --spacing-3xs-2xs: clamp(0.25rem, 0.1875rem + 0.3125vw, 0.5625rem);
-  --spacing-2xs-xs: clamp(0.5rem, 0.425rem + 0.375vw, 0.875rem);
-  --spacing-2xs-lg: clamp(0.5rem, 0.15rem + 1.75vw, 2.25rem);
-  --spacing-xs-sm: clamp(0.75rem, 0.675rem + 0.375vw, 1.125rem);
   --spacing-sm-md: clamp(1rem, 0.8625rem + 0.6875vw, 1.6875rem);
   --spacing-sm-lg: clamp(1rem, 0.75rem + 1.25vw, 2.25rem);
-  --spacing-sm-2xl: clamp(1rem, 0.3rem + 3.5vw, 4.5rem);
-  --spacing-sm-3xl: clamp(1rem, -0.15rem + 5.75vw, 6.75rem);
-  --spacing-sm-4xl: clamp(1rem, -0.6rem + 8vw, 9rem);
-  --spacing-sm-5xl: clamp(1rem, -1.05rem + 10.25vw, 11.25rem);
-  --spacing-sm-6xl: clamp(1rem, -1.5rem + 12.5vw, 13.5rem);
   --spacing-md-lg: clamp(1.5rem, 1.35rem + 0.75vw, 2.25rem);
   --spacing-lg-xl: clamp(2rem, 1.725rem + 1.375vw, 3.375rem);
-  --spacing-lg-2xl: clamp(2rem, 1.5rem + 2.5vw, 4.5rem);
-  --spacing-lg-3xl: clamp(2rem, 1.05rem + 4.75vw, 6.75rem);
-  --spacing-lg-4xl: clamp(2rem, 0.6rem + 7vw, 9rem);
-  --spacing-lg-5xl: clamp(2rem, 0.15rem + 9.25vw, 11.25rem);
-  --spacing-lg-6xl: clamp(2rem, -0.3rem + 11.5vw, 13.5rem);
-  --spacing-2xl-3xl: clamp(4rem, 3.45rem + 2.75vw, 6.75rem);
-  --spacing-2xl-6xl: clamp(4rem, 2.1rem + 9.5vw, 13.5rem);
-  --spacing-3xl-4xl: clamp(6rem, 5.4rem + 3vw, 9rem);
-  --spacing-4xl-5xl: clamp(8rem, 7.35rem + 3.25vw, 11.25rem);
 
-  --spacing-header-height: calc(var(--spacing-md) + (var(--spacing-xs-sm) * 2));
-
-  /* ---------- Radius (fluid, tied to the space scale) ---------- */
-  --radius-xs: var(--spacing-3xs);
-  --radius-sm: var(--spacing-sm);     /* resting card radius */
-  --radius-md: var(--spacing-sm-md);  /* media frames, mobile nav panel */
-  --radius-lg: var(--spacing-lg-xl);  /* hovered card radius */
-  --radius-pill: 999px;               /* derived name; buttons, labels, control buttons */
+  /* ---------- Shape and depth ---------- */
+  --radius-xs: 4px;
+  --radius-sm: 8px;     /* cards, tiles */
+  --radius-md: 10px;    /* tab panels */
+  --radius-lg: 14px;
+  --radius-pill: 999px; /* badges, chips */
+  --shadow-card: 0 1px 2px rgba(15, 46, 54, 0.06), 0 0 0 1px rgba(15, 46, 54, 0.05);
 
   /* ---------- Motion ---------- */
-  --ease-out: cubic-bezier(0, 0, 0.2, 1);               /* default for hovers and fades */
-  --ease-out-quartic: cubic-bezier(0.165, 0.84, 0.44, 1); /* image zoom */
-  --ease-header: cubic-bezier(0.25, 1, 0.5, 1);         /* derived name; header hide/reveal */
-  --ease-dna: cubic-bezier(0.16, 1, 0.3, 1);            /* derived name; long expo-out for hero DNA slide */
-  --default-transition-duration: 0.15s;
-  --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-
-  --duration-press: 0.15s;    /* derived: CTA card radius/colour */
-  --duration-hover: 0.2s;     /* CTA pill, simple-link underline */
-  --duration-control: 0.25s;  /* control buttons, site scrim */
-  --duration-card: 0.3s;      /* article card radius and title colour */
-  --duration-header: 0.5s;    /* header hide/reveal */
-  --duration-lazy: 0.75s;     /* lazy image fade-in */
-  --duration-portrait: 0.8s;  /* person card radius */
-  --duration-zoom: 1s;        /* portrait scale to 1.08 */
-  --duration-ink: 3s;         /* animated-text gradient reveal */
-
-  --blur-xl: 24px;
-  --aspect-video: 16 / 9;
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-out-quartic: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --duration-press: 0.15s;
+  --duration-hover: 0.2s;
+  --duration-control: 0.25s;
+  --duration-card: 0.3s;
 }
 
-/* ---------- Breakpoints (JS constants; CSS uses them as min-width queries) ----------
-   MIN 320, SM 640, NAV 640, MD 784, LG 1440, MAX 1920 */
-
 /* ---------- Base ---------- */
-html { scrollbar-gutter: stable; }
 body {
-  font-size: 16px;
   font-family: var(--font-sans);
   color: var(--color-fg-primary);
   background-color: var(--color-bg-primary);
-  font-feature-settings: "dlig" on;
+  font-variant-numeric: tabular-nums;   /* every figure lines up in its column */
   -webkit-font-smoothing: antialiased;
-  hanging-punctuation: first allow-end;
-  overflow-x: hidden;
 }
-::selection { background-color: var(--color-vivid); color: var(--color-fg-inverse); }
-.bg-vivid ::selection { background-color: var(--color-fg-inverse); color: var(--color-fg-primary); }
-:focus-visible { outline-offset: 0.35rem; }
-a { text-underline-offset: 0.1em; }
-
-/* ---------- Type styles (verbatim class names from production) ---------- */
-.text-display-6x-sans { font-family: var(--font-sans); font-size: var(--text-6); letter-spacing: -0.01em; font-weight: 400; line-height: 0.96; }
-.text-title-5x-sans   { font-family: var(--font-sans); font-size: var(--text-5); letter-spacing: -0.01em; font-weight: 400; line-height: 1; }
-.text-title-5x-serif  { font-family: var(--font-serif); font-size: var(--text-5); letter-spacing: -0.02em; font-weight: 400; line-height: 1; }
-.text-title-4x-sans   { font-family: var(--font-sans); font-size: var(--text-4); font-weight: 400; line-height: 1.04; }
-.text-title-4x-serif  { font-family: var(--font-serif); font-size: var(--text-4); letter-spacing: -0.01em; font-weight: 400; line-height: 1.04; }
-.text-title-3x-sans   { font-family: var(--font-sans); font-size: var(--text-3); letter-spacing: -0.01em; font-weight: 400; line-height: 1.04; }
-.text-sub-2x-serif    { font-family: var(--font-serif); font-size: var(--text-2); font-weight: 400; line-height: 1.04; }
-.text-sub-1x          { font-family: var(--font-sans); font-size: var(--text-1); font-weight: 600; line-height: 1.1; }
-.text-body-1x         { font-family: var(--font-sans); font-size: var(--text-1); font-weight: 400; line-height: 1.15; }
-.text-body-0x         { font-family: var(--font-sans); font-size: var(--text-0); font-weight: 400; line-height: 1.15; }
-.text-body--1x        { font-family: var(--font-sans); font-size: var(--text--1); letter-spacing: -0.005em; font-weight: 400; line-height: 1.15; }
-.text-body--2x        { font-family: var(--font-sans); font-size: var(--text--2); letter-spacing: 0.01em; font-weight: 400; line-height: 1.15; }
-
-/* The signature: sans and serif swap mid-sentence at identical size */
-.mixed-headline, .animated-text { font-family: var(--font-sans); font-size: var(--text-5); letter-spacing: -0.01em; font-weight: 400; line-height: 1; }
-:is(.mixed-headline, .animated-text) .font-serif { font-family: var(--font-serif); font-size: var(--text-5); letter-spacing: -0.02em; font-weight: 400; line-height: 1; }
-.mixed-headline--lg { font-size: var(--text-8); letter-spacing: -0.02em; line-height: 0.96; }
-.mixed-headline--lg .font-serif { font-size: var(--text-8); letter-spacing: -0.03em; line-height: 0.96; }
-
-/* Rich text: paragraphs at body-1x, sub-heads semibold, no serif inside long-form */
-.rich-text { text-wrap: pretty; }
-.rich-text h2 { font-size: var(--text-3); font-weight: 600; line-height: 1.04; text-wrap: pretty; }
-.rich-text h3 { font-size: var(--text-2); font-weight: 600; line-height: 1.1; }
-.rich-text h4, .rich-text h5, .rich-text h6 { font-size: var(--text-1); font-weight: 600; line-height: 1.1; }
-.rich-text p, .rich-text ul, .rich-text ol { font-size: var(--text-1); line-height: 1.15; }
-.rich-text ul, .rich-text ol { padding-inline-start: 1.5em; list-style-position: outside; }
-.rich-text.long-form > :not(h2):not(h3):not(h4):not(h5):not(h6) { grid-column: span 7; }
+::selection { background-color: var(--color-teal-tint); color: var(--color-dark-gray); }
+:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 2px; }
+a { color: var(--color-action); text-underline-offset: 0.15em; }
+a:hover { color: var(--color-action-hover); }
 
 /* ---------- Components ---------- */
-
-/* Pill button */
-.cta-link {
+.card {
+  background: var(--color-stark); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card); padding: var(--spacing-sm-md);
+}
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: var(--radius-pill);
+  font-size: var(--text--2); font-weight: 600;
+}
+.badge--ok    { color: var(--color-ok);    background: #e7f4ec; }
+.badge--warn  { color: var(--color-warn);  background: #fbf0e0; }
+.badge--error { color: var(--color-error); background: #fdecea; }
+.btn {
   display: inline-flex; align-items: center; gap: var(--spacing-2xs);
-  padding-inline: var(--spacing-sm); padding-block: var(--spacing-2xs);
-  font-family: var(--font-sans); font-size: var(--text-0); font-weight: 400; line-height: 1.15;
-  border: 1px solid transparent; border-radius: 999px;
-  transition: border-color 0.2s ease-out, background-color 0.2s ease-out, color 0.2s ease-out;
+  padding: 6px 14px; border-radius: var(--radius-xs); border: 1px solid var(--color-action);
+  background: var(--color-action); color: var(--color-white); font: 600 var(--text--1) var(--font-sans);
+  transition: background-color var(--duration-hover) var(--ease-out);
 }
-.cta-link:not(.cta-link--knockout) { background-color: var(--color-bg-inverse); color: var(--color-fg-inverse); }
-.cta-link:not(.cta-link--knockout):hover,
-.cta-link:not(.cta-link--knockout):focus-visible { background-color: var(--color-vivid); }
-.cta-link--knockout { border-color: var(--color-fg-primary); color: var(--color-fg-primary); background: transparent; }
-.cta-link--knockout:not(.active):hover,
-.cta-link--knockout:not(.active):focus-visible { border-color: var(--color-stark); background-color: var(--color-stark); }
-.cta-link--knockout.active { background-color: var(--color-bg-inverse); color: var(--color-fg-inverse); }
-.cta-link:active { transform: scale(0.97); }
+.btn:hover { background: var(--color-action-hover); }
+.btn--ghost { background: var(--color-stark); color: var(--color-action); }
+.btn--ghost:hover { background: var(--color-action-tint); }
+table { border-collapse: collapse; }
+th { text-align: left; font-weight: 600; color: var(--color-fg-secondary); border-bottom: 1px solid var(--color-hairline); }
+td { border-bottom: 1px solid var(--color-hairline); }
+td.num, th.num { text-align: right; }
 
-/* Text link: underline draws in from the left */
-.simple-link {
-  position: relative; text-decoration: none;
-  background: linear-gradient(to right, var(--color-fg-primary), var(--color-fg-primary) 49%, transparent 50%, transparent 100%);
-  background-position: 200% 101%; background-repeat: no-repeat; background-size: 200% 0.09em;
-  transition: color 0.2s ease-out, background-position 0.2s ease-out;
-}
-.simple-link:hover, .simple-link:focus-visible, .simple-link[aria-current="page"] { background-position: 0 101%; }
-
-/* Rich text link: underline slides out and back in */
-.rich-text a {
-  position: relative; text-decoration: none;
-  background: linear-gradient(90deg, currentColor, currentColor 33%, transparent 34% 66%, currentColor 67% 100%) 0 101% / 300% 0.09em no-repeat;
-  transition: color 0.35s ease-out, background-position 0.35s ease-out;
-}
-.rich-text a:hover, .rich-text a:focus-visible { background-position: 101% 101%; }
-
-/* Round control button (play, pause, arrow, close) */
-.control-button {
-  position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;
-  border-radius: 999px; background-color: var(--color-neutral); color: var(--color-vivid);
-  height: var(--spacing-xl); width: var(--spacing-xl);
-  transition: color 0.25s ease-out, background-color 0.25s ease-out;
-}
-.control-button--lg { height: var(--spacing-2xl-3xl); width: var(--spacing-2xl-3xl); color: var(--color-fg-primary); }
-.control-button--sm { height: var(--spacing-lg); width: var(--spacing-lg); }
-.control-button--sm:not(:hover):not(:focus-visible) { background-color: var(--color-bg-inverse); color: var(--color-fg-inverse); }
-.control-button:hover, .control-button:focus-visible { background-color: var(--color-vivid); color: var(--color-stark); }
-.control-button:active { transform: scale(0.97); }
-
-/* Article card: corners soften and title turns vivid on hover (no shadow, no lift) */
-.article-card {
-  background-color: var(--color-stark); padding: var(--spacing-md-lg); border-radius: var(--radius-sm);
-  transition: color 0.3s var(--ease-out), background-color 0.3s var(--ease-out), border-radius 0.3s var(--ease-out);
-}
-.article-card:hover, .article-card:focus-within { border-radius: var(--radius-lg); }
-.article-card:hover .article-card__title { color: var(--color-vivid); }
-
-/* Person card */
-.person { border-left: 1px solid var(--color-fg-inactive); padding-left: var(--spacing-sm-lg); }
-.person figure { aspect-ratio: 3 / 4; overflow: clip; background: var(--color-ghost); border-radius: var(--radius-sm); transition: border-radius 0.8s var(--ease-out); }
-.person:hover figure { border-radius: var(--radius-lg); }
-.person img.zoom-image { transition: transform 1s var(--ease-out-quartic), scale 1s var(--ease-out-quartic), opacity 1s var(--ease-out-quartic); transform-origin: 50%; }
-.person:hover img.zoom-image { scale: 1.08; }
-
-/* Header hide / reveal */
-#site-header {
-  background-color: var(--color-bg-primary); will-change: transform;
-  transition: transform 0.5s var(--ease-header), translate 0.5s var(--ease-header), color 0.5s var(--ease-header);
-}
-#site-header.is-at-top, #site-header.nav-open { background-color: transparent; }
-
-/* Site scrim behind the mobile nav */
-#site-scrim {
-  position: fixed; inset: 0; z-index: 10; display: none; opacity: 0; pointer-events: none;
-  background-color: var(--color-bg-scrim);
-  transition: opacity 0.25s ease-out, display 0.25s ease-out; transition-behavior: allow-discrete;
-}
-#site-scrim.active { display: block; opacity: 1; }
-@starting-style { #site-scrim.active { opacity: 0; } }
-
-/* Lazy images fade in */
-.lazyload, .lazyloading { opacity: 0; pointer-events: none; transition: opacity 0.75s var(--ease-out); }
-.lazyloaded { opacity: 1; transition: opacity 0.75s var(--ease-out); }
-
-/* Ink-in text reveal (CSS fallback; production uses GSAP SplitText + ScrollTrigger) */
-.animated-text {
-  color: transparent; will-change: background-position;
-  background-image: linear-gradient(172deg, var(--color-gray-9) 45%, var(--color-gray-2) 55%);
-  background-size: 100% 300%; background-position: 50% 100%;
-  -webkit-background-clip: text; background-clip: text;
-}
-.in-view .animated-text { animation: animatedTextBackground 3s ease-out forwards; }
-@keyframes animatedTextBackground { 0% { background-position: 50% 90%; } to { background-position: 50% 0; } }
-
-/* Custom cursor: vivid disc, 1/3 size at rest, full size over interactive elements */
-.cursor { position: fixed; top: 0; left: 0; z-index: 9999999; pointer-events: none; scale: 0.3333; transition: scale 0.3s; }
-.cursor svg { width: var(--spacing-xl); height: var(--spacing-xl); }
-.cursor circle { fill: var(--color-vivid); }
-body:has(a:hover, button:hover, [data-module="Card"]:hover) .cursor { mix-blend-mode: multiply; }
-
-/* ---------- Reduced motion: collapse every transition, keep the layout ---------- */
-@media screen and (prefers-reduced-motion: reduce), (update: slow) {
-  * {
-    background-attachment: initial !important;
-    scroll-behavior: auto !important;
-    transition-duration: 0.001ms !important;
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-  }
+@media screen and (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
 }

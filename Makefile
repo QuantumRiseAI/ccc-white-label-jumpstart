@@ -1,4 +1,4 @@
-# Serif jumpstarts. Python 3.9+, stdlib only; the tests need Node and Playwright.
+# Client jumpstarts (Unity Biomedicines demo). Python 3.9+, stdlib only; the tests need Node and Playwright.
 PERIOD ?= aug2026
 
 .PHONY: package build test clean

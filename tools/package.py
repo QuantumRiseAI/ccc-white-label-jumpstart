@@ -13,7 +13,7 @@ only place they are combined.
 
 claude-projects/<Project name>/ holds the same files in the repo as relative symlinks, with no
 second copy of anything: PROJECT_INSTRUCTIONS.md, to paste, and upload/, every file to upload,
-to select all and drag in. NetSuite's lists, Serif's data, are linked from inputs/reference/
+to select all and drag in. NetSuite's lists, client data, are linked from inputs/reference/
 (the OneDrive folder, not in Git), so the repo holds only the link. Do not edit it by hand: run
 this script, and `make test` fails when it is out of date.
 """
@@ -23,24 +23,24 @@ import sys
 import zipfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SCRIPTS = ["serif_uc2_flux.py", "serif_views.py", "serif_sources.py", "serif_design.py",
-           "serif_fonts.py", "build_pages.py", "netsuite_link_ids.sql",
+SCRIPTS = ["client_uc2_flux.py", "client_views.py", "client_sources.py", "client_design.py",
+           "client_fonts.py", "build_pages.py", "netsuite_link_ids.sql",
            "netsuite_income_statement.sql", "netsuite_gl_detail.sql"]
-SHARED = ["WHEN-DATA-BREAKS.md", "CONNECT-NETSUITE.md", "serif-accounts-and-departments.md",
-          "serif-policy-rules.md", "WRITING-GUIDE.md"]
+SHARED = ["WHEN-DATA-BREAKS.md", "CONNECT-NETSUITE.md", "client-accounts-and-departments.md",
+          "client-policy-rules.md", "WRITING-GUIDE.md"]
 TEMPLATES = ["accruals_log.csv", "coupa_dept_code_mapping.csv", "fixed_asset_register.csv",
              "hris_headcount.csv", "open_purchase_commitments.csv", "payroll_register.csv",
              "prepaid_amortization_schedule.csv"]
-# NetSuite's lists, for internal IDs in the import CSV. Serif's data, so they stay out of the repo:
+# NetSuite's lists, for internal IDs in the import CSV. client data, so they stay out of the repo:
 # read from inputs/reference/ (the OneDrive folder) when it is there, and said when it is not.
 NSREF = ["netsuite_ref_accounts.csv", "netsuite_ref_departments.csv", "netsuite_ref_programs.csv"]
 # the committed folders, named as the Projects are in Claude and in OneDrive
 NAMES = {"gl-coding-review": "GL Coding Review", "pl-flux": "P&L Flux"}
 PROJECTS = {
     "gl-coding-review": {
-        "scripts": ["serif_uc1_engine.py"] + SCRIPTS,
+        "scripts": ["client_uc1_engine.py"] + SCRIPTS,
         "docs": ["PROJECT_INSTRUCTIONS.md", "HOW-TO-RUN.md", "GL_CODING_REVIEW_SKILL.md",
-                 "serif-vendor-coding-baseline.md"],
+                 "client-vendor-coding-baseline.md"],
         "templates": TEMPLATES + ["accepted_exceptions.csv", "ebitda_addback_mapping.csv",
                                   "netsuite_vendor_master.csv"],
     },

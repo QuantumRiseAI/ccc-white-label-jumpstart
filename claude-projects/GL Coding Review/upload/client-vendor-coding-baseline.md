@@ -1,0 +1,1 @@
+../../../projects/gl-coding-review/client-vendor-coding-baseline.md

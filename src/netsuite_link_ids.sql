@@ -1,4 +1,4 @@
--- NetSuite link IDs for one month: every posting line of subsidiary 97 (FL87 Serif
+-- NetSuite link IDs for one month: every posting line of subsidiary 97 (PL87 Unity
 -- Biomedicines, Inc.), with its transaction's internal ID, the bill's Coupa invoice
 -- address and the line's Coupa PO. Replace Sep 2026 with the close month.
 -- Save the result as netsuite_link_ids_<month><year>.csv (eg netsuite_link_ids_sep2026.csv),

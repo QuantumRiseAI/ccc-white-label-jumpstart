@@ -1,1 +1,0 @@
-../../../src/serif_sources.py

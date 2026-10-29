@@ -1,7 +1,7 @@
 """Accepted exceptions: marked, kept, counted, and recorded in the manifest.
 
 Runs the coding engine on the real exports in inputs/aug2026 with a reviewer's list
-in a scratch folder (the list is a reviewer's input, not Serif data), then builds the
+in a scratch folder (the list is a reviewer's input, not client data), then builds the
 console from that run. Header-only and absent lists must change nothing.
     python3 tests/test_exceptions.py
 """
@@ -26,7 +26,7 @@ def ok(cond, msg):
 
 
 def engine(pending, out):
-    subprocess.run([sys.executable, "serif_uc1_engine.py", "--period", "Aug 2026", "--gl",
+    subprocess.run([sys.executable, "client_uc1_engine.py", "--period", "Aug 2026", "--gl",
                     *glob.glob(I + "/netsuite_gl_detail_*.xls"), "--coupa",
                     glob.glob(I + "/coupa_po_lines_*.csv")[0], "--pending", pending, "--out", out,
                     "--quiet"], cwd=pending, check=True)
@@ -101,13 +101,13 @@ def main():
 
     page = os.path.join(tmp, "page")
     path = os.path.join(tmp, "o1", "aug2026", "run.json")
-    subprocess.run([sys.executable, "serif_views.py", path, "--gl", *glob.glob(I + "/netsuite_gl_detail_*.xls"),
+    subprocess.run([sys.executable, "client_views.py", path, "--gl", *glob.glob(I + "/netsuite_gl_detail_*.xls"),
                     "--coupa", glob.glob(I + "/coupa_po_lines_*.csv")[0], "--roster", glob.glob(I + "/ukg_full_roster_*.csv")[0],
                     "--keep-names"], cwd=pend, check=True, stdout=subprocess.DEVNULL)
     subprocess.run([sys.executable, "build_pages.py", "--only", "coding", "--coding-run", path, "--gl",
                     *glob.glob(I + "/netsuite_gl_detail_*.xls"), "--out", page], cwd=pend, check=True,
                    stdout=subprocess.DEVNULL)
-    html = open(glob.glob(page + "/serif-gl-coding-review-*.html")[0]).read()
+    html = open(glob.glob(page + "/gl-coding-review-*.html")[0]).read()
     ok("Accepted Exceptions" in html and "Intended split" in html and "A. Approver" in html,
        "the console lists accepted exceptions with the reason and approver")
     ok("Rows Not Applied" in html and "Matched nothing, line 3" in html and "Rejected, line 4" in html,

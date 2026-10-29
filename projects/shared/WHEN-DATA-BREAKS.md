@@ -17,7 +17,7 @@ back to a system, and it will not be made the same way next month.
 
 ## Stop and Ask When a Script Stops
 
-Say which file, and quote what the script said. Then say what to ask Serif for:
+Say which file, and quote what the script said. Then say what to ask Unity for:
 
 | The script says | Ask for |
 |---|---|
@@ -44,5 +44,5 @@ Also stop when the tie-out fails. The export is incomplete; ask for a clean one.
 ## Then Fold It Back
 
 An export that changed shape once will arrive that way again. Flag it for Quantum Rise:
-the reader in `serif_sources.py`, or in the coding engine, needs to learn the new shape, so
+the reader in `client_sources.py`, or in the coding engine, needs to learn the new shape, so
 the next month runs on the export as it comes.

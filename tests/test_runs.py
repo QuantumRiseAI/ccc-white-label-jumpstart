@@ -69,7 +69,7 @@ for path in sorted(glob.glob(os.path.join(OUT, "*", "gl-coding-review", "run.jso
 
 # An id is what the item is, so the same item keeps its decision in every run: no card's id is a
 # numbered repeat of another's (ADJ-xxxxxxxx-2), which would follow the order a run lists them in.
-for path in sorted(glob.glob(os.path.join(OUT, "*", "*", "serif-*-v*.html"))):
+for path in sorted(glob.glob(os.path.join(OUT, "*", "*", "*-v*.html"))):
     if "-v" + VERSION + ".html" not in path:
         continue
     D = data(path)
@@ -83,7 +83,7 @@ for path in sorted(glob.glob(os.path.join(OUT, "*", "*", "serif-*-v*.html"))):
 CAPEX = 5000.0
 settled_any = False
 for month in sorted({p.split(os.sep)[-3] for p in glob.glob(os.path.join(OUT, "*", "*", "run.json"))}):
-    pages = {k: os.path.join(OUT, month, k, "serif-%s-%s-v%s.html" % (k, month, VERSION)) for k in ("gl-coding-review", "pl-flux")}
+    pages = {k: os.path.join(OUT, month, k, "%s-%s-v%s.html" % (k, month, VERSION)) for k in ("gl-coding-review", "pl-flux")}
     if not all(os.path.exists(p) for p in pages.values()):
         continue
     got = {}
@@ -94,9 +94,9 @@ for month in sorted({p.split(os.sep)[-3] for p in glob.glob(os.path.join(OUT, "*
     settled_any = settled_any or bool(got["gl-coding-review"])
     ok(want == got["pl-flux"], "%s: the GL Coding Review and the P&L Flux settle the same pass-through bills by their breakdowns, at the same amounts (%s)"
        % (month, ", ".join("%s $%s" % (b, format(a, ",.2f")) for b, a in sorted(want.items())) or "none"))
-# Sep 2026 has a settled Flagship bill, so a run of both months that settles none means a note
-# stopped rendering, not that nothing was settled.
-if glob.glob(os.path.join(OUT, "sep2026", "gl-coding-review", "serif-*-v%s.html" % VERSION)):
-    ok(settled_any, "some month's GL Coding Review settles a pass-through bill by its breakdown (the note renders)")
+# Sep 2026 has a Plurality bill with its breakdown supplied, so a Sep console with no breakdown note
+# means the note stopped rendering. (Its breakdown carries an item over $5,000, so it settles nothing.)
+for p in glob.glob(os.path.join(OUT, "sep2026", "gl-coding-review", "gl-coding-review-*-v%s.html" % VERSION)):
+    ok("breakdown supplied" in open(p, encoding="utf-8").read(), "sep2026: the GL Coding Review renders the pass-through breakdown note")
 
 sys.exit(1 if fails else 0)

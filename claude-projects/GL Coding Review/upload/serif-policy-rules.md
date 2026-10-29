@@ -1,1 +1,0 @@
-../../../projects/shared/serif-policy-rules.md

@@ -12,7 +12,7 @@ const ok = (c, m) => { console.log((c ? '  PASS ' : '  FAIL ') + m); if (!c) fai
 const num = s => Number(String(s).replace(/[^0-9.\-]/g, '')) * (/\(/.test(s) ? -1 : 1);
 
 (async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'serif-fluxcoding-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wl-fluxcoding-'));
   const b = await chromium.launch();
   try {
     const GL = fs.readdirSync(B + 'inputs/aug2026').filter(f => /^netsuite_gl_detail_.*\.xls$/.test(f)).map(f => B + 'inputs/aug2026/' + f);
@@ -25,7 +25,7 @@ const num = s => Number(String(s).replace(/[^0-9.\-]/g, '')) * (/\(/.test(s) ? -
     const g = cp.spawnSync('python3', ['build_pages.py', '--only', 'coding', '--coding-run', O + 'gl-coding-review/run.json', '--gl', ...GL, '--out', glOut, '--drafts', drafts], {cwd: DG, encoding: 'utf8'});
     ok(g.status === 0, 'coding console builds with a drafted Journal Entry');
     const ctx = await b.newContext({acceptDownloads: true}), p = await ctx.newPage();
-    await p.goto('file://' + path.join(glOut, fs.readdirSync(glOut).find(f => /^serif-gl-coding-review-aug2026-v[\d.]+\.html$/.test(f))));
+    await p.goto('file://' + path.join(glOut, fs.readdirSync(glOut).find(f => /^gl-coding-review-aug2026-v[\d.]+\.html$/.test(f))));
     const find = from => p.evaluate(from => Object.keys(DATA.je).filter(id => document.querySelector('[data-item="' + id + '"][data-flag]') && new RegExp('from ' + from + ' to 6410000').test(DATA.je[id].memo))
       .sort((a, c) => DATA.je[c].lines[0].debit - DATA.je[a].lines[0].debit), from);
     const fac = await find('6607000'), syn = await find('6501100');
@@ -51,8 +51,8 @@ const num = s => Number(String(s).replace(/[^0-9.\-]/g, '')) * (/\(/.test(s) ? -
     let n = 0;
     const build = (extra, name, fluxRun) => { const out = path.join(tmp, name || 'b' + (n++));
       const r = cp.spawnSync('python3', ['build_pages.py', '--only', 'flux', '--flux-run', fluxRun || O + 'pl-flux/run.json', '--gl', ...GL, '--income-statement', IS[0], '--out', out, ...extra], {cwd: D, encoding: 'utf8'});
-      const f = fs.existsSync(out) && fs.readdirSync(out).find(x => /^serif-pl-flux-aug2026-v[\d.]+\.html$/.test(x));
-      return {out: path.join(out, f || 'serif-pl-flux-aug2026.html'), r}; };
+      const f = fs.existsSync(out) && fs.readdirSync(out).find(x => /^pl-flux-aug2026-v[\d.]+\.html$/.test(x));
+      return {out: path.join(out, f || 'pl-flux-aug2026.html'), r}; };
     const CODING = ['--coding-run', O + 'gl-coding-review/run.json'];
     const w = build([...CODING, '--coding-record', rec, '--coding-drafts', drafts]);
     ok(w.r.status === 0 && /4 booked Journal Entries/.test(w.r.stdout), 'flux builds with the coding run, record and drafts: ' + (w.r.stdout.split('\n')[0] || w.r.stderr.slice(-200)));

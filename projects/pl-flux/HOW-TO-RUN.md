@@ -20,7 +20,7 @@ From this project folder, for a close of Sep 2026, first tie the ledger to NetSu
 Statement, account by account, for the month and the month before:
 
 ```sh
-python3 serif_sources.py tie --period "Sep 2026" --prior \
+python3 client_sources.py tie --period "Sep 2026" --prior \
   --gl netsuite_gl_detail_* \
   --income-statement netsuite_income_statement_by_*
 ```
@@ -31,11 +31,11 @@ Income Statement again. Then:
 
 ```sh
 # Leave out --forecast when the month has no cut of its own (see Each Month).
-python3 serif_uc2_flux.py --period "Sep 2026" \
+python3 client_uc2_flux.py --period "Sep 2026" \
   --gl       netsuite_gl_detail_* \
   --coupa    coupa_po_lines_*.csv \
-  --forecast serif_rolling_forecast_2026-09.xlsx \
-  --plan     serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
+  --forecast rolling_forecast_2026-09.xlsx \
+  --plan     rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
   --pending  . \
   --out      out
 ```
@@ -51,9 +51,9 @@ python3 serif_uc2_flux.py --period "Sep 2026" \
   Without it, Actual vs. Budget does not run.
 
 ```sh
-python3 serif_views.py out/sep2026/run.json \
+python3 client_views.py out/sep2026/run.json \
   --gl     netsuite_gl_detail_* \
-  --plan   serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
+  --plan   rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
   --coupa  coupa_po_lines_*.csv \
   --roster ukg_full_roster_*.csv \
   --balance-sheet netsuite_balance_sheet_*.xls \
@@ -64,11 +64,11 @@ python3 serif_views.py out/sep2026/run.json \
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json \
   --gl netsuite_gl_detail_* \
   --income-statement netsuite_income_statement_by_* \
-  --flagship-breakdown flagship_breakdown_*.xlsx \
+  --parent-breakdown *breakdown_INV*.xlsx \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 
-With a Flagship cost breakdown (`--flagship-breakdown`, left out when there is none), a proposal
+With a Plurality cost breakdown (`--parent-breakdown`, left out when there is none), a proposal
 to capitalize a pass-through bill whose breakdown ties and has no item on the account at or over
 $5,000 is not made, as on the GL Coding Review, and Adjustments names the bill.
 
@@ -88,12 +88,12 @@ plan line on Actual vs. Budget, notes on adjustments and the executive summary. 
 each draft against the run; one it leaves out is printed and listed in the Run log under
 **Drafts Left Out**. The format is in `PROJECT_INSTRUCTIONS.md`.
 
-Leave out `--balance-sheet`, `--flagship-breakdown` or `--netsuite-ref` (or `--netsuite-ids`) when
+Leave out `--balance-sheet`, `--parent-breakdown` or `--netsuite-ref` (or `--netsuite-ids`) when
 its file is absent: a pattern that matches no file stops the command in zsh; in bash an unmatched
-`--netsuite-ref` or `--flagship-breakdown` is ignored without a word. Leave the flag out. Without the Balance Sheet, Balance Sheet Flux
+`--netsuite-ref` or `--parent-breakdown` is ignored without a word. Leave the flag out. Without the Balance Sheet, Balance Sheet Flux
 and the tie-outs to it do not run, and Claude says so in the chat.
 
-`serif_views.py` adds the schedules to the run artifact. It reads each input, lays it out
+`client_views.py` adds the schedules to the run artifact. It reads each input, lays it out
 and decides nothing; rerunning it replaces what it added.
 
 `--roster` reads the UKG roster for Payroll Analytics. With `--keep-names` the console keeps
@@ -108,7 +108,7 @@ In a Claude Project every uploaded file sits at the top level, so all of these a
 filenames. In the repo, `make build PERIOD=sep2026` runs the same commands from the packaged
 Project folder on the exports in `inputs/sep2026/`.
 
-The last command writes `out/sep2026/serif-pl-flux-sep2026-v<version>.html` (the console version, 2.3.0 now), one self-contained
+The last command writes `out/sep2026/pl-flux-sep2026-v<version>.html` (the console version, 2.3.0 now), one self-contained
 file that opens in any browser. The filename carries the period and the console version.
 Inside, the **Run log** has a Build record listing the console, engine and ruleset versions,
 the run id, and a fingerprint for every input file, so if a figure moves between two builds
@@ -120,7 +120,7 @@ Python 3.9 or newer. Nothing else. Check with `python3 --version`.
 
 ## Each Month
 
-Serif sends these exports, uploaded as they are:
+Unity sends these exports, uploaded as they are:
 
 1. The NetSuite Custom General Ledger saved search, exported as `.xls` (an `.xlsx` saved
    from it also reads), named `netsuite_gl_detail_<range>.xls`. Columns are found by name, so a
@@ -131,13 +131,13 @@ Serif sends these exports, uploaded as they are:
 2. The Coupa PO line report with all available columns, the months Coupa returns through the month, as `.csv`.
 3. The rolling forecast workbook FP&A saved after the month closed, as `.xlsx` (the month's
    cut, for Forecast vs. Actual), and the workbook the plan comes from, if it is a different
-   file (the plan stays in the Project until Serif sets a new one). Without the month's cut,
+   file (the plan stays in the Project until Unity sets a new one). Without the month's cut,
    Forecast vs. Actual does not run, and Claude says so.
 4. The newest UKG roster, as `.csv`.
 5. The NetSuite Balance Sheet report with monthly columns, and the Income Statement by month,
    as `.xls`.
-6. Optional: each Flagship pass-through bill's cost breakdown from Coupa,
-   `flagship_breakdown_<invoice>.xlsx`, the same files as for the GL Coding Review.
+6. Optional: each Plurality pass-through bill's cost breakdown from Coupa,
+   `*breakdown_INV<n>.xlsx`, the same files as for the GL Coding Review.
 
 Open the close's chat, below, and ask: `Run the P&L flux for Sep 2026.`
 
@@ -274,9 +274,9 @@ published console. A console opened as a file keeps the review in that browser.
 
 ## Links to NetSuite and Coupa
 
-Serif's NetSuite is account 5602907, set as `NETSUITE_ACCOUNT` at the top of
-`serif_sources.py`. It is one Flagship-wide instance, so one document number can belong to
-bills of several Flagship companies; the links use internal IDs, never the number.
+Unity's NetSuite is account 5602907, set as `NETSUITE_ACCOUNT` at the top of
+`client_sources.py`. It is one Plurality-wide instance, so one document number can belong to
+bills of several Plurality companies; the links use internal IDs, never the number.
 
 * **Document numbers** open the transaction in NetSuite. Without its internal ID a number
   is plain text: NetSuite's search results cannot be opened from a link.
@@ -290,9 +290,9 @@ bills of several Flagship companies; the links use internal IDs, never the numbe
 ### Pulling the link IDs with the NetSuite connector
 
 The IDs come from one SuiteQL query, `netsuite_link_ids.sql`, run through the NetSuite
-connector in Serif's Claude instance:
+connector in Unity's Claude instance:
 
-1. Open a chat in Serif's instance, with the NetSuite connector on, and paste
+1. Open a chat in Unity's instance, with the NetSuite connector on, and paste
    `netsuite_link_ids.sql` with the close month in place of `Sep 2026`. Ask Claude to run it,
    page through every row, and save the rows with code, exactly as returned, as
    `netsuite_link_ids_<month>.csv`.
@@ -304,7 +304,7 @@ connector in Serif's Claude instance:
 3. Put the file with the month's exports and pass it to the schedules step:
 
 ```sh
-python3 serif_views.py out/sep2026/run.json ... --netsuite-ids netsuite_link_ids_sep2026.csv
+python3 client_views.py out/sep2026/run.json ... --netsuite-ids netsuite_link_ids_sep2026.csv
 ```
 
 The file is read for links only, and no figure or finding comes from it. The schedules step
@@ -332,25 +332,22 @@ pro-rated and read as zero. Say so when reporting it.
 
 ## Design
 
-The console follows the Serif Brand Guide on Brandpad (brandpad.io/serif), through the
-tokens in `design-system/tokens.css` in the repo, carried in `serif_design.py`. The page is
-Light Gray, cards are white, and the top bar is Dark Gray with the wordmark in White. Text is
-Dark Gray, secondary text is Mid Gray, and rules are Warm Gray.
+The console follows the client's design system, through the tokens in
+`design-system/tokens.css` in the repo, carried in `client_design.py`. The look is a clean,
+clinical biotech style: a light neutral page, white cards, and a clinical teal accent for
+the rail, headings and links.
 
-Red marks what needs action: an item over the threshold, the current page, the one
-primary button. It never fills behind text. Where red is text it is a darker red,
-`#c72e00`, which passes WCAG AA on white. The one other color the palette does not name is
-`#d6d6d4`, for rules and hover fills on a white card.
+One action color marks what needs action: an item over the threshold, the current page, the
+one primary button. It never fills behind text, and where it is text it passes WCAG AA on
+white.
 
 Everything is in sentence case. Cards have soft corners and no borders or shadows, and
 buttons are pills.
 
-Headlines and all text are set in Denim. Eliza appears only as a short highlight in a
-headline. Denim and Eliza are licensed and are
-not redistributed, so `serif_fonts.py` inlines open-licensed stand-ins: Figtree for Denim
-at `size-adjust: 96%` and PT Serif for Eliza at `104%`. After those come the alternatives
-the brand names, Helvetica or Arial and Georgia. If `serif_fonts.py` is missing, the
-console renders in those.
+The fonts are open-licensed, and `client_fonts.py` inlines them so the HTML needs no network.
+If `client_fonts.py` is missing, the console renders in the system font stack.
+
+See `design-system/README.md` for the palette and type.
 
 ## Working the Console
 
@@ -437,8 +434,8 @@ month and the month before; GL debits against credits; operating expenses, total
 income against the Income Statement; net income against the change in the Balance Sheet's Net
 Income; the balance sheet balancing; and the month's change in cash, prepaid expenses, fixed
 assets, accumulated depreciation, accounts payable and accrued expenses against GL activity.
-Each shows both figures and Pass, or the difference. Then **Related Party: Flagship**, the
-Flagship-named vendors and the journals whose memo names Flagship, by account over three
+Each shows both figures and Pass, or the difference. Then **Related Party: Plurality**, the
+Plurality-named vendors and the journals whose memo names Plurality, by account over three
 months; the intercompany policy is a draft. Then the GAAP checklist, the source data, and the
 sign-off: Prepared by, Controller Review and CFO Approval.
 

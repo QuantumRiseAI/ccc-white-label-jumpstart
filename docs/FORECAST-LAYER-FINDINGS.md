@@ -3,7 +3,7 @@
 **Prepared:** 2026-09-18 · **Status:** DRAFT, independently verified
 
 Response to the 2026-09-18 feedback asking for a two-layer workflow, accounting first and FP&A second,
-with the budget comparison driven off the `ext$_` tabs of `2026-08 Serif Rolling Forecast.xlsx`.
+with the budget comparison driven off the `ext$_` tabs of `2026-08 Rolling Forecast.xlsx`.
 
 The short version.
 Both forecast vintages are inside that one workbook, so the second layer is unblocked from the file we
@@ -39,7 +39,7 @@ That block is the June cut, confirmed rather than assumed: it reconciles to the 
 * `budget_fy2026_by_account_dept_month.csv`: 1,990 rows, from the **June** vintage by default
 * `forecast_lines_2026-06.csv`: 3,115 un-aggregated June lines
 * `forecast_lines_2026-08.csv`: 3,067 un-aggregated August lines
-* `unmapped_forecast_accounts.csv`: 10 categories that could not be placed, for Serif to complete
+* `unmapped_forecast_accounts.csv`: 10 categories that could not be placed, for Unity to complete
 
 Only the `EXT$_` tabs were named in the feedback.
 `LAB` and `OH` are the same shape and carry lab supplies and overhead, so excluding them would report a
@@ -77,7 +77,7 @@ That second condition matters: `Moving Expenses` is absent from the GL and the C
 6508000, which the ledger uses for **Partnered Research**. Six such fallbacks are refused and reported
 rather than accepted.
 
-Worth raising with Serif: this is a live FP&A model maintained against a stale account map.
+Worth raising with Unity: this is a live FP&A model maintained against a stale account map.
 
 ## Finding 2: A $4.47M Reclass Is Staged in the Model and Not Booked
 
@@ -114,7 +114,7 @@ So the August vintage for these accounts is the ledger with a manual reclass lai
 
 Two further lines on 6509000 are annotated `needs reclass to R&D`, totalling $2,147.59.
 
-This is a question for Serif rather than a conclusion from us, since the model may be staging a
+This is a question for Unity rather than a conclusion from us, since the model may be staging a
 reclass that is deliberately not yet booked. It is also exactly the shape of output the feedback asked
 for: a dimension called out, an amount, a reason carried on the line, and a correction that is either
 booked or not.
@@ -138,7 +138,7 @@ are exact thousands against none in the August cut, and its largest gaps land wh
 should be wrong about August. That is the **budget-versus-actual test**, and it is what the budget feed
 is now built from.
 
-An earlier draft of this document recommended requesting the June workbook from Serif. That was wrong.
+An earlier draft of this document recommended requesting the June workbook from Unity. That was wrong.
 It is block 2 of the file we already have.
 
 One point on naming. This is a forecast re-cut monthly, not an approved budget. The extract records the
@@ -203,15 +203,15 @@ corrected, and it should be fixed the same way.
    `FSP Charges – PBU` at $2.7M, which is a June-vintage name the August cut renamed to
    `FSP Charges - Origination`, so it needs confirming rather than guessing. Two rows carrying
    $3.5M have a blank department in the workbook.
-3. **Confirmation on the COA tab**, which is a Serif-side maintenance issue in a live model.
+3. **Confirmation on the COA tab**, which is a Unity-side maintenance issue in a live model.
 4. **UKG access**, unchanged, and the only thing standing between us and the requisitioner check.
 
 ## Reproducing This
 
 ```sh
-cd serif-data-jumpstarts
+cd client-data-jumpstarts
 python3 tools/forecast_to_csv.py \
-    data/real/serif_rolling_forecast_2026-08.xlsx \
+    data/real/rolling_forecast_2026-08.xlsx \
     data/pending \
     --prior-vintage 2026-06 \
     --gl data/real/derived/netsuite_gl_aug2026.csv \

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Slice Serif's NetSuite Custom General Ledger export into per-period CSVs.
+"""Slice the client's NetSuite Custom General Ledger export into per-period CSVs.
 
 The raw export is SpreadsheetML (XML with an `.xls` extension), ~58 MB and ~44k rows.
 That is too large to upload to a Claude Project, so this splits it into one CSV per

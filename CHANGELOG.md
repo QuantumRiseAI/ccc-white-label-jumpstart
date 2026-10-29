@@ -18,8 +18,8 @@ Output files carry the console version in the name, so successive builds do not
 silently overwrite each other:
 
 ```
-serif-gl-coding-review-aug2026-v1.8.2.html
-serif-pl-flux-aug2026-v1.8.2.html
+gl-coding-review-aug2026-v1.8.2.html
+pl-flux-aug2026-v1.8.2.html
 ```
 
 ## Bumping a version
@@ -34,6 +34,27 @@ serif-pl-flux-aug2026-v1.8.2.html
 * **Engine**, a change to how a run artifact is produced.
 * **Ruleset**, a change to what the rules test or the thresholds they apply. This is
   the one an accountant cares about: a ruleset bump invalidates a prior sign-off.
+
+---
+
+## 2.4.0: white-labelled for the Unity Biomedicines demo
+
+Console 2.4.0. Engine, ruleset and views unchanged; every count and amount matches 2.3.0 on the
+same inputs.
+
+- **Client.** The consoles, docs and Project instructions name the demo client, PL87 Unity
+  Biomedicines, Inc., and its parent, Plurality Group, whose labs bill pass-through costs.
+  Plurality Labs Explorations Inc, the landlord, is not a pass-through vendor.
+- **Look.** "Clinical teal": cool-gray page, white cards, a deep-teal header and cyan accents,
+  Figtree with tabular figures, and a hexagon-and-atoms monogram. Tokens in
+  `design-system/tokens.css`; the bundled serif fonts and the reference screenshots are gone.
+- **Names.** Client-neutral source files (`src/client_*.py`, `client-*.md`), output files
+  (`<kind>-<period>-v<V>.html`), ticket tags and browser storage keys. `--parent-breakdown`
+  replaces `--flagship-breakdown`, which is kept as a hidden alias. Reviews saved in the browser
+  under the old keys do not carry over.
+- **Tests.** The pass-through check asks that the Sep breakdown note renders rather than that it
+  settles a bill: the v3 breakdown carries an item over $5,000, so correctly it settles none.
+  The CapEx threshold check counts against the data rather than a fixed 2.
 
 ---
 
@@ -58,7 +79,7 @@ check in its own right.
   on a Facilities account, cloud services on a Facilities account, cleaning supplies on a
   software account, lab equipment on a software or computer account. An item that could sit on
   more than one account gets none: lab instrument software on 6816000 Office Non-Cap Software
-  rather than 6416000 Lab Non-Capital Software is Serif's choice, not an error. The entry goes in
+  rather than 6416000 Lab Non-Capital Software is Unity's choice, not an error. The entry goes in
   `entries` marked `"fit": true`; it credits the lines' account and debits the one they belong
   on, both sides keeping each line's department, Project and Program, and its reason says what
   was bought and why the account does not fit. Lines another item already covers are left out
@@ -66,7 +87,7 @@ check in its own right.
   chat Claude says how many lines it read and what it drafted. The vendor lines in `run.json` are
   the month's P&L lines, so a bill booked to a fixed asset or prepaid account is not read; it
   keeps its card on CapEx or Prepaid Flags.
-- **An Account fit card** (reverses SERIF-158 for these cards): each entry is a card on
+- **An Account fit card** (reverses UNITY-158 for these cards): each entry is a card on
   Organization & Account, under vs. Vendor History, as CODING-NN whatever account it debits,
   with an **Account fit** tag beside the vendor, folded or open, so the reviewer knows the item
   comes from Claude's reading of the lines and not from a check. Other drafted entries still
@@ -130,12 +151,12 @@ Console 2.2.3, flux engine 0.8.4, views 1.7.4. Decisions keep their stored verbs
   JE1536973474623; its memo names 1510000 Lab Equipment - New"), not "Not a prepaid or capital
   purchase".
 - **An off-plan vendor card** states the amount it moves and that the rest of the vendor's off-plan
-  spend is on its other cards (the Flagship card said $282,774.15 and moved $228,872.00).
+  spend is on its other cards (the Plurality card said $282,774.15 and moved $228,872.00).
 - **An accrual's lines reverse no posted line** (`reverses_line` is no longer set on them).
 - **Instructions**, from the gaps the mock runs listed:
   - A later run asks for the Income Statement exported with the newest GL.
   - Connector-format files a reviewer attaches count as the month's exports.
-  - The Coupa export's months and its row limit are described as Serif sends them.
+  - The Coupa export's months and its row limit are described as Unity sends them.
   - Pass-Through Bills has no threshold, and a note there only where the check does not settle it.
   - A vendor Recode recommendation says where the lines belong, with no second entry.
   - Every adjustment card gets a note, under the threshold too; open commitments that could not
@@ -149,20 +170,20 @@ Console 2.2.3, flux engine 0.8.4, views 1.7.4. Decisions keep their stored verbs
   - The Load Summary has DEGRADED and COUPA rows; the posting-lag check's two ids are explained;
     the Aug 2026 reference counts are current (279 findings, engine 0.2.8).
 
-## 2.2.2: the P&L Flux reads the Flagship breakdown (SERIF-176)
+## 2.2.2: the P&L Flux reads the Plurality breakdown (UNITY-176)
 
 Console 2.2.2, views 1.7.3. Decisions keep their stored verbs. No id changes on Sep or Aug 2026; a
 CapEx or Prepaid card on a bill split across departments, which those months do not have, is now
 one card, keeping the id of its largest department's.
 
 - **The two consoles agree on a pass-through bill its cost breakdown settles.** With
-  `--flagship-breakdown`, the P&L Flux does not propose capitalizing a pass-through bill whose
+  `--parent-breakdown`, the P&L Flux does not propose capitalizing a pass-through bill whose
   breakdown ties to it and puts no item on the account at or over the $5,000 CapEx threshold, as
   the GL Coding Review leaves its CapEx flag to Pass-Through Bills. Adjustments says which bill it
-  left out and why. Before, the flux proposed it (Sep 2026: Flagship INV19269, a MacBook Pro at
+  left out and why. Before, the flux proposed it (Sep 2026: Plurality INV19269, a MacBook Pro at
   $4,828.46 and AppleCare), and approving it would have booked an asset the coding review says is
   not one. One function, `breakdown_settles`, decides for both consoles.
-- The P&L Flux's build commands pass `--flagship-breakdown` (left out when there is none), and its
+- The P&L Flux's build commands pass `--parent-breakdown` (left out when there is none), and its
   monthly exports list the breakdowns as optional; `tools/build.sh` passes them to both builds.
 - The build prints each capitalize it leaves out, with its finding, since `run.json` still lists
   it: the instructions tell Claude to write no note for it and leave it out of the summary's count.
@@ -180,7 +201,7 @@ one card, keeping the id of its largest department's.
 - `tests/test_runs.py` checks that both consoles settle the same bills each month (the flux only
   those at or over $5,000, as it proposes nothing capital below that).
 
-## 2.2.1: checks that could not run say so, and ids that hold across runs (SERIF-175)
+## 2.2.1: checks that could not run say so, and ids that hold across runs (UNITY-175)
 
 Console 2.2.1, GL engine 0.2.8, flux engine 0.8.2, views 1.7.2. Decisions keep their stored verbs.
 
@@ -200,7 +221,7 @@ Console 2.2.1, GL engine 0.2.8, flux engine 0.8.2, views 1.7.2. Decisions keep t
 - **A pass-through bill's CapEx flag is settled by its cost breakdown** when the breakdown ties to
   the bill and puts no item on the flagged account at or over the CapEx threshold: the bill is
   left to Pass-Through Bills, and the CapEx page says so, with the bill's largest item there
-  (Sep 2026: Flagship INV19269, a MacBook Pro at $4,828.46 and AppleCare). The threshold is the
+  (Sep 2026: Plurality INV19269, a MacBook Pro at $4,828.46 and AppleCare). The threshold is the
   one the console was built with; lowering it on the CapEx page does not bring the card back. The P&L
   Flux does not read the breakdown and still proposes capitalizing the bill.
 - **Each capital bill gives its own reason**, from its own finding, not its vendor's first bill's.
@@ -232,7 +253,7 @@ Console 2.2.1, GL engine 0.2.8, flux engine 0.8.2, views 1.7.2. Decisions keep t
 Console 2.2.0. Decisions keep their stored verbs, so saved reviews and decision records load as
 before.
 
-- **One note per item** (SERIF-162): the GL Coding Review's `drafts.json` has `notes`, a list.
+- **One note per item** (UNITY-162): the GL Coding Review's `drafts.json` has `notes`, a list.
   Each note names its `vendor`, its `check` (the item's reference ID prefix: `capex`, `fa`,
   `prepaid`, `ppd`, `coding`, `pass`, `new` or `clear`; `dept` for a department flag with no bill), the bill's `document` for an
   item about a bill, `recommend` and `note`, and goes on exactly one item: the first it fits. A
@@ -284,23 +305,23 @@ before.
 - **SOX Input Files** counts every file the engine and schedules read, as the Run log does.
 - **Memo ends with the month**: every proposed entry's Memo ends with `| Mon'YY` (`| Sep'26`), as
   the Data Entry Policy requires; the build adds it where a Memo lacks it.
-- **Budget commentary** (SERIF-173): the P&L Flux's `drafts.json` has `budget_commentary`, keyed
+- **Budget commentary** (UNITY-173): the P&L Flux's `drafts.json` has `budget_commentary`, keyed
   by account code, drafted beside each plan line on Actual vs. Budget, beside `commentary` (Actual
   vs. Actual, MoM). A key with no plan line is listed as left out.
-- **Adjustments page** (SERIF-173): the Review Checklist no longer counts Section C (Billed Twice
+- **Adjustments page** (UNITY-173): the Review Checklist no longer counts Section C (Billed Twice
   After a Gap) as open, so it agrees with the badge and the Decided counter. Section B says "Not
   run for <month>: no forecast was supplied." or "No forecast revisions in <month>." when it is
   empty. Each adjustment's folded header shows its amount.
-- **Project instructions** (SERIF-173), in both Projects: one order for the first reply (the
+- **Project instructions** (UNITY-173), in both Projects: one order for the first reply (the
   month, the tie's result, then missing exports, Coupa columns and the row cap, then the rest),
   in the Load Summary too; a missing export that only turns a check off is run without, and the
   check named; `--gl netsuite_gl_detail_*`, so the pattern no longer matches
   `netsuite_gl_detail.sql`; `--balance-sheet`, `--netsuite-ids`, `--netsuite-ref` and the
-  Flagship breakdowns are left out when their file is absent; publishing loads the
+  Plurality breakdowns are left out when their file is absent; publishing loads the
   `artifact-capabilities` skill for the runtime contract (the Artifact tool has no `capabilities`
   action). In the P&L Flux: payroll moves are explained from the UKG roster, and only the cutoff
   accrual needs the payroll register; without the GL Coding Review's run and record the flux
-  shows the ledger as posted, and says so; a Flagship cost breakdown settles a capitalize or
+  shows the ledger as posted, and says so; a Plurality cost breakdown settles a capitalize or
   prepaid adjustment on its bill and is cited in the note; adjustment notes are two short
   sentences, since an accepted note goes into the NetSuite Memo after " | ", cut at 999
   characters.
@@ -312,7 +333,7 @@ Console 2.1.0. Decisions keep their stored verbs (`approve`, `modify`, `netsuite
 load as before.
 
 - **Review Checklist**: the Overview's close checklist is renamed, in both consoles, at Scott's request.
-- **Decision buttons** (SERIF-160): a flag offers **Add to NetSuite CSV** (`approve`), **Edited
+- **Decision buttons** (UNITY-160): a flag offers **Add to NetSuite CSV** (`approve`), **Edited
   Manually in NetSuite** (`netsuite`) and **Reject** (`reject`). The Modify button is gone from
   both consoles: editing an entry's lines still marks it `modify`, still sends it to the CSV and
   still needs a note. Same item, two accounts offers Reject in place of Coding Stands. Vendor
@@ -322,7 +343,7 @@ load as before.
   CSV**. P&L Flux adjustments: **Add to NetSuite CSV** and **Reject**. Statuses read "Added to
   NetSuite CSV", "Added to NetSuite CSV, edited" and "Edited manually in NetSuite". The buttons sit
   under the folds (Why it was flagged, Journal Entry, Last three months, Lines).
-- **Drafted entries in their category** (SERIF-158): a Journal Entry Claude drafted is built like
+- **Drafted entries in their category** (UNITY-158): a Journal Entry Claude drafted is built like
   any other item (vendor title, Current coding, Proposed recode, Document / item, Lines, Last
   three months), carries no Draft marker, and offers Edited Manually in NetSuite too. A debit to
   15xxxxx puts it on CapEx as CAPEX-NN, to 13xxxxx on Prepaid as PREPAID-NN, otherwise on
@@ -330,13 +351,13 @@ load as before.
   draft added later moves no existing reference ID. Item ids keep `DR-`, so saved decisions carry
   over; the work paper's decision Path adds ", drafted by Claude". DRAFT-NN is gone. The P&L Flux
   keeps drafts on Adjustments, Section A.
-- **Vendor and Coupa PO on every entry line** (SERIF-161): the Journal Entry has editable Vendor
+- **Vendor and Coupa PO on every entry line** (UNITY-161): the Journal Entry has editable Vendor
   and Coupa PO columns, and the NetSuite CSV has **Name** (the vendor, NetSuite's entity) and
   **Coupa PO Number** after Program, in both consoles. They are filled from the item's bill
   lines: the PO on the line's account and department, for the same amount where one matches; the
   debit receiving a cost carries the PO of the credit removing it. The PO is the PO number as the
   GL reader holds it.
-- **Organization & Account** (SERIF-163): Dept & Entity is renamed, and its items sit in a
+- **Organization & Account** (UNITY-163): Dept & Entity is renamed, and its items sit in a
   **Coding Inconsistencies** box with four tabs: vs. Vendor History (Department flags, Coding
   changed vendors, drafted account or department recodes), vs. Coupa PO (account flags against
   the PO; a dash and the run's reason when that check did not run), vs. Forecast (Coded off
@@ -344,7 +365,7 @@ load as before.
   department, for what its entry changes. Reviewed & Cleared is now **Vendors Reviewed &
   Cleared** and New This Period **New Vendors This Period**, each with a folder tab per
   department.
-- **Headers say what they count** (SERIF-164, SERIF-171): each review and vendor page has one
+- **Headers say what they count** (UNITY-164, UNITY-171): each review and vendor page has one
   Decided counter (0 of 5) with a line saying what its items are. The Overview has Vendor Spend
   (and what it leaves out), Items to Review (booked-to-fixed-assets and prepaid lines included,
   matching the Review badge) and Vendors to Confirm (matching the Confirm badge). Total Period
@@ -354,17 +375,17 @@ load as before.
   Flux, Total OpEx, Adjustments to Decide, the department, payroll and SOX tiles are relabeled to
   say what they cover; Net Loss, YoY Net Loss, To Review (MoM), Departments, Total P&L, Monthly
   Run Rate and AI Disclosed are gone.
-- **Navigation and folding** (SERIF-167, SERIF-168): a section's pages open in a bar under the
+- **Navigation and folding** (UNITY-167, UNITY-168): a section's pages open in a bar under the
   header. Every page opens with all its items folded, in both consoles; the 12-card threshold
   and the Expand all / Collapse all bar are gone.
-- **A coding the vendor used before proposes no move** (SERIF-156): a Coded off plan vendor whose
+- **A coding the vendor used before proposes no move** (UNITY-156): a Coded off plan vendor whose
   codings the vendor used before says "The coding matches the vendor's earlier months; only the
   plan differs.", with the memo `Recode <vendor>`, in place of an entry recoding accounts to
   themselves.
-- **Pass-through bills stay on Pass-Through Bills** (SERIF-157): a Coding changed or off plan card
+- **Pass-through bills stay on Pass-Through Bills** (UNITY-157): a Coding changed or off plan card
   leaves the vendor's pass-through bills to their own cards; its codings, line count, Lines and
   notes cover the vendor's other bills only.
-- **Facts, not instructions** (SERIF-172): items state what was found and why, never what to do.
+- **Facts, not instructions** (UNITY-172): items state what was found and why, never what to do.
   The "Action:" steps, the CapEx and Prepaid step text, the "Ask the owner" labels and the
   imperative sentences in reasons and Claude's notes are gone. A Department item states the
   vendor's earlier coding ("Of the vendor's 8 earlier lines, 6 are coded Chemistry") in place of
@@ -388,20 +409,20 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   coding) were nowhere in the console, and drafts for them were left out. A vendor card names each
   pass-through bill it covers.
 - **A bill a Journal Entry already moves is not proposed again** (ruleset
-  `2026.10-uc2-flux-serif-thresholds+journal-moved`): the capital and prepaid checks, in both
+  `2026.10-uc2-flux-client-thresholds+journal-moved`): the capital and prepaid checks, in both
   consoles, skip a bill when a journal line in the month on the same account, for its amount the
   other way, names its document number. The naming journal lines must net to the move: a
-  department move on the account, or a reclass reversed in the month, does not count. Sep 2026's VWR freezer (bill 8822578887), which Serif's
+  department move on the account, or a reclass reversed in the month, does not count. Sep 2026's VWR freezer (bill 8822578887), which Unity's
   30 Sep entry JE1536973474623 capitalized, was proposed for capitalization a second time.
 
 ## Unreleased: the import with its support, and the September review fixes
 
-- **SERIF-152, as far as Serif's answers allow**: a percent of the comparison can be added to the
-  P&L Flux review threshold in Settings (off until Serif chooses; Disha's practice is 20% over a
+- **UNITY-152, as far as Unity's answers allow**: a percent of the comparison can be added to the
+  P&L Flux review threshold in Settings (off until Unity chooses; Disha's practice is 20% over a
   dollar floor); the coding console flags **Same item, two accounts** (Lab Supplies/Consumables
   against Lab Non-Capital Equipment, from the ledger alone, two in Sep 2026: TaqMan master mix and
-  depth filters); a pass-through breakdown shows each item's Flagship department.
-- **The NetSuite import with its support file** (SERIF-153): one export, in both consoles, saves the
+  depth filters); a pass-through breakdown shows each item's Plurality department.
+- **The NetSuite import with its support file** (UNITY-153): one export, in both consoles, saves the
   import CSV and beside it `...-support.html`: every entry in the import by External ID, with its
   reason, the decision and who made it, the reviewer's note, the source document and its lines,
   plus the items fixed in NetSuite (not imported) and the sign-off.
@@ -419,25 +440,25 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   import CSV's real columns and `manifest.coupa_coverage`, and no longer say the connector's GL
   cannot be read.
 
-## Unreleased: Flagship pass-through bills (SERIF-148)
+## Unreleased: Plurality pass-through bills (UNITY-148)
 
 - **Sign-off you can find**: both consoles end their SOX page with one full-width Sign-Off & Export
   card in the action blue: the three signatures side by side, and the close's exports beside them
   (P&L Flux: Commentary CSV and the flux pack; GL Coding Review: the work paper and the NetSuite CSV).
 - **Sign Off button**: on the SOX page, a floating Sign Off button (with how many have signed) scrolls
   to the sign-off card, and steps aside while the card is on screen.
-- **Pass-Through Bills**, a page under Review in the GL Coding Review: each Flagship Labs LLC and
-  Flagship Pioneering Labs TPC bill of the month (not the FSP charges, 6901xxx), one card each.
-- **With its cost breakdown** (`--flagship-breakdown`, the Excel attached in Coupa, read by column
-  name): the breakdown tied to the bill and each activity to its booked line, Flagship's accounts
-  mapped to Serif's from the bill, each item checked against the capital and prepaid thresholds,
+- **Pass-Through Bills**, a page under Review in the GL Coding Review: each Plurality Labs LLC and
+  Plurality Group Labs TPC bill of the month (not the FSP charges, 6901xxx), one card each.
+- **With its cost breakdown** (`--parent-breakdown`, the Excel attached in Coupa, read by column
+  name): the breakdown tied to the bill and each activity to its booked line, Plurality's accounts
+  mapped to Unity's from the bill, each item checked against the capital and prepaid thresholds,
   its service period and its account (parking or travel booked as consulting), and the reclass
   proposed as a Journal Entry for the import. On Sep 2026's INV19269: 13 items tie to $42,845.63;
   $163.54 of Bay State IT parking moves from General Consulting to Parking; the MacBook and
   AppleCare are each under $5,000 and the Notion renewal under the prepaid threshold.
 - **Without one**, nothing waits: the card links to Coupa and is decided Reviewed in Coupa, and every
   other card on that bill says one line may hold several items.
-- `serif_sources.py passthrough` lists the bills and which have a breakdown; the Project asks the
+- `client_sources.py passthrough` lists the bills and which have a breakdown; the Project asks the
   reviewer for any it lacks, once, and runs without them.
 
 ## Unreleased: consoles that lead with the decision
@@ -502,7 +523,7 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
 - **Coupa links from line memos**: a field that starts with a Coupa invoice link and goes on with a
   note gives the link alone.
 - **P&L Flux instructions**: an earlier month's forecast cut is not the month's cut; a journal with
-  no vendor is often Serif's own close entry, to be read from its memo; and only an adjustment with
+  no vendor is often Unity's own close entry, to be read from its memo; and only an adjustment with
   a proposed Journal Entry takes a note, so the summary covers the rest.
 
 ## Unreleased: what the September run taught
@@ -534,7 +555,7 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
 
 - `netsuite_income_statement.sql` pulls each P&L account's posted debit and credit by accounting
   period for the close month and the month before, through the NetSuite connector. The tie
-  (`serif_sources.py tie`) and the build take the saved result as `--income-statement` in place
+  (`client_sources.py tie`) and the build take the saved result as `--income-statement` in place
   of NetSuite's `.xls` report, with the report's totals on SOX & GAAP. Both Projects say how to
   run it. Checked on Aug 2026: the report's figures in the query's layout tie on every account
   and give the same totals as the `.xls`.
@@ -543,8 +564,8 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
 
 - With NetSuite's lists (`--netsuite-ref`: accounts, departments, programs, pulled through the connector),
   the import CSV carries internal IDs for Subsidiary (97), Account, Department and Program, and Project by
-  name. Serif's account full names carry no number and its departments sit under parents, so a name is
-  not a safe match. The subsidiary name is now NetSuite's, "FL87 Serif Biomedicines, Inc.".
+  name. Unity's account full names carry no number and its departments sit under parents, so a name is
+  not a safe match. The subsidiary name is now NetSuite's, "PL87 Unity Biomedicines, Inc.".
 - Journal Date and Reversal Date are M/D/YYYY. Currency and Exchange Rate are dropped (the subsidiary's
   USD applies). The readable account number, department and program and the Reversing Entry flag follow
   as reviewer columns, left unmapped.
@@ -555,7 +576,7 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   resolves to an active NetSuite account, department and program. Two Aug flux accruals built from Coupa
   receipts have no ledger department and wait for the reviewer to pick one.
 
-## Unreleased: Project and Program on lines and entries, Non-Specific on balance sheet lines (SERIF-144)
+## Unreleased: Project and Program on lines and entries, Non-Specific on balance sheet lines (UNITY-144)
 
 - **Both consoles**: each ledger line a card lists shows its Project and Program (the GL's
   `ProjectID: Name` and `Program: Name`) beside its department: a card's lines, and a bill booked
@@ -575,11 +596,11 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   department. Entry lines mark it `reverses_line` (in `views.entries` and in Claude's drafted
   entries). A line the reviewer moves to a balance sheet account takes Non-Specific, which can
   still be changed. Balance sheet lines keep the Project and Program. Ledger balance sheet lines
-  that carry another department are not flagged: that is an open question to Serif (123 of 1,260
+  that carry another department are not flagged: that is an open question to Unity (123 of 1,260
   in Aug 2026).
 - **Saved reviews** load as before: an entry edit saved earlier takes the run's Project and
   Program on its lines. The decision record's format stays 3.
-- `serif_views.py`: `detail.items` and the `views.entries` lines carry `project` and `program`; a
+- `client_views.py`: `detail.items` and the `views.entries` lines carry `project` and `program`; a
   flux finding's transactions, which do not, take them from the GL by document and account, and
   only when its lines agree.
 - Aug 2026: 2,711 of 2,713 ledger lines carry a Project and all carry a Program (212 on
@@ -594,12 +615,12 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   earlier saved edit; `test_readers.py` (25) follows Project and Program from the reader to both
   sides of an entry and reverses a balance sheet line on its own department.
 
-## Unreleased: a threshold per coding screen, and Capital in Process or a fixed asset (SERIF-142, SERIF-147)
+## Unreleased: a threshold per coding screen, and Capital in Process or a fixed asset (UNITY-142, UNITY-147)
 
-- **Serif's thresholds** (Mike's write-up, 12 Oct 2026): **$5,000** PP&E capitalization and
+- **Unity's thresholds** (Mike's write-up, 12 Oct 2026): **$5,000** PP&E capitalization and
   **$25,000** prepaid. They replace the draft asset policy's "no threshold, by design" and the
   $10,000 the draft prepaid policy had been read as. The P&L Flux commentary threshold is not
-  changed; it is still open with Serif.
+  changed; it is still open with Unity.
 - **GL Coding Review, Settings** has three thresholds, each saved in the browser with the review as
   the one threshold was: **Review threshold** ($2,500: the account recodes on Dept & Entity and
   drafted entries), **CapEx threshold** ($5,000) and **Prepaid threshold** ($25,000). A CapEx card
@@ -610,7 +631,7 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   fixed at build). Stored as `thr`, `thr_capex` and `thr_prepaid`; a review saved with `thr` alone
   restores as it was, its threshold kept, CapEx and Prepaid at their defaults. SOX Documentation
   lists the defaults.
-- **Each CapEx recommendation says where it goes and why** (SERIF-147): `1505000` Capital in
+- **Each CapEx recommendation says where it goes and why** (UNITY-147): `1505000` Capital in
   Process for build-out work (the wording names a build-out, fit-out, construction, renovation,
   tenant improvement, a phase, or an office or space expansion) or an asset not yet in service (a
   deposit, a down payment, a progress or milestone payment); otherwise the asset is in service at
@@ -625,11 +646,11 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
 - **Prepaid lists like CapEx.** F9.PREPAID lists related charges from the $2,500 reporting floor
   (it tested $10,000 before), so lowering the Prepaid threshold in Settings shows more; $25,000 is
   the review default. A prepaid under $25,000 says it stays expense, and the P&L Flux proposes no
-  Journal Entry for it (`serif_views.entries`), so its adjustments do not fill with small prepaids:
+  Journal Entry for it (`client_views.entries`), so its adjustments do not fill with small prepaids:
   the finding is in the run, not on a flux page. Capital is the same: the P&L Flux proposes a
   capital entry only for a bill of $5,000 or more, its lines together, so it never proposes
   capitalizing what the coding card says stays expense.
-- **Flux engine 0.8.0, ruleset 2026.10-uc2-flux-serif-thresholds; views 1.7.0.** F9.PREPAID lists
+- **Flux engine 0.8.0, ruleset 2026.10-uc2-flux-client-thresholds; views 1.7.0.** F9.PREPAID lists
   from $2,500 and the views propose its entry from $25,000. F10.CAPITALIZE still lists every bill
   from the $2,500 reporting floor, so a reviewer can lower the CapEx threshold, and the views
   propose its entry from $5,000; each finding's correction carries
@@ -638,7 +659,7 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   each bill's placement and its finding's total on the flag's `match`. The coding engine is
   unchanged: its prepaid and fixed-asset constants still carry the draft readings and are not used.
 - **Aug 2026.** Coding: CapEx 3 flags, Review 3 before, 1 now (Red Thread Spaces, $38,590.70, to
-  Capital in Process as build-out work, as Serif moved Phase 1 there on 31 Jul; Bay State IT
+  Capital in Process as build-out work, as Unity moved Phase 1 there on 31 Jul; Bay State IT
   $3,240.63 and Repligen $2,823.39 are under $5,000). Prepaid 1 flag before (Nova Biomedical,
   $16,746.00 service contract, marked Review), 3 now, none marked Review at $25,000 (Nova; Beckman
   Coulter, $7,540.00; Agilent, $4,572.00, all service contracts); at $5,000, 2 are. Booked to
@@ -663,13 +684,13 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   Statement too, and ask for it by accounting period. Both Projects say the Income Statement
   must be by accounting period.
 
-## Unreleased: the ledger tied to the Income Statement by account (SERIF-146)
+## Unreleased: the ledger tied to the Income Statement by account (UNITY-146)
 
 - **Both Projects** tie the ledger to NetSuite's Income Statement by month report, account by
   account, before anything is built: the close month for the GL Coding Review, the month and the
   month before for the P&L Flux. Accounts under the Income and Other Income headings are compared
   with their sign turned; an account on either side that differs by a cent or more fails.
-  `python3 serif_sources.py tie` runs it first, prints each account that differs with both figures
+  `python3 client_sources.py tie` runs it first, prints each account that differs with both figures
   and the difference, and exits 2. Both Projects' instructions now run it before the scripts and
   stop on a failure.
 - **The build** (`build_pages.py`) checks the same tie and stops on a failure without writing a
@@ -679,7 +700,7 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   it, the first page says the ledger was not tied. Aug 2026: 88 accounts tie, Aug and Jul.
 - New `tests/test_tie.py` in `make test`.
 
-## Unreleased: Edited in NetSuite (SERIF-143)
+## Unreleased: Edited in NetSuite (UNITY-143)
 
 - **GL Coding Review**: **Edited in NetSuite** sits beside Approve Recode on CapEx, Prepaid and
   Dept & Entity flags, and beside Recode on the booked balance-sheet lines and the vendors on
@@ -707,15 +728,15 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
 - **Versioning rule**: `STORE_VERSION` is gone from the code; the rule above now says how a new
   decision verb is added.
 
-## Unreleased: finding reference IDs (SERIF-145)
+## Unreleased: finding reference IDs (UNITY-145)
 
 - **GL Coding Review**: each card's header starts with a reference ID, numbered by screen within
   the close: CAPEX, FA (booked to fixed assets), PREPAID, PPD (booked to prepaid), DEPT, DRAFT
   (Claude's drafted entries), CLEAR (Reviewed & Cleared) and NEW (New This Period), for example
   DEPT-01. Within a screen the largest amount is 01, and a tie goes by item id, so a rebuild of
   the same data numbers every card the same; a drafted entry takes a DRAFT number and moves no
-  other. The IDs are per close; permanent IDs across closes stay on the roadmap (SERIF-128,
-  SERIF-130). The page data carries them as `ref`, item id to ID.
+  other. The IDs are per close; permanent IDs across closes stay on the roadmap (UNITY-128,
+  UNITY-130). The page data carries them as `ref`, item id to ID.
 - **Memo**: each proposed Journal Entry's Memo follows the Data Entry Policy with the card's ID in
   front, `DEPT-01 | Reclass VWR International LLC from 6607000 to 6410000 | Aug'26`, in the entry
   editor, the Export page, the NetSuite CSV (Memo and Line Memo) and the entries handed to the
@@ -732,7 +753,7 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   reads as well as NetSuite's `.xls`. A missing required column stops the run and names
   it. Of the two "ProjectID: Name" columns, a line's project is the one naming a real
   project. A "PO Number" column, when filled, gives the line's Coupa PO. The coding engine
-  reads the GL through `serif_sources.py`, the same reader as the consoles (engine 0.2.5).
+  reads the GL through `client_sources.py`, the same reader as the consoles (engine 0.2.5).
   Aug 2026 reads unchanged; the Sep 2026 `.xlsx` (Jan to Sep 2026) matches the Aug export
   on every month both hold.
 - **Coupa**: the Coupa Data Pull (PO Lines) report reads beside the export with all
@@ -741,7 +762,7 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   the reviewer which checks they feed before anything else. A report's totals row is
   not read as a PO line.
 
-## Unreleased: accepted exceptions (SERIF-64)
+## Unreleased: accepted exceptions (UNITY-64)
 
 - **Accepted exceptions** (GL Coding Review): a reviewer-maintained `templates/accepted_exceptions.csv`
   (vendor, account, reason, approved_by, approved_on) is read by the coding engine as an input, hashed
@@ -750,7 +771,7 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   unmatched rows are shown there and in the load summary. Engine 0.2.4 (run.json gains `excepted`,
   `summary.excepted_*` and `manifest.exceptions`); no rule changes, so the ruleset version does not move.
 
-## Unreleased: coding corrections in the P&L flux (SERIF-44)
+## Unreleased: coding corrections in the P&L flux (UNITY-44)
 
 - **P&L Flux with the GL Coding Review**: `build_pages.py --only flux` takes the coding run
   (`--coding-run`) and the coding decision record (`--coding-record`). Actual vs. Actual (MoM)
@@ -761,7 +782,7 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
 
 - The cost estimate prices Claude Sonnet 5.5 ($2 input, $0.20 cached, $10 output per million; was the Sonnet 4.6 $3 / $0.30 / $15) and assumes 500 tokens of output per script run (was 2,000); the scripts print at most about 300 tokens each. Aug 2026: coding about $0.62 (847K tokens), flux about $1.08 (1.77M tokens).
 
-## Unreleased: Line Memo keeps the original date (SERIF-126)
+## Unreleased: Line Memo keeps the original date (UNITY-126)
 
 - **Fix**: the coding build finished each proposed Journal Entry twice (once for the flux
   hand-off), and the second pass dropped the original transaction date from every Line Memo.
@@ -773,7 +794,7 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   in-period. An out-of-period adjustment (a line posted in a closed period) is drafted on
   request, dated in the close month, with the Memo naming the period, for the controller.
 
-## Unreleased: Journal Entries from variances, NetSuite fields (SERIF-125, SERIF-126)
+## Unreleased: Journal Entries from variances, NetSuite fields (UNITY-125, UNITY-126)
 
 - **Propose entry** on each Actual vs. Actual (MoM) row (P&L Flux) opens an editable two-line
   Journal Entry that goes through the same approval gate and NetSuite CSV as the others; the NetSuite
@@ -781,7 +802,7 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   Exchange Rate, Memo, Reversing Entry, Reversal Date and a Line Memo on each line. Entries are
   dated the last day of the close month, with the transaction date in the Line Memo.
 
-## Unreleased: duplicate vendor records (SERIF-17)
+## Unreleased: duplicate vendor records (UNITY-17)
 
 - **GL Coding Review**: an explicit pair list, `VENDOR_PAIRS` in the engine's policy module,
   applied to the GL and Coupa vendor names before the vendor-pattern checks. Only "confirmed"
@@ -791,7 +812,7 @@ Found by running both Projects on Sep 2026 and writing the drafts as the Project
   record). A list that contradicts itself (a record confirmed into two names, or merges
   that would put an "apart" pair under one name) stops the run. Engine 0.2.3.
 
-## Unreleased: item account drift (SERIF-26)
+## Unreleased: item account drift (UNITY-26)
 
 - **GL Coding Review**: `T4.ITEM_ACCOUNT_DRIFT` flags a Coupa PO line in the close month (by PO
   line date; later lines are never read) whose account differs from the account the same item
@@ -832,7 +853,7 @@ reports. Engines and ruleset are unchanged; everything is computed from the GL e
 - **Billed twice after a gap** (Adjustments, Section C): two or more bills this month, none last
   month, billed in two of the four months before, at least 1.5 times the usual month and at or
   over the threshold. Aug 2026 has 4.
-- **Related party: Flagship** (SOX & GAAP): Flagship-named vendors and journals, by account,
+- **Related party: Plurality** (SOX & GAAP): Plurality-named vendors and journals, by account,
   over three months. Aug 2026: $430,605.
 - **Trailing averages** (Actual vs. Actual, MoM): each account's 3- and 6-month averages.
 
@@ -854,7 +875,7 @@ Both consoles:
 
 Not built, because the data does not support them: department-level bonus (the roster's
 departments), the accrual roll-forward (the accruals log is not supplied), small amounts
-capitalized below a threshold (Serif's asset policy sets none), reading prepaid terms from line
+capitalized below a threshold (Unity's asset policy sets none), reading prepaid terms from line
 text (most lines carry none; the invoice is the source), and a prior-month forecast column
 (the workbook holds the August cut and the June plan only).
 
@@ -863,7 +884,7 @@ text (most lines carry none; the invoice is the source), and a prior-month forec
 ## Console 2.0.0: 2026-10-06
 
 The updated UI replaces the 1.8 console in both jumpstarts. It is laid out as Chris's August
-reports, in Serif's design, and built by `build_pages.py` in each Project from that Project's
+reports, in Unity's design, and built by `build_pages.py` in each Project from that Project's
 own run. Engine and ruleset versions are unchanged, and the runs are identical to the ones the
 updated UI v1 read.
 
@@ -898,14 +919,14 @@ updated UI v1 read.
 - **Item ids** are built from what the item is (vendor, accounts, description), so a decision
   matches the same item in a later run. Records from 1.8 do not load into 2.0.0.
 - **The coding console reads only the coding run.** Its CapEx and Prepaid screens come from the
-  flux engine's prepaid and capital rules, which `serif_views.py` already runs over the month
+  flux engine's prepaid and capital rules, which `client_views.py` already runs over the month
   for the vendor rows.
 - **Not carried over from 1.8:**
   - the Follow up and Fixed in NetSuite outcomes, and line-level reclass;
   - the Questions, decision log and proposed-entries CSVs, and the work paper;
   - recording the NetSuite upload, and the Finish the close button;
   - the posting lag and tax findings, which are counted on the run log only.
-- **Names and pay** are kept (`serif_views.py --keep-names`), for the accounting team.
+- **Names and pay** are kept (`client_views.py --keep-names`), for the accounting team.
 - **Repo layout:** each file lives once.
   - `src/` holds the scripts, `projects/` what is particular to each Claude Project (with
     `projects/shared/` for the docs both carry), and `templates/` the feed templates.
@@ -915,7 +936,7 @@ updated UI v1 read.
     (`make test`) tests the consoles, standalone and in shared mode.
   - `consoles/` holds the current console for each Project. Each version is a commit to it,
     tagged `console-v<version>`, from v1.8.3 on.
-  - `serif_design.py` carries the design tokens, logo, fonts and the run log's cards.
+  - `client_design.py` carries the design tokens, logo, fonts and the run log's cards.
     `build_report.py` and its tests are retired; they stay in Git history before 2.0.0.
   - The design system is in `design-system/`; the data manifest, internal notes and Chris's
     two August reports (`docs/spec/`) are in `docs/`.
@@ -994,7 +1015,7 @@ same as the standard console's.
   `build_report.py` stays, but is no longer how they are built.
 - **Views 1.6.4:**
   - `--balance-sheet` reads the NetSuite Balance Sheet report as NetSuite exports it
-    (`serif_sources.read_balance_sheet`);
+    (`client_sources.read_balance_sheet`);
   - the flux run gains `dept_months`, `payroll` and Payroll vs. HRIS;
   - `--keep-names` keeps employee names and pay in the run and adds the roster to the payroll
     detail. The UI update is built with it.
@@ -1041,11 +1062,11 @@ AIJ-116. Both consoles.
   a file. The decision record and every export include the shared state.
 - **Claude's drafts stay in the page.** Commentary that is still the draft, not accepted, is
   never written to the shared state.
-- The page title reads `Serif GL Coding Review - Aug 2026`, which names the artifact.
+- The page title reads `Unity GL Coding Review - Aug 2026`, which names the artifact.
 - **Project instructions:** Publishing the Console (publishing is the default delivery, one
   artifact per close month, capabilities and rules), Shared Mode, and rule 9 (11 in the
   flux): the console is published only as a private-by-default Artifact, the reviewer
-  shares it inside the organization, and anything wider is Serif's decision. HOW-TO-RUN: Shared Mode and How to Test Shared Mode.
+  shares it inside the organization, and anything wider is Unity's decision. HOW-TO-RUN: Shared Mode and How to Test Shared Mode.
   WHEN-DATA-BREAKS: the console and shared state are never edited by hand.
 
 ## Console 1.8.7, Project docs: 2026-10-05
@@ -1088,7 +1109,7 @@ From the 1.8.6 hand-off review, AIJ-110, AIJ-115, AIJ-16 and AIJ-118.
 - Page and outcome names live in one place, `LABELS` in `build_report.py`. The decision
   stores keep `v2`.
 
-Console 1.8.6 is kept alongside, as `serif-<use case>-aug2026-v1.8.6.html`.
+Console 1.8.6 is kept alongside, as `<use case>-aug2026-v1.8.6.html`.
 
 ## Console 1.8.6, HOW-TO-RUN: 2026-10-04
 
@@ -1103,7 +1124,7 @@ From the review of 1.8.5 and the 2 Oct instructions.
   the chat days later. The console from the last run carries that run, so Claude can still
   compare against it. Both HOW-TO-RUN files now ask for it in The Close in One Chat.
 
-Console 1.8.5 is kept alongside, as `serif-<use case>-aug2026-v1.8.5.html`.
+Console 1.8.5 is kept alongside, as `<use case>-aug2026-v1.8.5.html`.
 
 ## Console 1.8.5: 2026-10-02
 
@@ -1127,7 +1148,7 @@ Engines, rulesets, figures and the decision stores are unchanged.
 - **Line reclasses on Journal Entries:** the page lists each reclass that joins the
   NetSuite import, `RECLASS-001` and on, with its reason.
 
-Console 1.8.4 is kept alongside, as `serif-<use case>-aug2026-v1.8.4.html`.
+Console 1.8.4 is kept alongside, as `<use case>-aug2026-v1.8.4.html`.
 
 ## Project instructions: 2026-10-02
 
@@ -1151,7 +1172,7 @@ Console 1.8.4 is kept alongside, as `serif-<use case>-aug2026-v1.8.4.html`.
   forecast revisions. The leadership summary is written only on request, in the chat, from
   commentary the reviewer has explained. The console `summary` stays off.
 - **Ad hoc cuts.** A cut the console does not have is computed with code from the run, or
-  from the exports through `serif_sources`, and labeled "Ad hoc, not a finding" with the
+  from the exports through `client_sources`, and labeled "Ad hoc, not a finding" with the
   run id, the files and the filter. It never becomes a finding or settles an item. Names
   stay withheld.
 - **Connectors are read-only.** Claude uses read tools only and never writes to NetSuite or
@@ -1359,7 +1380,7 @@ says to set it there.
 - In a reclass, the picked value is one rounded block with its focus ring, and the reason row has room around it.
 - The notices on the Decisions page about draft thresholds and client confidentiality are gone.
 
-Console 1.8.3 is kept alongside, as `serif-<use case>-aug2026-v1.8.3.html`.
+Console 1.8.3 is kept alongside, as `<use case>-aug2026-v1.8.3.html`.
 
 ## Console 1.8.3, Schedules 1.6.1: 2026-09-30
 
@@ -1478,28 +1499,29 @@ $6,244,493 for the flux; the bands add up to the same totals.
 
 ## Console 1.7.2: 2026-09-29
 
-**The console follows the Serif Brand Guide on Brandpad.** Colors, typefaces and their
-usage match the guide. Layout, features and figures are the same: outside the stylesheet,
+**The console follows the client's design system.** Colors, typefaces and their usage
+match the design guide. Layout, features and figures are the same: outside the stylesheet,
 the Aug 2026 builds are identical to 1.7.1.
 
-* Palette: Dark Gray `#2E2D29`, Mid Gray `#525046`, Warm Gray `#ADA990`, Light Gray
-  `#E5E5E5` and Red `#FF3D00`. Secondary text and the under-threshold state are Mid Gray
-  (8.09:1 on white). Rules, borders and rail text are Warm Gray.
-* The wordmark on the rail is White. The brand allows the logo in Dark Gray or White only.
-* Eliza is kept for headline highlights and the headline figures. Finding titles, evidence
-  headings and treemap values are in Denim.
-* Rail section headings are in sentence case, semibold, in Warm Gray (5.81:1 on Dark Gray).
-* The font stacks fall back to the brand's alternatives, Helvetica or Arial and Georgia,
-  after the open-licensed Figtree and PT Serif.
-* `serif-design-system/` takes the brand guide as its primary source. `tokens.css` adds the
-  five brand colors by name and points `fg-secondary` at Mid Gray and `bg-secondary` at Warm
-  Gray. `README.md` labels each rule by source, adds Logo and Brand Graphics sections and the
-  brand voice, and corrects the site rules the guide overrides. `reference/` holds the guide's
-  sections as `brandpad-<topic>.png`. The console tokens match `tokens.css`.
+* Palette: the named brand colors replace the earlier approximations. Secondary text and the
+  under-threshold state use the mid neutral (8.09:1 on white). Rules, borders and rail text
+  use the warm neutral.
+* The wordmark on the rail is white, one of the two logo colors the guide allows.
+* The display face is kept for headline highlights and the headline figures. Finding titles,
+  evidence headings and treemap values use the text face.
+* Rail section headings are in sentence case, semibold, in the warm neutral (5.81:1 on the
+  dark rail).
+* After the open-licensed fonts, the font stacks fall back to the alternatives the guide
+  names.
+* `design-system/` takes the design guide as its primary source. `tokens.css` adds the
+  brand colors by name and repoints `fg-secondary` and `bg-secondary`. `README.md` labels
+  each rule by source, adds Logo and Brand Graphics sections and the brand voice, and
+  corrects the site rules the guide overrides. `reference/` holds the guide's sections as
+  images. The console tokens match `tokens.css`.
 
 ## Console 1.7.1, Schedules 1.6.0, coding engine 0.2.0, flux engine 0.7.0: 2026-09-28
 
-**Both engines read Serif's exports exactly as the systems write them.** No sliced, converted
+**Both engines read Unity's exports exactly as the systems write them.** No sliced, converted
 or summarized file is an input. The NetSuite Custom General Ledger `.xls`, the Coupa PO line
 `.csv`, the rolling forecast `.xlsx` and the UKG roster `.csv` go in as exported, and each
 script takes what it needs in memory.
@@ -1512,7 +1534,7 @@ script takes what it needs in memory.
   the workbooks: `--plan` with `--plan-vintage`, and `--forecast`.
 * The schedules read the plan from the workbook and the Coupa department codes from the
   roster. `--write-dept-codes` and the normalized Coupa reader are gone.
-* `serif_sources.py`, new in both Projects, holds the NetSuite, Coupa and forecast readers,
+* `client_sources.py`, new in both Projects, holds the NetSuite, Coupa and forecast readers,
   moved unchanged from the three tools that used to cut the files. The coding engine reads
   NetSuite with its own bundled reader.
 * Removed from both Projects: `forecast_lines_2026-06.csv`, `forecast_lines_2026-08.csv`,
@@ -1569,7 +1591,7 @@ Payroll vs. HRIS, Journal Entries, Decisions.
 * **Questions, CSV**: every question with its owner department, amount, flags and lines.
 * **Ledger checks** holds posting lag and tax on one page.
 * **Prepaid and capital flags in the coding review.** The rules are the flux engine's own,
-  imported from `serif_uc2_flux.py`, which now ships in both Project folders.
+  imported from `client_uc2_flux.py`, which now ships in both Project folders.
 * Department vs. Plan, Coding health and Not tested are off the rail.
 
 **P&L Flux: nine pages, down from fourteen.** Actual vs. Actual carries the same month
@@ -1601,7 +1623,7 @@ drafts vendor notes, reasons for cleared rows, questions for owners, Journal Ent
 NetSuite import layout, flux commentary per account from the drill-down data, notes on each
 adjustment, and a leadership summary, all from the run's own figures.
 
-**The UKG roster is a monthly input** for both Projects, which run on Serif's own Claude
+**The UKG roster is a monthly input** for both Projects, which run on Unity's own Claude
 instance. The requester flag on Vendors and Payroll vs. HRIS now run in the Project; every
 employee name stays withheld from the console.
 
@@ -1624,7 +1646,7 @@ coding console carried six roster names and three email addresses from engine me
   `gl_paths` and `period` in place of three slice paths, and `coding_engine.loaders` gains
   `load_gl_exports`, which reads through `gl_extract.netsuite_gl_to_csv` and refuses a
   month held by two exports. The budget file leaves `PENDING_FEEDS`. The flux engine and
-  the schedules read through `serif_sources.py`: the same parsing as `gl_extract`,
+  the schedules read through `client_sources.py`: the same parsing as `gl_extract`,
   `coupa_extract` and `forecast_to_csv`, returning rows in memory instead of writing files.
   The forecast reader maps account names through the GL lines supplied.
 
@@ -1704,7 +1726,7 @@ which departments raised its purchase orders. Fisher Scientific: coded mostly to
 R&D, requested mostly by Platform.
 
 **Three months.** Period over Period and the flux pack's month-over-month page carry the
-month before the prior one, so a swing that reverses reads as one. `serif_views.py` takes
+month before the prior one, so a swing that reverses reads as one. `client_views.py` takes
 `--prior2`; the flux engine derives it from `--history`.
 
 **New Adjustments schedules**, from engine 0.5.0: Prepaids and Capital (with what was
@@ -1762,7 +1784,7 @@ The period as schedules, in both consoles, and one table style for all of them.
 
 **For the repo port.** No engine rule changed: both engines emit the same findings as
 before, 118 and 135, on the same inputs. What is new is a step between engine and
-console, `serif_views.py`, byte-identical in both `upload-to-project/` folders, which adds
+console, `client_views.py`, byte-identical in both `upload-to-project/` folders, which adds
 a `views` block to `run.json`: account names, the schedules, and each proposed correction
 as Journal Entry lines. The console renders that block and computes nothing from it. Its
 inputs are fingerprinted under `views.inputs` and listed in the Build record, because the
@@ -1830,7 +1852,7 @@ with a letter prefix, so the numeric part maps each Coupa code to a department. 
 mapping is written, with no personal data, to
 `data/real/derived/coupa_dept_code_mapping_from_ukg.csv` and copied into both Projects.
 Codes 1, 11, 23 and 56 resolve to UKG departments that are not ledger departments, and the
-file says so. Serif has not confirmed the mapping.
+file says so. Unity has not confirmed the mapping.
 
 **Percent variance follows the variance's sign** in the new tables: it is divided by the
 size of the base, so a negative-base account no longer shows the opposite sign to its
@@ -1845,7 +1867,7 @@ The flux pack as a table, alongside the findings queue rather than instead of it
 decision". A flux pack answers "explain the period", and an account that did not move is
 part of that answer: a flat line is a statement, and a reviewer who cannot see it cannot
 confirm it. 72 account lines for Aug 2026 across 18 subtotalled sections, drawn from
-Serif's own account hierarchy rather than an imposed one.
+Unity's own account hierarchy rather than an imposed one.
 
 Three comparisons, each its own rail page under Flux pack: **Actual vs. Actual**, the same
 year over year, and **Actual vs. Budget**. Both comparisons ride on every row, so following
@@ -2012,8 +2034,8 @@ Severity tiers replaced by a threshold the reviewer sets.
   applicable, with the reason.
 * Decision log export carries the band, the threshold in force, and department in place
   of severity.
-* Serif's crossing-loop and hairline-curve motif replaces the cropped S, in the page
-  background and in the rail. Use-case name in the rail set in the serif face at a
+* Unity's crossing-loop and hairline-curve motif replaces the cropped one, in the page
+  background and in the rail. Use-case name in the rail set in the display face at a
   readable size, since the two consoles get opened side by side.
 * Focus mode separated to the right of the filter row with an eye icon, so it does not
   read as one more filter.
@@ -2049,8 +2071,8 @@ First working surface rather than a report.
 
 * Application shell: fixed rail, five views, master-detail findings workspace.
 * Decisions persisted per run, with CSV and JSON export and a sign-off block.
-* Adopted `serif-design-system`: Serif's own tokens, the wordmark, the cropped hairline
-  S, open-licensed Figtree and PT Serif at the specified size-adjust. Nothing uppercase,
+* Adopted `client-design-system`: Unity's own tokens, the wordmark, the cropped hairline
+  motif, open-licensed fonts at the specified size-adjust. Nothing uppercase,
   no borders or shadows on cards, pills for actions, one vivid accent.
 
 ---
@@ -2068,7 +2090,7 @@ these add 10.
   average over $5,000, and a current month nil or under a quarter of it. Only for
   suppliers with no Coupa line this period, and never for one the receipt method already
   accrues. Proposes the average less what was billed. Confidence drops where the average
-  rests on one invoice. Aug 2026: Mirai Bio, Altasciences, Miltenyi.
+  rests on one invoice. Aug 2026: a partnered-research vendor, Altasciences, Miltenyi.
 * **`F7.REVENUE_IN_EXPENSE`**, a customer document (invoice, credit memo, cash sale)
   posted to an expense account, proposing a reclass to 4001003 Revenue - Cost
   Reimbursement. Aug 2026: the credit that turned 6201000 General Consulting negative.
@@ -2166,5 +2188,5 @@ version, pending a decision on where the use-case boundary sits.
 ## Not yet ratified
 
 No rule in either engine has been signed off by an accountant. Every threshold comes
-from Serif's DRAFT, unapproved policies, and every finding says so. A ruleset bump will
+from Unity's DRAFT, unapproved policies, and every finding says so. A ruleset bump will
 invalidate any sign-off obtained before it, see `../questions for chris.txt`.

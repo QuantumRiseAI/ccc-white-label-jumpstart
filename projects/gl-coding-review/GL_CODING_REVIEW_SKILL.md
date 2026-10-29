@@ -1,7 +1,7 @@
 # GL Coding Review: Reference
 
 Pairs with [`PROJECT_INSTRUCTIONS.md`](PROJECT_INSTRUCTIONS.md). What each check tests, how an
-entry is shaped, and how to read Serif's lines. The scripts apply all of it; use this file to
+entry is shaped, and how to read Unity's lines. The scripts apply all of it; use this file to
 explain a result, not to reproduce one.
 
 ## What Each Check Tests
@@ -64,7 +64,7 @@ account it debits. The build leaves one out (Drafts Left Out) when it takes off 
 card moves, names no line of the month, or moves a department, Project or Program.
 
 The threshold that decides what needs a look is the reviewer's, in dollars, one per screen:
-CapEx $5,000 (Serif's capitalization threshold), Prepaid $25,000 (Serif's prepaid threshold),
+CapEx $5,000 (Unity's capitalization threshold), Prepaid $25,000 (Unity's prepaid threshold),
 and $2,500 for the account recodes on Organization & Account and drafted entries. Department flags
 have none: every line off Non-Specific is recoded, whatever its size. Both screens list from
 $2,500, so a lower threshold shows more: a capital bill under $5,000, or a prepaid under
@@ -133,10 +133,10 @@ Capital in Process or a fixed asset account. Every capital recommendation says w
 | `6815000` Office Non-Cap Equipment/Furniture, anything else | None in the chart. The entry holds it in `1505000 Capital in Process`; ask the Controller which account to use |
 
 Aug 2026: Red Thread Spaces, "Office Desk Expansion (Phase 2)", goes to Capital in Process as
-build-out work, as Serif moved Phase 1 there on 31 Jul 2026. Ask when employees began, or
+build-out work, as Unity moved Phase 1 there on 31 Jul 2026. Ask when employees began, or
 will begin, using the space.
 
-## Reading Serif's Lines
+## Reading Unity's Lines
 
 * The line **description** says what was bought. The memo is filled on about 6% of P&L lines.
   A line with no description is where the invoice has to be read.
@@ -151,7 +151,7 @@ will begin, using the space.
   computers and software in service, `1510000 Lab Equipment - New` lab equipment. Reagents on a
   Facilities account, cloud services on one, cleaning supplies on a software account, or a
   centrifuge on a software or computer account cannot fit. Lab instrument software on `6816000`
-  rather than `6416000` can: either is defensible, and that is Serif's choice.
+  rather than `6416000` can: either is defensible, and that is Unity's choice.
 * **Repairs and maintenance** raise a capital question: a repair is expense, a replacement
   unit or a new instrument may be an asset. A service contract on the account is a prepaid
   question once it reaches $25,000.
@@ -166,7 +166,7 @@ Print this after the month, the tie's result and any missing Coupa columns (the 
 
 ```
 GL CODING REVIEW, DATA LOAD
-Period: [Mon YYYY] | Entity: FL87 Serif Biomedicines, Inc.
+Period: [Mon YYYY] | Entity: PL87 Unity Biomedicines, Inc.
 LOADED:    [file]  [N] lines   (one row per file)
 TIE-OUT:   Dr [X] / Cr [Y] / net [Z]   [PASS or FAIL]
 NOT RUN:   [check]  needs [feed]        (one row per check)
@@ -190,6 +190,6 @@ A failed tie-out stops the run. Report the difference and produce nothing else.
 
 ## Limits
 
-* Every Serif policy is a draft and unapproved.
-* The vendor coding baseline records what Serif does, not what Serif should do.
+* Every Unity policy is a draft and unapproved.
+* The vendor coding baseline records what Unity does, not what Unity should do.
 * The IRC §174 base is preliminary and needs tax counsel before it reaches a return.
