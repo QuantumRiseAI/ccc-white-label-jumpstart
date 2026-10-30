@@ -13,8 +13,8 @@ file to explain a result, not to reproduce one.
 | `F5.MODEL_TIE` | Forecast vs. Actual | The closed months of the forecast cut after the month closed, against the ledger. A difference is an entry staged in one and not the other. |
 | `F3.ACCRUAL_RECEIPT` | Accrual Proposals | Goods received in Coupa and not invoiced, $5,000 or more per supplier and account |
 | `F6.ACCRUAL_PATTERN` | Accrual Proposals | A vendor that bills every month and billed nothing this month, at its three-month average |
-| `F9.PREPAID` | Prepaids and Capital | Bills for one good or service of $2,500 or more that name a service term, or sit on a term account the vendor does not bill most months. Only those of $25,000 or more (Serif's prepaid threshold, related charges together) get a proposed Journal Entry; the rest stay expense |
-| `F10.CAPITALIZE` | Prepaids and Capital | Bills of $2,500 or more on an account the asset policy names for review, or on repairs and maintenance, that do not name a service term. Each says whether it goes to Capital in Process or its fixed asset account, and why. Only a bill of $5,000 or more (Serif's capitalization threshold, the bill's lines together) gets a proposed Journal Entry; under it, it says it stays expense |
+| `F9.PREPAID` | Prepaids and Capital | Bills for one good or service of $2,500 or more that name a service term, or sit on a term account the vendor does not bill most months. Only those of $25,000 or more (Unity's prepaid threshold, related charges together) get a proposed Journal Entry; the rest stay expense |
+| `F10.CAPITALIZE` | Prepaids and Capital | Bills of $2,500 or more on an account the asset policy names for review, or on repairs and maintenance, that do not name a service term. Each says whether it goes to Capital in Process or its fixed asset account, and why. Only a bill of $5,000 or more (Unity's capitalization threshold, the bill's lines together) gets a proposed Journal Entry; under it, it says it stays expense |
 | `F7.REVENUE_IN_EXPENSE` | Reclassifications | A customer document posted to an expense account |
 | `F8.VENDOR_DROPPED` | Reclassifications | A journal with no vendor where the same account, department and amount carried one before, including prepaid releases |
 
@@ -26,14 +26,14 @@ default, in dollars.
 | Account group | What drives it | In commentary |
 |---|---|---|
 | `6100000` Employee Expenses | Headcount, bonus cycle, benefits | Explain the move from the UKG roster: hires, job and pay changes, and each department's roster salary against its GL (see [`PROJECT_INSTRUCTIONS.md`](PROJECT_INSTRUCTIONS.md), Payroll accounts). The payroll register adds the cutoff accrual and the payroll tax on the bonus. |
-| `6200000` Consulting | `Flagship Labs LLC`, about $9.1M net | Related party. Keep Flagship apart from other consulting. |
+| `6200000` Consulting | `Plurality Labs LLC`, about $9.1M net | Related party. Keep Plurality apart from other consulting. |
 | `6300000` Legal & Professional | `K&L Gates LLP` corporate, IP legal apart | Milestone driven. Check for unbilled legal against `2204000`. |
 | `6400000` Lab Expenses | Fisher Scientific, New England BioLabs, Life Technologies | Explain by vendor and order cycle, not one line. |
 | `6500000` External Research | Sequencing, synthesis, in vivo, in vitro, CMC | Moves in steps with milestones and batches. A drop is often a missing invoice. Check accruals first. |
 | `6600000` Facilities | Rent, CAM, parking | Largely fixed. Explain any move. |
 | `6700000` Travel & Entertainment | Conferences, travel, meals | Follows the conference calendar. |
 | `6800000` Administrative | Office supplies, software, insurance | Many small lines. Comment in aggregate. |
-| `6900000` FSP Operating Charges | Flagship shared-platform allocation | A move means the allocation changed, not Serif's activity. Related party. |
+| `6900000` FSP Operating Charges | Plurality shared-platform allocation | A move means the allocation changed, not Unity's activity. Related party. |
 | `7100000` Depreciation | Fixed asset schedule | Moves only with additions and disposals. Flag any other move. |
 | `7301000` Stock Compensation | Grant schedule | Rarely adjusted. Flag any move. |
 | `8202000` Interest Expense - Cash | Debt schedule | Tie to principal and rate, not operations. |
@@ -139,7 +139,7 @@ A failed tie-out stops the run. Report the difference and produce nothing else.
 
 ## Limits
 
-* Every Serif policy is a draft and unapproved.
+* Every Unity policy is a draft and unapproved.
 * Receipt accruals are pro-rated from the PO line total; the count of PO lines with no
   quantity is in F3.RECEIVED_NOT_INVOICED's note. Billing-pattern accruals are estimates that the budget owner confirms.
 * No Coupa invoice data, so a receipt cannot be matched to a later bill.

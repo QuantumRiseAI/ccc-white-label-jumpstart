@@ -8,7 +8,7 @@ const B = path.resolve(__dirname, '..') + '/';
 const W = Number(process.argv[2]) || 1440;
 (async () => {
   const b = await chromium.launch(); let bad = 0;
-  for (const f of ['consoles/serif-gl-coding-review.html', 'consoles/serif-pl-flux.html']){
+  for (const f of ['consoles/gl-coding-review.html', 'consoles/pl-flux.html']){
     const p = await b.newPage({viewport: {width: W, height: 900}});
     await p.goto('file://' + B + f); await p.waitForTimeout(300);
     const res = await p.evaluate(() => {

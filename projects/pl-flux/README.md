@@ -1,4 +1,4 @@
-# Serif P&L Flux: Claude Project
+# Unity P&L Flux: Claude Project
 
 What this Project carries that the other does not: [`PROJECT_INSTRUCTIONS.md`](PROJECT_INSTRUCTIONS.md),
 [`HOW-TO-RUN.md`](HOW-TO-RUN.md) and the files beside them. The scripts are in `../../src/`, the
@@ -10,7 +10,7 @@ docs both Projects carry in `../shared/`, and the feed templates in `../../templ
 Follow [`claude-projects/README.md`](../../claude-projects/README.md): paste
 `claude-projects/P&L Flux/PROJECT_INSTRUCTIONS.md` into the Project's Instructions field, and drag in
 every file in `claude-projects/P&L Flux/upload/`. The header-only
-templates look empty on purpose: their presence is how the agent reports a feed Serif has not
+templates look empty on purpose: their presence is how the agent reports a feed Unity has not
 sent.
 
 ## Each Month
@@ -21,7 +21,7 @@ Add the month's exports, as the systems write them:
 |---|---|
 | `netsuite_gl_detail_<range>.xls` | NetSuite Custom General Ledger saved search. Together the exports hold the month, the six before it and the same month last year. |
 | `coupa_po_lines_<year>.csv` | Coupa PO line report with all available columns, the months Coupa returns through the month |
-| `serif_rolling_forecast_<vintage>.xlsx` | The workbook FP&A saved after the month closed, and the one whose prior cut is the plan |
+| `rolling_forecast_<vintage>.xlsx` | The workbook FP&A saved after the month closed, and the one whose prior cut is the plan |
 | `ukg_full_roster_hrbp_<date>.csv` | The newest UKG roster |
 | `netsuite_balance_sheet_*.xls` | The Balance Sheet report, monthly columns, for Balance Sheet Flux and the tie-outs |
 | `netsuite_income_statement_by_month_*.xls` | The Income Statement by month, for the tie-outs |
@@ -30,9 +30,9 @@ Then say: *"Run the P&L flux for Sep 2026."*
 
 ## What Comes Out
 
-`serif-pl-flux-<period>-v2.0.0.html`, in the Project or in `out/<period>/pl-flux/`: one
+`pl-flux-<period>-v2.0.0.html`, in the Project or in `out/<period>/pl-flux/`: one
 self-contained file, laid out as the controller's August flux pack. The current version is
-`../../consoles/serif-pl-flux.html`; each earlier one is tagged `console-v<version>` in Git. See
+`../../consoles/pl-flux.html`; each earlier one is tagged `console-v<version>` in Git. See
 [`../../CHANGELOG.md`](../../CHANGELOG.md).
 
 Aug 2026 reference run: 99 findings, 14 proposed Journal Entries, every tie-out passing,

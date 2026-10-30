@@ -1,7 +1,7 @@
 """The export readers find columns by name, so a saved search or report with columns
 added, moved or renamed reads the same, and the GL's Project and Program reach the
 console's lines and both sides of a proposed Journal Entry. Synthetic files only: no
-Serif data.
+client data.
 
     python3 tests/test_readers.py
 """
@@ -12,8 +12,8 @@ import zipfile
 from xml.sax.saxutils import escape
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-import serif_sources as S  # noqa: E402
-import serif_views as V  # noqa: E402
+import client_sources as S  # noqa: E402
+import client_views as V  # noqa: E402
 
 FAILED = []
 
@@ -24,7 +24,7 @@ def ok(cond, label):
         FAILED.append(label)
 
 
-TITLE = [["Flagship Labs"], ["Custom General Ledger"], ["From Jan 2026 to Sep 2026"], [""]]
+TITLE = [["Plurality Labs"], ["Custom General Ledger"], ["From Jan 2026 to Sep 2026"], [""]]
 AUG = ["Account", "Type", "Date", "Document Number", "Name", "Debit", "Credit", "Balance",
        "Account: Name", "Accounting Period: Name", "Department: Name", "Program: Name",
        "ProjectID: Name", "ProjectID: Name", "Subsidiary: Name", "Description", "Memo"]
@@ -93,10 +93,10 @@ with tempfile.TemporaryDirectory() as d:
     rows = TITLE + [AUG,
         [ACCT, "Bill", "2026-08-12T00:00:00.000", "B-1", "Fisher Scientific", "100.50", "", "",
          "Lab Supplies/Consumables", "Aug 2026", "Production", "00 Non-Specific", "", "Internal CMC",
-         "FL87 Serif Biomedicines, Inc.", "Pipettes", "Aug order"],
+         "PL87 Unity Biomedicines, Inc.", "Pipettes", "Aug order"],
         [AP, "Bill", "2026-08-12T00:00:00.000", "B-1", "Fisher Scientific", "", "100.50", "",
          "Accounts Payable", "Aug 2026", "Non-Specific", "00 Non-Specific", "00 Non-Specific",
-         "00 Non-Specific", "FL87 Serif Biomedicines, Inc.", "", ""]]
+         "00 Non-Specific", "PL87 Unity Biomedicines, Inc.", "", ""]]
     aug = os.path.join(d, "netsuite_gl_aug.xls")
     open(aug, "w").write(spreadsheetml(rows, skip_cell=(len(TITLE) + 1, 12)))
     lines, files = S.read_gl([aug])
@@ -105,7 +105,7 @@ with tempfile.TemporaryDirectory() as d:
     ok(a[0]["account_code"] == "6410000" and a[0]["amount"] == 100.5, "account and amount")
     ok(a[0]["date"] == "2026-08-12" and a[0]["department"] == "Production", "date and department")
     ok(a[0]["project"] == "Internal CMC", "the project from whichever ProjectID column names one")
-    ok(a[0]["memo"] == "Aug order" and a[0]["subsidiary"].startswith("FL87"),
+    ok(a[0]["memo"] == "Aug order" and a[0]["subsidiary"].startswith("PL87"),
        "a skipped cell (ss:Index) does not shift the columns after it")
 
     print("Income Statement, the connector's query result")
@@ -127,11 +127,11 @@ with tempfile.TemporaryDirectory() as d:
     serial = (S.dt.date(2026, 9, 3) - S.EXCEL_EPOCH).days
     rows = TITLE + [SEP,
         [ACCT, "Bill", serial, "B-2", "VWR International LLC", 250, "", "", "Lab Supplies/Consumables",
-         "Sep 2026", "Platform", "VWR International LLC", "FL87 Serif Biomedicines, Inc.",
+         "Sep 2026", "Platform", "VWR International LLC", "PL87 Unity Biomedicines, Inc.",
          "00 Non-Specific", "Internal CMC", "00 Non-Specific", "Tips", "Sep order",
          "FL087030260-1", "1"],
         [AP, "Bill", serial, "B-2", "VWR International LLC", "", 250, "", "Accounts Payable",
-         "Sep 2026", "Non-Specific", "VWR International LLC", "FL87 Serif Biomedicines, Inc.",
+         "Sep 2026", "Non-Specific", "VWR International LLC", "PL87 Unity Biomedicines, Inc.",
          "00 Non-Specific", "00 Non-Specific", "00 Non-Specific", "", "", "", ""]]
     sep = os.path.join(d, "netsuite_gl_sep.xlsx")
     with zipfile.ZipFile(sep, "w") as z:
@@ -139,7 +139,7 @@ with tempfile.TemporaryDirectory() as d:
             z.writestr(name, body)
     s = S.read_gl([sep])[0]["Sep 2026"]
     ok(len(s) == 2 and s[0]["date"] == "2026-09-03", "an .xlsx reads, its date serials as dates")
-    ok(s[0]["department"] == "Platform" and s[0]["subsidiary"].startswith("FL87"),
+    ok(s[0]["department"] == "Platform" and s[0]["subsidiary"].startswith("PL87"),
        "an added Entity column does not shift Department or Subsidiary")
     ok(s[0]["program"] == "00 Non-Specific" and s[0]["project"] == "Internal CMC",
        "Program and Project found by name")
@@ -151,7 +151,7 @@ with tempfile.TemporaryDirectory() as d:
     conn = os.path.join(d, "netsuite_gl_detail_sep2026.csv")
     head = ("account_number,account_name,type,date,document_number,name,debit,credit,period,department,"
             "program,project,subsidiary,description,memo,internal_id,line_id,coupa_transaction_url,coupa_po_num\n")
-    sub = '"FL87 Serif Biomedicines, Inc."'
+    sub = '"PL87 Unity Biomedicines, Inc."'
     url = "https://" + S.COUPA_HOST + "/invoices/9"
     open(conn, "w").write(head
         + f"2000100,Accounts Payable : Accounts Payable 3rd party,Bill,2026-09-03,B-9,Abcam Inc,,150,Sep 2026,Non-Specific,00 Non-Specific,00 Non-Specific,{sub},,,77,0,{url},\n"
@@ -243,7 +243,7 @@ with tempfile.TemporaryDirectory() as d:
            "transactions": [{"document_number": "B-1", "account_code": "6410000", "amount": 6100.5}],
            "correction": {"entry": "Dr 1505000 Capital in Process / Cr 6410000 Lab Supplies/Consumables"
                                    " / Production for $6,100.50"}, "evidence": {}}
-    # over the $5,000 capitalization threshold, under which no capital entry is proposed (SERIF-142)
+    # over the $5,000 capitalization threshold, under which no capital entry is proposed (CCC-142)
     e2 = V.entries([cap], "Aug 2026", lookup=V.gl_dims(cur))[0]["lines"]
     bs, pl = [l for l in e2 if l["account"] == "1505000"], [l for l in e2 if l["account"] == "6410000"]
     ok(bs and bs[0]["department"] == "Non-Specific" and pl and pl[0]["department"] == "Production",

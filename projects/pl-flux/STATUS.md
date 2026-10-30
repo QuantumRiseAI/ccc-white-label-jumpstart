@@ -2,7 +2,7 @@
 
 ## What Is Deterministic
 
-Computed by `serif_uc2_flux.py`, reproducible run to run:
+Computed by `client_uc2_flux.py`, reproducible run to run:
 
 * **Month-over-month variance** per P&L account, with its departments and largest vendors
   on the finding and the prior year for context. Every move at or above $2,500 is
@@ -17,7 +17,7 @@ Computed by `serif_uc2_flux.py`, reproducible run to run:
 * **Forecast-to-ledger reconciliation** against the cut FP&A saved after the month closed,
   when `--forecast` is passed
 * **Billing-pattern accruals**, the policy's Step B, for suppliers Coupa does not reach
-* **Prepaid candidates** from $2,500, proposed for booking at or over Serif's $25,000 prepaid
+* **Prepaid candidates** from $2,500, proposed for booking at or over Unity's $25,000 prepaid
   threshold, and **capitalization review** of the accounts the asset policy names plus
   repairs and maintenance, from $2,500, proposed for booking at or over the $5,000
   capitalization threshold, each saying whether it goes to Capital in Process or its fixed
@@ -34,9 +34,9 @@ Journal Entries. 71
 in variance review: 39 accounts against the prior month, 32 against plan. Accrual population **$110,105**; open PO commitments
 **$1,369,533** reported as a disclosure and not accrued.
 
-Every input is a system export as the system wrote it, read by `serif_sources.py`.
+Every input is a system export as the system wrote it, read by `client_sources.py`.
 
-`serif_views.py` lays the Adjustments out as schedules, adds plan by department, and
+`client_views.py` lays the Adjustments out as schedules, adds plan by department, and
 writes each proposed correction as a Journal Entry. It reads the same inputs and decides
 nothing.
 
@@ -62,15 +62,15 @@ That split is deliberate. A variance an LLM computes will not reproduce next mon
   register are still pending, so proposals cannot be checked against what is already
   carried.
 * **Payroll cutoff accrual.** Needs the payroll register.
-* **Derived-to-reported tie-out.** Done (SERIF-146): the ledger is tied to the Income
+* **Derived-to-reported tie-out.** Done (UNITY-146): the ledger is tied to the Income
   Statement by month report, account by account, for the month and the month before, before
   the console is built.
 
 ## Accounting Review Still Outstanding
 
-No rule here has been ratified by an accountant. The thresholds come from Serif's own
+No rule here has been ratified by an accountant. The thresholds come from Unity's own
 DRAFT, unapproved policies, except the prepaid ($25,000) and capitalization ($5,000)
-thresholds, which are Serif's, from Mike's write-up of 12 Oct 2026. Two calls in particular
+thresholds, which are Unity's, from Mike's write-up of 12 Oct 2026. Two calls in particular
 deserve a second opinion:
 
 * The commentary rule: **$10,000**, dollars only, against the prior month and plan, one

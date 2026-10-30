@@ -1,6 +1,6 @@
-"""The prepaid and capital screens at Serif's thresholds of 12 Oct 2026 (SERIF-142), and
+"""The prepaid and capital screens at the client's thresholds of 12 Oct 2026 (CCC-142), and
 where a capital purchase goes, Capital in Process or its fixed asset account, and why
-(SERIF-147). Synthetic ledger lines; no exports needed.
+(CCC-147). Synthetic ledger lines; no exports needed.
 
     python3 tests/test_screens.py
 """
@@ -9,8 +9,8 @@ import sys
 
 B = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, os.path.join(B, "src"))
-import serif_uc2_flux as F  # noqa: E402
-import serif_views as V  # noqa: E402
+import client_uc2_flux as F  # noqa: E402
+import client_views as V  # noqa: E402
 
 FAILED = []
 
@@ -68,9 +68,9 @@ p = F.capex_placement("6815000", "Conference room chairs", "2026-08-25")
 ok(p["to"] == "1505000" and p["kind"] == "no_account" and "Controller" in p["ask"] and "no fixed asset account for office furniture" in p["why"],
    "office furniture in service: the chart has no account for it, so the entry holds it in Capital in Process and asks")
 ok("2026-08-25" in p.get("basis", ""), "office furniture's placement keeps its in-service basis, for the P&L Flux, which has no Placed in service field")
-chart = open(os.path.join(B, "projects", "shared", "serif-accounts-and-departments.md"), encoding="utf-8").read()
+chart = open(os.path.join(B, "projects", "shared", "client-accounts-and-departments.md"), encoding="utf-8").read()
 targets = {F.CAPITAL_IN_PROCESS} | {a for a in F.CAPEX_REVIEW.values() if a} | {("1530000", "Computers & Software")}
-ok(all("%s - %s" % t in chart for t in targets), "every target is an account in Serif's chart, by its name")
+ok(all("%s - %s" % t in chart for t in targets), "every target is an account in the client's chart, by its name")
 
 print("capital findings")
 fs = F.capex_findings([bill("Red Thread Spaces LLC", "6815000", 38_590.70, "Office Desk Expansion (Phase 2)", doc="18171"),
@@ -124,15 +124,15 @@ ok(len(F.prepaid_findings([sub], {}, LEAVES, "Aug 2026", [0])) == 1
 
 # a capital bill with lines in two departments: the entry takes each department's lines off it, and
 # the finding names each line, so the console makes a card per department and no other
-split2 = F.capex_findings([bill("Flagship Labs LLC", "6815000", 2_000, "Non-Capital Equipment", doc="INV1", dept="General G&A"),
-                           bill("Flagship Labs LLC", "6815000", 3_280.67, "Non-Capital Equipment", doc="INV1", dept="Finance")], LEAVES, "Aug 2026", [0])
+split2 = F.capex_findings([bill("Plurality Labs LLC", "6815000", 2_000, "Non-Capital Equipment", doc="INV1", dept="General G&A"),
+                           bill("Plurality Labs LLC", "6815000", 3_280.67, "Non-Capital Equipment", doc="INV1", dept="Finance")], LEAVES, "Aug 2026", [0])
 e2 = V.entries(split2, "Aug 2026")
 rev = sorted((l["department"], l["credit"]) for l in (e2[0]["lines"] if e2 else []) if l.get("reverses_line"))
 ok(len(e2) == 1 and rev == [("Finance", 3280.67), ("General G&A", 2000.0)]
    and abs(sum(l["debit"] for l in e2[0]["lines"]) - sum(l["credit"] for l in e2[0]["lines"])) < 0.01,
    "a capital bill split across departments is taken off each department, and the entry balances")
-neg = F.capex_findings([bill("Flagship Labs LLC", "6815000", 8_000, "Non-Capital Equipment", doc="INV2", dept="General G&A"),
-                        bill("Flagship Labs LLC", "6815000", -1_000, "Non-Capital Equipment", doc="INV2", dept="Finance")], LEAVES, "Aug 2026", [0])
+neg = F.capex_findings([bill("Plurality Labs LLC", "6815000", 8_000, "Non-Capital Equipment", doc="INV2", dept="General G&A"),
+                        bill("Plurality Labs LLC", "6815000", -1_000, "Non-Capital Equipment", doc="INV2", dept="Finance")], LEAVES, "Aug 2026", [0])
 en = V.entries(neg, "Aug 2026")
 ok(len(en) == 1 and abs(sum(l["debit"] for l in en[0]["lines"]) - sum(l["credit"] for l in en[0]["lines"])) < 0.01
    and any(l["department"] == "Finance" and l["debit"] == 1000.0 and l.get("reverses_line") for l in en[0]["lines"]),

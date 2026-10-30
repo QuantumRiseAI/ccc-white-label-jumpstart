@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Slice Serif's Coupa PO line export into per-period CSVs with parsed coding segments.
+"""Slice the client's Coupa PO line export into per-period CSVs with parsed coding segments.
 
 The raw export is one wide CSV (103 columns, 9,571 lines for calendar 2026). Most columns
 are empty or irrelevant, two are actively misleading, and the GL coding lives packed inside

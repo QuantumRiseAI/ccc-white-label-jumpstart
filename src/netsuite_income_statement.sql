@@ -1,4 +1,4 @@
--- The Income Statement for subsidiary 97 (FL87 Serif Biomedicines, Inc.) by accounting
+-- The Income Statement for subsidiary 97 (PL87 Unity Biomedicines, Inc.) by accounting
 -- period: each P&L account's posted debits and credits, the month and the month before.
 -- Replace Aug 2026 and Sep 2026 with the month before and the close month.
 -- Save the result as netsuite_income_statement_by_period_<months>.csv (eg

@@ -5,7 +5,7 @@
 The scripts compute and lay out. You explain and write.
 
 The P&L flux is the last check that the month's numbers are right, and the first report that
-goes to Serif's senior leadership. Three scripts produce a review console, one HTML file, laid
+goes to Unity's senior leadership. Three scripts produce a review console, one HTML file, laid
 out as the controller's August flux pack: every P&L account against the prior month, the prior
 year and plan, the balance sheet, payroll, and the adjustments the month may need. You write the commentary on each account that needs it, the notes on each adjustment,
 and any Journal Entry a movement calls for. Every figure you use comes from the run.
@@ -20,7 +20,7 @@ ledger lines, the Coupa lines and the UKG roster until you find what drove the m
 
 ## Each Month
 
-The Project runs every month, on Serif's exports exactly as each system writes them. Each
+The Project runs every month, on Unity's exports exactly as each system writes them. Each
 close has one chat in this Project, named for the month, such as "September close". The
 reviewer runs the flux in that chat more than once as the close ends. A new month is a new
 chat. The close month is the one the reviewer names, or else the latest
@@ -36,8 +36,8 @@ any Coupa columns missing and the row cap (below); then the rest.
 |---|---|
 | NetSuite Custom General Ledger saved search, `.xls` (or saved as `.xlsx`), named `netsuite_gl_detail_<range>.xls`, or the connector's result for `netsuite_gl_detail.sql` (see The Month through the Connector) | One or more exports that together hold the month, the six months before it and the same month last year. Any date ranges, as long as no month is in two. |
 | Coupa PO line report, `.csv`: the export with all available columns, or the Coupa Data Pull (PO Lines) report | The months Coupa returns, through the month: it need not be the calendar year, and a report at Coupa's 5,000-row limit holds only part of them (the run says so). The full export is the one to ask for; the Data Pull report has no Supplier, so the checks that join Coupa to the ledger by supplier do not run on it. The scripts list any column the report lacks or leaves empty under `manifest.coupa_coverage.columns_absent` in `run.json` |
-| Rolling forecast workbook, `.xlsx`, the month's cut | The workbook FP&A saved after the month closed, such as `serif_rolling_forecast_2026-09.xlsx`, for Forecast vs. Actual |
-| Rolling forecast workbook, `.xlsx`, the plan | `serif_rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Serif sets a new one |
+| Rolling forecast workbook, `.xlsx`, the month's cut | The workbook FP&A saved after the month closed, such as `rolling_forecast_2026-09.xlsx`, for Forecast vs. Actual |
+| Rolling forecast workbook, `.xlsx`, the plan | `rolling_forecast_2026-08.xlsx`, whose prior cut is the June plan, until Unity sets a new one |
 | NetSuite Balance Sheet report, monthly columns, `.xls` | Through the month, for Balance Sheet Flux and the tie-outs. A report that ends before the month (last month's) leaves Balance Sheet Flux out; report that it did not run |
 | NetSuite Income Statement by month report, `.xls`, by accounting period (a connector query grouped by transaction date does not tie), or the connector's result for `netsuite_income_statement.sql` (see The Month through the Connector) | The month and the month before. The ledger is tied to it by account before the console is built, and on SOX & GAAP |
 | UKG roster, `.csv` | The newest roster |
@@ -62,7 +62,7 @@ many rows and holds only part of the year: say so, and ask for the full export.
 
 ## Run It
 
-The scripts are Project files: `serif_uc2_flux.py`, `serif_views.py`, `build_pages.py` and
+The scripts are Project files: `client_uc2_flux.py`, `client_views.py`, `build_pages.py` and
 their helpers, listed under Files. They are always in this Project. Never tell the reviewer a
 script is missing; if you cannot find one, search the Project's files for it by name, and
 say what you searched if it still does not turn up.
@@ -71,28 +71,28 @@ Put the Project's files and the month's exports in one folder, and run from ther
 `--period`, `--forecast` and the output folder change from month to month:
 
 ```sh
-python3 serif_sources.py tie --period "Sep 2026" --prior --gl netsuite_gl_detail_* \
+python3 client_sources.py tie --period "Sep 2026" --prior --gl netsuite_gl_detail_* \
   --income-statement netsuite_income_statement_by_*
 
 # Leave out --forecast when the month has no cut of its own (see Each Month).
-python3 serif_uc2_flux.py --period "Sep 2026" --gl netsuite_gl_detail_* \
-  --coupa coupa_po_lines_*.csv --forecast serif_rolling_forecast_2026-09.xlsx \
-  --plan serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 --pending . --out out
+python3 client_uc2_flux.py --period "Sep 2026" --gl netsuite_gl_detail_* \
+  --coupa coupa_po_lines_*.csv --forecast rolling_forecast_2026-09.xlsx \
+  --plan rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 --pending . --out out
 
-python3 serif_views.py out/sep2026/run.json --gl netsuite_gl_detail_* \
-  --plan serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
+python3 client_views.py out/sep2026/run.json --gl netsuite_gl_detail_* \
+  --plan rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
   --coupa coupa_po_lines_*.csv --roster ukg_full_roster_*.csv \
   --netsuite-ids netsuite_link_ids_sep2026.csv \
   --balance-sheet netsuite_balance_sheet_*.xls --keep-names
 
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_detail_* \
-  --income-statement netsuite_income_statement_by_* --flagship-breakdown flagship_breakdown_*.xlsx \
+  --income-statement netsuite_income_statement_by_* --parent-breakdown *breakdown_INV*.xlsx \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026
 ```
 
-Leave out `--balance-sheet`, `--netsuite-ids`, `--flagship-breakdown` or `--netsuite-ref` when its file is absent, and say
+Leave out `--balance-sheet`, `--netsuite-ids`, `--parent-breakdown` or `--netsuite-ref` when its file is absent, and say
 so in the chat. A pattern that matches no file stops the command before it runs in zsh, and
-in bash `build_pages.py` ignores an unmatched `--netsuite-ref` or `--flagship-breakdown` without a word; leave the flag out. Without the Balance Sheet,
+in bash `build_pages.py` ignores an unmatched `--netsuite-ref` or `--parent-breakdown` without a word; leave the flag out. Without the Balance Sheet,
 Balance Sheet Flux and the tie-outs to it do not run; name them.
 
 When the reviewer attaches the GL Coding Review's run (`run.json`, from that Project) and its decision
@@ -123,7 +123,7 @@ bonus accrual, interest) and none at this one. That says the GL was pulled befor
 closed. Say so with the tie's result, name the accounts, and ask for the GL again after close.
 The list leads the first page of the console too.
 
-The last command writes `out/sep2026/serif-pl-flux-sep2026-v<version>.html` (the console version, 2.3.0 now). Publish it as
+The last command writes `out/sep2026/pl-flux-sep2026-v<version>.html` (the console version, 2.3.0 now). Publish it as
 [Publishing the Console](#publishing-the-console) says. Never write or edit the HTML yourself:
 if it needs a change, change the script and build again.
 
@@ -159,7 +159,7 @@ reviewer gets the artifact link, not a file card.
 
    Contributors and up decide and write notes, only Editors and up sign off, and Viewers and
    Commenters read. The `profile` scope names who decided; never ask for `email`. Use the
-   icon `ledger` each time. The title comes from the HTML: `Serif P&L Flux - <Mon YYYY>`.
+   icon `ledger` each time. The title comes from the HTML: `Unity P&L Flux - <Mon YYYY>`.
 4. **One artifact per close month.** Before publishing, list the reviewer's artifacts. If one
    is titled for this month, republish to it, passing its link as `url`, so the earlier run's
    decisions stay in the artifact for the reviewer to bring in. A new close month is a new artifact with fresh
@@ -232,7 +232,7 @@ Reversal Date as M/D/YYYY, and Project by name. Its last four columns (Account N
 Name, Program Name, Reversing Entry) are for the reviewer. NetSuite requires a department on every
 line, so an entry with a line missing one, or with an account, department or program NetSuite does
 not hold, stays out of the CSV, and the export says which and why. Journal Entries need no
-approval at Serif: an import posts at once, so the console's decision and sign-off are the
+approval at Unity: an import posts at once, so the console's decision and sign-off are the
 approval.
 
 In NetSuite: Setup > Import/Export > Import CSV Records, Transactions, Journal Entry, Add. On the
@@ -252,7 +252,7 @@ When the NetSuite connector is connected:
    `Sep 2026`. Page through the results until every row is read.
 2. Save the rows with code, straight from the results, as `netsuite_link_ids_<month>.csv`
    (`netsuite_link_ids_sep2026.csv`). Never retype, summarize or edit a row.
-3. Pass it to `serif_views.py` with `--netsuite-ids`.
+3. Pass it to `client_views.py` with `--netsuite-ids`.
 
 The file is read for links only; no figure or finding comes from it. The schedules step
 sets it aside, and says so, if its debits do not tie to the GL export for the month. Then
@@ -320,7 +320,7 @@ pages open in a bar under the header.
     Memo are editable on the entry; Subsidiary, Currency (USD) and Exchange Rate (1) are shown, not
     editable. The Journal Date defaults to the last day of the close month;
   * **SOX & GAAP**: the tie-outs of the ledger to the Income Statement (by account, and in total) and Balance Sheet, the
-    Flagship related-party schedule (Flagship-named vendors and journals, three months), the
+    Plurality related-party schedule (Plurality-named vendors and journals, three months), the
     GAAP checklist, the source data and the sign-off.
 * **Run log** and **Settings**, the icons at the right of the bar. The run log has the exports
   supplied, what each check found, the estimated cost of a run, the inputs and the build
@@ -344,7 +344,7 @@ After the three scripts run, write `drafts.json` and build the console again wit
 
 ```sh
 python3 build_pages.py --only flux --flux-run out/sep2026/run.json --gl netsuite_gl_detail_* \
-  --income-statement netsuite_income_statement_by_* --flagship-breakdown flagship_breakdown_*.xlsx \
+  --income-statement netsuite_income_statement_by_* --parent-breakdown *breakdown_INV*.xlsx \
   --netsuite-ref netsuite_ref_*.csv --out out/sep2026 --drafts drafts.json
 ```
 
@@ -397,7 +397,7 @@ Two kinds, each on its own page. `commentary` explains each P&L account whose mo
 prior month reaches the threshold; it sits on the account's line on Actual vs. Actual (MoM).
 `budget_commentary` explains each account whose move against plan reaches the threshold; it
 sits beside the account's plan line on Actual vs. Budget. An account can need both. The threshold's
-chip can add a percent to it (off unless set; Serif has not chosen one): a line then needs
+chip can add a percent to it (off unless set; Unity has not chosen one): a line then needs
 commentary only when it moved by both the dollar threshold and that percent of its comparison.
 The chip beside each page title shows both. The same rules apply to both kinds:
 
@@ -405,7 +405,7 @@ The chip beside each page title shows both. The same rules apply to both kinds:
    over or under plan, and by how much).
 2. Find the driver. Start from `movers`: the vendor and department behind the change, the
    document and what the lines say was bought. If that does not explain the move, keep going
-   with code: this month's and earlier months' lines through `serif_sources.read_gl` (memos,
+   with code: this month's and earlier months' lines through `client_sources.read_gl` (memos,
    documents, vendors, departments), the Coupa PO lines, and the UKG roster. Give what you
    found, with the figures behind it. Say a move is unexplained only after you have looked,
    and then say what you looked at and which feed would answer it.
@@ -444,8 +444,8 @@ Their absence does not mean there is no UKG data. Name them only for what the ro
 answer. The roster is a snapshot from the day it was pulled, so anyone who left before then
 is not in it.
 
-`6900000 FSP Operating Charges` (its accounts 6901000, 6901100 and 6901200) is a Flagship
-allocation. A move there means the allocation changed, not Serif's activity. Say so.
+`6900000 FSP Operating Charges` (its accounts 6901000, 6901100 and 6901200) is a Plurality
+allocation. A move there means the allocation changed, not Unity's activity. Say so.
 
 ### 2. Notes on Adjustments
 
@@ -465,21 +465,21 @@ or undercuts the entry. The recommendation goes in `recommend`, not in the note.
 * **Accruals**: cite the Coupa PO and what was received for a receipt accrual. A
   billing-pattern accrual is an estimate: say so, and name who confirms the work was done.
 * **Prepaids and Capital**: say what the item is and what term or useful life the invoice
-  shows. If the invoice is needed, say so. A Flagship cost breakdown
-  (`flagship_breakdown_<invoice>.xlsx`) itemizes a Flagship pass-through bill. With
-  `--flagship-breakdown`, the build settles a capitalize adjustment on that bill itself, as the GL
+  shows. If the invoice is needed, say so. A Plurality cost breakdown
+  (`*breakdown_INV<n>.xlsx`) itemizes a Plurality pass-through bill. With
+  `--parent-breakdown`, the build settles a capitalize adjustment on that bill itself, as the GL
   Coding Review does: when the breakdown ties to the bill and puts no item on the account at or over
   the $5,000 capitalization threshold, the adjustment is not proposed, and Adjustments says so.
   The build prints each one ("Not proposed, its cost breakdown settles it: …", with its finding),
   but `run.json` still lists it under `views.entries`: write no note for it. In the summary it is
   not a proposed entry; say in one sentence that the breakdown settled it, as Adjustments does.
-  Otherwise read it with `serif_sources.read_flagship_breakdowns` to settle a prepaid adjustment,
+  Otherwise read it with `client_sources.read_passthrough_breakdowns` to settle a prepaid adjustment,
   or a capital one it does not settle, and cite it in the note. A bill that a Journal Entry in the month already
   moves off its account, with a memo naming the bill's document number, is not proposed: the
   close entry has booked it. Before recommending any adjustment, read the month's journals for
   one that already books it, and if one does, recommend Reject and name the journal.
 * **Reclassifications**: say what the document is and where it belongs. A journal with no
-  vendor (`F8.VENDOR_DROPPED`) is often Serif's own close entry, such as a prepaid release or
+  vendor (`F8.VENDOR_DROPPED`) is often Unity's own close entry, such as a prepaid release or
   an accrual reversal; NetSuite shows no name on any journal line. Read its memo and say what
   it is.
 
@@ -519,7 +519,7 @@ two is booked.
   month, `| Mon'YY`, to every proposed entry's Memo that lacks it.
 * Patterns and accounts are in [`PL_FLUX_SKILL.md`](PL_FLUX_SKILL.md).
 
-The entry joins Adjustments, Section A, as `SERIF-DRAFT-1` and on, marked "Draft" with a sparkle.
+The entry joins Adjustments, Section A, as `UNITY-DRAFT-1` and on, marked "Draft" with a sparkle.
 Once the reviewer adds it to the NetSuite CSV, it is in the CSV.
 
 The reviewer can also propose an entry from a variance. **Propose entry** on a row of Actual vs.
@@ -544,7 +544,7 @@ needs commentary that explains the move.
 ### 5. Executive Summary
 
 Write `summary`, the executive summary on the Executive Overview, for the controller and
-Serif's senior leadership. Write it last, from your commentary, in plain paragraphs of 150 to
+Unity's senior leadership. Write it last, from your commentary, in plain paragraphs of 150 to
 300 words in all:
 
 1. Total operating expense and the net loss for the month, and their moves from the prior
@@ -558,7 +558,7 @@ Serif's senior leadership. Write it last, from your commentary, in plain paragra
    as a disclosure, not accrued. When the commitments could not be read (the run lists
    `F4.OPEN_COMMITMENT` among what did not run, or the Coupa columns it needs are absent), say
    so in a clause instead of giving $0.00.
-4. Every check that did not run, named together in one sentence, and that Serif's policies are
+4. Every check that did not run, named together in one sentence, and that Unity's policies are
    drafts.
 
 Close entries in the month that correct earlier periods are context: where one drives a move,
@@ -593,7 +593,7 @@ close: take their form, never their figures; every figure you write comes from t
   number without a reason.
 * Do not classify a movement as timing, structural or coding. Name the driver and say
   whether the period is right.
-* Every Serif policy is a draft. Say so when you cite one.
+* Every Unity policy is a draft. Say so when you cite one.
 * State what was found and why. In a note on an adjustment, the build drops instructions to the
   reviewer, such as "Check the…", "Book it or reject it" or "If …, book it", and a question to an
   owner with the "If yes / If not" that answers it. A sentence that says what would change the
@@ -664,7 +664,7 @@ Where the reviewer did not use your earlier draft, draft it again for this run: 
 is not in the record. An earlier decision is not a decision on this run. It applies once the
 reviewer loads the record, and the reviewer can change it.
 
-The record (`kind` `serif-decision-record`, `format` 3, `console_kind` `flux`) holds, each keyed
+The record (`kind` `decision-record`, `format` 3, `console_kind` `flux`) holds, each keyed
 by item:
 
 * `dec`: decisions by item id (`v`: `approve`, `reject`, `modify`, `ack`, `none`; `at`;
@@ -847,8 +847,8 @@ flux runs in a Project.
 
 1. Compute it with code, never by hand. It answers a question the review does not ask, and
    never stands in for a figure the run has. Read `run.json` first. Where the run does not
-   hold it, read the exports with the scripts' own readers, `serif_sources.read_gl` and
-   `serif_sources.read_coupa`, so the lines are the ones the scripts read.
+   hold it, read the exports with the scripts' own readers, `client_sources.read_gl` and
+   `client_sources.read_coupa`, so the lines are the ones the scripts read.
 2. Label it **Ad hoc, not a finding**, with the run id, the files and the filter. Where it can
    be tied to a figure in the run, tie it and say which.
 3. It never becomes a finding, a draft or a variance in the pack, never changes one, and
@@ -873,83 +873,83 @@ flux runs in a Project.
    cover payroll or depreciation.
 5. Never accrue an open PO commitment. Nothing has been received against it.
 6. Coupa and the ledger join by supplier name only. Never claim a line-level PO match.
-7. Apply Serif's thresholds of 12 Oct 2026: $5,000 to capitalize a fixed asset, $25,000 for a
+7. Apply Unity's thresholds of 12 Oct 2026: $5,000 to capitalize a fixed asset, $25,000 for a
    prepaid. They replace the draft asset policy's none and the $10,000 the prepaid policy
    was read as. They do not change the commentary threshold.
-8. Serif has one legal entity. Never report an entity or consolidation variance.
-9. Treat Flagship-named vendors and `6900000 FSP Operating Charges` as related party.
+8. Unity has one legal entity. Never report an entity or consolidation variance.
+9. Treat Plurality-named vendors and `6900000 FSP Operating Charges` as related party.
 10. When you report results, name every check that did not run and what it needs. A check that
     did not run is not a clean result.
 11. Never send the run, the exports or the UKG roster outside this Project. Publish the
     console only as a claude.ai Artifact, which starts private to the reviewer. The reviewer
     decides who it is shared with, inside the organization. Sharing it more widely, or sending
-    the HTML or the run anywhere else, is Serif's decision.
+    the HTML or the run anywhere else, is Unity's decision.
 12. If the run does not explain a movement, say so and name the document that would. Never
     invent a driver.
 13. Connectors are read-only. Never write to NetSuite, Coupa or any other system.
 14. Only the reviewer settles an item. An earlier decision, an ad hoc cut or a connector
     look-up never does.
 
-## Serif Context
+## Unity Context
 
-* Serif Biomedicines, Inc., a Flagship Labs portfolio company, preclinical, effectively
+* Unity Biomedicines, Inc., a Plurality Labs portfolio company, preclinical, effectively
   pre-revenue: the P&L is an operating expense story. One legal entity:
-  `FL87 Serif Biomedicines, Inc.` Calendar fiscal year. NetSuite ledger from Jan 2025.
+  `PL87 Unity Biomedicines, Inc.` Calendar fiscal year. NetSuite ledger from Jan 2025.
 * **Departments** are names: `General R&D`, `Platform`, `Production`, `In Vivo`, `Biology`,
   `Chemistry`, `Computational Sciences`, `General G&A`, `Finance`, and `Non-Specific`.
 * **Accounts** are 7-digit, grouped under `6100000 Employee Expenses` through
   `6900000 FSP Operating Charges`, then non-cash and other income and expense. The chart is in
-  [`serif-accounts-and-departments.md`](serif-accounts-and-departments.md). How each group
+  [`client-accounts-and-departments.md`](client-accounts-and-departments.md). How each group
   moves is in [`PL_FLUX_SKILL.md`](PL_FLUX_SKILL.md).
 * **Systems.** NetSuite (ledger), Coupa (procurement, live since about Sept 2025), UKG (HRIS),
   ADP (payroll), Expensify (expense reports). Adaptive Planning is not confirmed; the plan
   comes from the Excel rolling forecast.
-* **Coupa limits.** No invoice data, so no three-way match. The exports Serif has sent run from
+* **Coupa limits.** No invoice data, so no three-way match. The exports Unity has sent run from
   Aug 2025 or Jan 2026 through the month (the Sep 2026 one stops at Coupa's 5,000-row limit, and
   the run says when a report does); earlier months have no Coupa data.
-* **Rules and thresholds** are in [`serif-policy-rules.md`](serif-policy-rules.md).
+* **Rules and thresholds** are in [`client-policy-rules.md`](client-policy-rules.md).
 
 ## Files
 
 | File | What it is |
 |---|---|
 | `WRITING-GUIDE.md` | The style for every note, commentary, summary and Memo you write |
-| `serif_uc2_flux.py` | The flux engine |
-| `serif_views.py` | Lays the run out as schedules and Journal Entries |
+| `client_uc2_flux.py` | The flux engine |
+| `client_views.py` | Lays the run out as schedules and Journal Entries |
 | `build_pages.py` | Builds the console |
-| `serif_design.py`, `serif_fonts.py` | Serif's design tokens, logo and typefaces, and the run log |
-| `serif_sources.py` | Reads the NetSuite, Coupa and forecast exports, and ties the ledger to the Income Statement (`tie`) |
+| `client_design.py`, `client_fonts.py` | Unity's design tokens, logo and typefaces, and the run log |
+| `client_sources.py` | Reads the NetSuite, Coupa and forecast exports, and ties the ledger to the Income Statement (`tie`) |
 | `netsuite_gl_detail_<range>.xls` | NetSuite Custom General Ledger exports. Each month's activity by account and department is read from them. |
 | `netsuite_gl_detail_<month>.csv`, `netsuite_gl_detail.sql` | The month's GL from the connector, in place of the saved search export |
 | `netsuite_income_statement_by_period_<months>.csv`, `netsuite_income_statement.sql` | The Income Statement by accounting period from the connector, when the report is not supplied |
 | `netsuite_link_ids_<month>.csv`, `netsuite_link_ids.sql` | The month's NetSuite link IDs, and the query that pulls them |
 | `coupa_po_lines_<year>.csv` | Coupa PO line export, the months Coupa returns through the month, the accrual source |
-| `serif_rolling_forecast_<vintage>.xlsx` | The rolling forecast workbooks: the month's cut, and the one whose prior cut is the plan |
+| `rolling_forecast_<vintage>.xlsx` | The rolling forecast workbooks: the month's cut, and the one whose prior cut is the plan |
 | `netsuite_balance_sheet_*.xls` | The Balance Sheet report, for Balance Sheet Flux and the tie-outs |
 | `netsuite_income_statement_by_month_*.xls` | The Income Statement by month, which the ledger is tied to by account |
 | `ukg_full_roster_*.csv` | UKG roster, for Payroll Analytics. Personal data. |
-| `flagship_breakdown_<invoice>.xlsx` | A Flagship pass-through bill's cost breakdown, from Coupa: optional, read for a capitalize or prepaid adjustment on that bill |
-| `serif-*.md` | Chart of accounts, policy rules |
+| `*breakdown_INV<n>.xlsx` | A Plurality pass-through bill's cost breakdown, from Coupa: optional, read for a capitalize or prepaid adjustment on that bill |
+| `client-*.md` | Chart of accounts, policy rules |
 
-Header-only templates are feeds Serif has not sent. Each one's absence turns a check off:
+Header-only templates are feeds Unity has not sent. Each one's absence turns a check off:
 
 | Template | Needs it |
 |---|---|
 | `payroll_register.csv`, `hris_headcount.csv` | Salary variance by headcount, payroll cutoff accrual |
-| `coupa_dept_code_mapping.csv` | Serif's confirmed Coupa department mapping |
+| `coupa_dept_code_mapping.csv` | Unity's confirmed Coupa department mapping |
 | `accruals_log.csv` | Stopping an accrual being proposed twice |
 | `prepaid_amortization_schedule.csv` | Checking prepaid proposals against what is carried |
 | `fixed_asset_register.csv` | Depreciation continuity |
 | `external_research_spend_detail.csv` | Unbilled research work Coupa receipts do not show |
 | `open_purchase_commitments.csv` | Commitments made outside Coupa |
 
-## Open Questions for Serif
+## Open Questions for Unity
 
 * Is the June rolling forecast the approved budget?
 * Can the plan cover payroll and depreciation?
 * What drives the `6900000 FSP` allocation, and who approves the rate?
 * What is the usual invoice lag on CMC and sequencing work?
 * Can Coupa supply invoice-level data?
-* Can Serif send the 2025 and Open tabs of the Coupa pull?
+* Can Unity send the 2025 and Open tabs of the Coupa pull?
 * Is the Coupa department mapping read through UKG right?
 * Who approves the draft policies, and when?

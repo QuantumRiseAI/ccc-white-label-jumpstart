@@ -1,26 +1,26 @@
-"""Build the Serif AI Jumpstarts deployment brief: two printed pages for Scott.
+"""Build the Unity AI Jumpstarts deployment brief: two printed pages for Scott.
 
     python3 tools/roadmap/build_roadmap.py [out.html]
 
-What it says is written here; the layout uses Serif's design system
-(src/serif_design.py and its inlined open fonts). Stdlib only.
+What it says is written here; the layout uses Unity's design system
+(src/client_design.py and its inlined open fonts). Stdlib only.
 """
 import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "src"))
-import serif_design as DS  # noqa: E402
+import client_design as DS  # noqa: E402
 
 DEFAULT_OUT = os.path.join(HERE, "..", "..", "..", "..", "6-deliverables",
-                           "2026-10-09 - Serif AI Jumpstarts - Deployment Brief.html")
+                           "2026-10-09 - Unity AI Jumpstarts - Deployment Brief.html")
 
 BODY = """
 <header>
   <div class="mark">{logo}</div>
   <div>
     <p class="eyebrow">AI Jumpstarts &middot; GL Coding Review and P&amp;L Flux</p>
-    <h1>Deploying the jumpstarts: what it would give Serif</h1>
+    <h1>Deploying the jumpstarts: what it would give Unity</h1>
     <p class="by">For Scott Keys &middot; October 9, 2026 &middot; Draft</p>
   </div>
 </header>
@@ -41,21 +41,21 @@ The same exports always give the same findings. What a chat cannot do:</p>
 </ul>
 
 <h2>What deploying it would mean, and where</h2>
-<p>The same scripts and console as a small web app: Serif's team signs in and the review is
+<p>The same scripts and console as a small web app: Unity's team signs in and the review is
 waiting. Behind it, a database that remembers decisions and follow-ups between closes, a scheduled
-job, read-only connections to NetSuite (and Coupa once Flagship IT's connector exists), and Claude,
+job, read-only connections to NetSuite (and Coupa once Plurality IT's connector exists), and Claude,
 called by the app to draft as it does today. The rules do not change, and people still approve
 every entry.</p>
-<p><b>Our view:</b> host it in Flagship's own cloud (Azure, if that is where Flagship runs), behind
-the sign-in Serif already uses. The console carries ledger detail, names and pay; keeping it inside
-Flagship's environment means no new vendor holds Serif's data and the security review is one
-Flagship already runs. Vercel works too, but only on its Enterprise plan, which is where company
-sign-in and audit logs are, and it adds a vendor. Flagship IT sets the timing: they have to agree to
+<p><b>Our view:</b> host it in Plurality's own cloud (Azure, if that is where Plurality runs), behind
+the sign-in Unity already uses. The console carries ledger detail, names and pay; keeping it inside
+Plurality's environment means no new vendor holds Unity's data and the security review is one
+Plurality already runs. Vercel works too, but only on its Enterprise plan, which is where company
+sign-in and audit logs are, and it adds a vendor. Plurality IT sets the timing: they have to agree to
 host it, and they named separating each portfolio company's data as the blocker for anything hosted.</p>
 
 <h2>Why it would be worth it</h2>
 <ul class="two">
-  <li><b>No monthly uploads.</b> The ledger read from NetSuite through the connector Serif already
+  <li><b>No monthly uploads.</b> The ledger read from NetSuite through the connector Unity already
   has; Coupa once its connector lands.</li>
   <li><b>Follow-ups that last.</b> A permanent ID, owner, status and links to related items, open
   across closes until fixed, closed against the entry that fixed it.</li>
@@ -69,7 +69,7 @@ host it, and they named separating each portfolio company's data as the blocker 
   <li><b>Bills checked against contracts.</b> Key terms per contract, so a bill that does not match
   its SOW is caught.</li>
   <li><b>An audit trail and room to grow.</b> Every change traced to its review and approver; later
-  jumpstarts and other Flagship companies on the same build.</li>
+  jumpstarts and other Plurality companies on the same build.</li>
 </ul>
 
 <h2 class="pb">Cost of ownership</h2>
@@ -82,8 +82,8 @@ host it, and they named separating each portfolio company's data as the blocker 
 <tr class="tot"><td>Running cost</td><td>About $580 a month, $7,000 a year</td><td>About $1,870 a month, $22,500 a year</td></tr>
 <tr><td>One-time</td><td>None</td><td>The build, scoped and estimated separately</td></tr>
 </tbody></table>
-<p class="note">List prices, October 2026, to confirm against Serif's and Flagship's contracts; upkeep at
-$100 an hour; six users, three analyses a close day. Serif's Claude seats stay either way. Vercel's
+<p class="note">List prices, October 2026, to confirm against Unity's and Plurality's contracts; upkeep at
+$100 an hour; six users, three analyses a close day. Unity's Claude seats stay either way. Vercel's
 hosting costs about the same, plus its Enterprise plan, which is priced by negotiation. Upkeep, not
 hosting, is most of the difference, and it needs an owner: maintenance is outside the current SOW.
 Against it sit the hours the deployment saves each close, and the decision to post entries to
@@ -95,14 +95,14 @@ NetSuite, which we would leave read-only until the checked import has run cleanl
 <tbody>
 <tr><td>October close</td><td>Run the Projects on the September close, with our support; agree the
   review thresholds.</td><td>Nothing</td></tr>
-<tr><td>October</td><td>Decide with Flagship IT where it would be hosted, and whether the ledger comes
-  through the NetSuite connector.</td><td>Flagship IT</td></tr>
+<tr><td>October</td><td>Decide with Plurality IT where it would be hosted, and whether the ledger comes
+  through the NetSuite connector.</td><td>Plurality IT</td></tr>
 <tr><td>November close</td><td>Pull the ledger through the connector, read-only, and compare it line
   by line with the saved search export.</td><td>The connector decision</td></tr>
 <tr><td>Once hosting is agreed</td><td>Build the hosted review: shared decisions, follow-ups across
-  closes, the checked NetSuite import.</td><td>Flagship IT; a scope and estimate</td></tr>
+  closes, the checked NetSuite import.</td><td>Plurality IT; a scope and estimate</td></tr>
 <tr><td>After a few closes</td><td>Scheduled runs; Coupa, the payroll register, Expensify and the
-  sub-ledgers; posting approved entries.</td><td>Coupa connector; Serif's sign-off</td></tr>
+  sub-ledgers; posting approved entries.</td><td>Coupa connector; Unity's sign-off</td></tr>
 </tbody></table>
 <p class="note">Each step is scoped and estimated before it starts. Nothing past the October close is
 committed.</p>
@@ -154,7 +154,7 @@ def page():
     body = body.replace("</table>", "</table></div>")
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
-            '<title>Serif AI Jumpstarts Deployment Brief</title><style>' + DS.FONT_CSS + DS.TOKENS + CSS
+            '<title>Unity AI Jumpstarts Deployment Brief</title><style>' + DS.FONT_CSS + DS.TOKENS + CSS
             + '</style></head><body><main class="page">' + body + '</main></body></html>')
 
 

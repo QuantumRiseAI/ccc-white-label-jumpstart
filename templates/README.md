@@ -1,6 +1,6 @@
 # Feed Templates
 
-The `.csv` files here are header-only templates for data Serif has not yet provided, except
+The `.csv` files here are header-only templates for data Unity has not yet provided, except
 `coupa_dept_code_mapping.csv`, which carries the Coupa department codes found so far. The
 headers are the exact column names both agents expect. `tools/package.py` copies each Project
 the templates it reads. To activate a feed, fill the file with real rows and keep the filename
@@ -22,10 +22,10 @@ than reporting nothing.
 * `netsuite_vendor_master.csv`: vendor country, type, related-party flag, default coding
   - Feeds: GL Coding Review entity and department tests
   - Without it: vendor classification falls back to the most-used-coding baseline in each agent's
-    `reference/serif-vendor-coding-baseline.md`, at reduced confidence
+    `reference/client-vendor-coding-baseline.md`, at reduced confidence
 * `budget_fy2026_by_account_dept_month.csv`: forecast by account, department, month
   - **POPULATED 2026-09-18.** 1,990 rows carrying the **June 2026** vintage, extracted from the
-    `EXT$_R&D`, `EXT$_G&A`, `LAB` and `OH` tabs of `../real/serif_rolling_forecast_2026-08.xlsx`
+    `EXT$_R&D`, `EXT$_G&A`, `LAB` and `OH` tabs of `../real/rolling_forecast_2026-08.xlsx`
     by `../../tools/forecast_to_csv.py`
   - Feeds: budget variance in both agents
   - Read `../../../FORECAST-LAYER-FINDINGS.md` before relying on it. Four things matter:
@@ -44,7 +44,7 @@ than reporting nothing.
   - Neither is a feed either engine reads today
   - The August file is what surfaces the $4.47M `Claude Reclass: Labs to CMC` topside
 * `unmapped_forecast_accounts.csv`: the 10 categories that could not be placed
-  - A data ask for Serif, with `gl_account_code` and `gl_account_leaf` left blank to fill in
+  - A data ask for Unity, with `gl_account_code` and `gl_account_leaf` left blank to fill in
   - Carries a `reason` column separating unknown accounts from rows whose department or account is
     blank in the workbook
   - Largest is `FSP Charges – PBU` at $2.7M, a June name the August cut renamed to
@@ -58,27 +58,27 @@ than reporting nothing.
     checks; this template, which asks for salary per person, stays empty.
 * `fixed_asset_register.csv`: existing PP&E, useful lives, accumulated depreciation
   - Feeds: PP&E duplicate detection, depreciation continuity
-  - Serif has live fixed asset accounts (`1510000`, `1530000`, `1590000`), so a register exists
+  - Unity has live fixed asset accounts (`1510000`, `1530000`, `1590000`), so a register exists
 * `prepaid_amortization_schedule.csv`: open prepaids and amortization
   - Feeds: prepaid recode proposals, prepaid rollforward
-  - Serif has four live prepaid accounts (`1305000`, `1310000`, `1315000`, `1320000`)
+  - Unity has four live prepaid accounts (`1305000`, `1310000`, `1315000`, `1320000`)
 * `accruals_log.csv`: posted and proposed accruals with reversal periods
   - Feeds: duplicate-accrual prevention in both agents
-  - Serif has seven live accrual accounts under `2200000`
+  - Unity has seven live accrual accounts under `2200000`
 * `open_purchase_commitments.csv`: goods and services received, not yet invoiced
   - Feeds: accrual identification
   - **Largely superseded 2026-09-16.** Coupa is live and its PO export now supplies this directly:
     see `../real/coupa_po_lines_<period>.csv`, column `received_not_invoiced_value`. Keep this
     template only for non-PO commitments Coupa does not capture.
 * `coupa_dept_code_mapping.csv`: the nine Coupa department codes mapped to GL department names
-  - Feeds: attributing Coupa PO spend to a Serif department in both agents
+  - Feeds: attributing Coupa PO spend to a Unity department in both agents
   - Without it: Coupa comparisons work at account and supplier level only, not by department
-  - Pre-filled with each code's CY2026 line count, spend, and most-used GL accounts so Serif has
+  - Pre-filled with each code's CY2026 line count, spend, and most-used GL accounts so Unity has
     context to answer. Codes are `13`, `73`, `9`, `55`, `40`, `2`, `15`, `23`, `5`.
   - **Do not guess a mapping.** Volume correlation is not conclusive: `13` and `73` both point at
     Platform, and `9` and `55` sit near 50%.
 * `external_research_spend_detail.csv`: sequencing, synthesis, in vivo, and CMC unbilled WIP
-  - Feeds: external research accrual, the largest single accrual risk in Serif's P&L
+  - Feeds: external research accrual, the largest single accrual risk in Unity's P&L
   - Maps to accounts `6501000`, `6501100`, `6502000`, `6502500`, `6504000`
 * `accepted_exceptions.csv`: findings a reviewer has accepted (vendor, account, reason, approver)
   - Feeds: GL Coding Review. A matching department or account finding (T1, T4) is kept, counted and marked excepted with its reason
@@ -101,4 +101,4 @@ accruals_log_aug2026.csv
 Keep the base name and header row exactly as given so the agents still recognize the file.
 
 See [`../docs/DATA-MANIFEST.md`](../docs/DATA-MANIFEST.md) for the full real-versus-pending picture and
-the open questions for Serif.
+the open questions for Unity.

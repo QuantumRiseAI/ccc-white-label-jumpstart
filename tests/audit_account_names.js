@@ -7,7 +7,7 @@ let chromium; try { ({ chromium } = require('playwright')); }
 catch (e) { ({ chromium } = require(process.env.PLAYWRIGHT || '/Users/anniebritton/.npm/_npx/520e866687cefe78/node_modules/playwright')); }
 const path = require('path');
 const B = path.resolve(__dirname, '..') + '/';
-const files = process.argv.slice(2).length ? process.argv.slice(2) : [B + 'consoles/serif-gl-coding-review.html', B + 'consoles/serif-pl-flux.html'];
+const files = process.argv.slice(2).length ? process.argv.slice(2) : [B + 'consoles/gl-coding-review.html', B + 'consoles/pl-flux.html'];
 (async () => {
   const b = await chromium.launch(); let bad = 0;
   for (const f of files){

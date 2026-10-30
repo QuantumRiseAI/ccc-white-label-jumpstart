@@ -4,29 +4,29 @@
 provenance layer, kept in OneDrive.
 
 The operative rules from these documents are synthesized into
-`serif-policy-rules.md`, which *is* uploaded, about 2,000 tokens instead of ~18,000 of
+`client-policy-rules.md`, which *is* uploaded, about 2,000 tokens instead of ~18,000 of
 policy prose per conversation. If a rule is disputed, check it here, then change it in the
 synthesized file and in the engine's `policy.py`.
 
-## `serif-policies/`
+## `client-policies/`
 
-Serif's eight draft accounting policies, as received. All are **DRAFT and unapproved**.
+Unity's eight draft accounting policies, as received. All are **DRAFT and unapproved**.
 
-## `not-serif-documents/`
+## `not-client-documents/`
 
-Two documents that arrived in the Serif policy pack but do not describe Serif. Kept so
+Two documents that arrived in the Unity policy pack but do not describe Unity. Kept so
 the exclusion is auditable rather than invisible.
 
-* `CCC-treasury-policy-NOT-SERIF.docx`: names CrossCountry Consulting as the company,
+* `CCC-treasury-policy-NOT-CLIENT.docx`: names CrossCountry Consulting as the company,
   Investcorp as PE sponsor, Sage Intacct as system of record, ~35 cost centers. This is
   CCC's own treasury policy. Feeding it to an agent would inject another company's
   thresholds.
 * `foreign-currency-memo-INDIA-ENTITY.docx`: a functional currency memo whose only
-  analyzed entity is India. Serif has one US subsidiary and no India entity. Revisit if a
-  foreign entity appears; Serif does post to FX accounts `8231000` and `8232000`.
+  analyzed entity is India. Unity has one US subsidiary and no India entity. Revisit if a
+  foreign entity appears; Unity does post to FX accounts `8231000` and `8232000`.
 
 Their presence suggests the policy pack was assembled from a template set rather than from
-Serif's own documents. Worth raising with CCC.
+Unity's own documents. Worth raising with CCC.
 
 ## `reviewer-feedback/`
 
@@ -67,10 +67,10 @@ only: nothing here is an engine input.
 
 ## `format-examples/`
 
-Another client's dashboard, kept as a reference for layout. Not Serif data: none of its
-figures, vendors or accounts describe Serif.
+Another client's dashboard, kept as a reference for layout. Not Unity data: none of its
+figures, vendors or accounts describe Unity.
 
 * `aura-vendor-coding-dashboard-2026-06-OTHER-CLIENT.html`: a vendor coding review for a
   different company. The period-over-period, budget-coding and reclass tables are the
-  model for the Serif schedules; its charts and summary panels were deliberately not
+  model for the Unity schedules; its charts and summary panels were deliberately not
   carried over.

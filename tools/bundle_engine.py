@@ -28,15 +28,15 @@ for pkg in PKGS:
         sources[name] = (is_pkg, path.read_text(encoding="utf-8"))
 
 header = '''#!/usr/bin/env python3
-"""Serif UC1 — GL Coding Review engine, bundled as a single file.
+"""UC1 — GL Coding Review engine, bundled as a single file.
 
-Generated from the ccc-serif-jumpstarts repo. Do not edit by hand: change the
+Generated from the ccc-jumpstarts repo. Do not edit by hand: change the
 repo and re-bundle, or the two will drift.
 
 Stdlib only. No network. No pip install. Runs anywhere Python 3.10+ runs,
 including inside a Claude Project's code execution sandbox.
 
-    python3 serif_uc1_engine.py --current <gl.csv> [--prior <gl.csv>]
+    python3 client_uc1_engine.py --current <gl.csv> [--prior <gl.csv>]
                                 [--prior-year <gl.csv>] [--coupa <coupa.csv>]
                                 [--pending <dir>] --out <dir>
 
@@ -89,8 +89,8 @@ def main(argv=None):
     from coding_engine.runner import run, write_artifact
 
     parser = argparse.ArgumentParser(
-        prog="serif_uc1_engine",
-        description="Serif UC1 GL coding review — deterministic rules engine.",
+        prog="client_uc1_engine",
+        description="UC1 GL coding review — deterministic rules engine.",
     )
     parser.add_argument("--current", required=True, help="current period GL CSV")
     parser.add_argument("--prior", help="prior month GL CSV")
@@ -125,7 +125,7 @@ def _summarize(result, path):
     tie = m["tie_out"]
     bar = "-" * 72
     print(bar)
-    print(f"SERIF UC1 GL CODING REVIEW - {m['period']}")
+    print(f"UC1 GL CODING REVIEW - {m['period']}")
     print(f"Entity: {m['entity']}")
     print(bar)
     for item in m["inputs"]:
@@ -145,7 +145,7 @@ def _summarize(result, path):
           f"Low {s.get('by_severity', {}).get('low', 0)}")
     print(f"AMOUNT AT RISK  ${s.get('amount_at_risk', 0):,.2f}")
     print(f"\\nWrote {path}")
-    print("Next: python3 serif_views.py " + path + ", then build_pages.py")
+    print("Next: python3 client_views.py " + path + ", then build_pages.py")
 
 
 if __name__ == "__main__":

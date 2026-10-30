@@ -1,6 +1,6 @@
 """Build the GL Coding Review and P&L Flux consoles, version 2.0.0.
 
-Chris's August page set, in Serif's design, from the runs. In a Claude Project,
+Chris's August page set, in Unity's design, from the runs. In a Claude Project,
 from the folder holding the runs and the exports:
 
     python3 build_pages.py --only flux --flux-run out/sep2026/run.json \
@@ -33,14 +33,14 @@ from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-import serif_sources as SS  # noqa: E402
-import serif_design as DS   # noqa: E402
+import client_sources as SS  # noqa: E402
+import client_design as DS   # noqa: E402
 
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 ap = argparse.ArgumentParser(description="Build the GL Coding Review and P&L Flux consoles.")
 ap.add_argument("--only", choices=("coding", "flux"), help="build one console; both by default")
-ap.add_argument("--coding-run", help="the GL Coding Review run.json, after serif_views.py --keep-names")
-ap.add_argument("--flux-run", help="the P&L Flux run.json, after serif_views.py --keep-names --balance-sheet")
+ap.add_argument("--coding-run", help="the GL Coding Review run.json, after client_views.py --keep-names")
+ap.add_argument("--flux-run", help="the P&L Flux run.json, after client_views.py --keep-names --balance-sheet")
 ap.add_argument("--gl", nargs="+", help="the NetSuite Custom General Ledger export(s), as NetSuite writes them")
 ap.add_argument("--income-statement", nargs="+", action="extend", help="the NetSuite Income Statement by month report: the ledger is tied to it by account before the build, and the flux tie-outs")
 ap.add_argument("--allow-tie-differences", action="store_true", help="build although the ledger does not tie to the Income Statement; the differences lead the first page")
@@ -48,8 +48,9 @@ ap.add_argument("--coding-record", help="the GL Coding Review decision record (J
 ap.add_argument("--coding-drafts", help="the GL Coding Review's drafts.json, with --coding-record: Journal Entries Claude drafted there, so a decision on one can be applied")
 ap.add_argument("--drafts", help="Claude's drafts.json for the console being built (with --only)")
 ap.add_argument("--out", help="output folder")
-ap.add_argument("--flagship-breakdown", nargs="+", action="extend", default=[], metavar="XLSX",
-                help="cost breakdowns of Flagship pass-through bills, from Coupa: each bill with one is reviewed item by item")
+ap.add_argument("--parent-breakdown", dest="parent_breakdown", nargs="+", action="extend", default=[],
+                metavar="XLSX", help="cost breakdowns of the parent's pass-through bills, from Coupa: each bill with one is reviewed item by item")
+ap.add_argument("--flagship-breakdown", dest="parent_breakdown", nargs="+", action="extend", help=argparse.SUPPRESS)   # the old flag name, still accepted
 ap.add_argument("--netsuite-ref", nargs="+", default=[], metavar="CSV",
                 help="NetSuite's lists from the connector (netsuite_ref_accounts.csv, netsuite_ref_departments.csv, "
                      "netsuite_ref_programs.csv): the import CSV then carries internal IDs")
@@ -73,7 +74,7 @@ if A.coding_record:
         CODING_REC = json.load(open(A.coding_record, encoding="utf-8"))
     except (OSError, ValueError) as ex:
         sys.exit("--coding-record cannot be read as JSON: %s" % ex)
-    if not isinstance(CODING_REC, dict) or CODING_REC.get("kind") != "serif-decision-record" or CODING_REC.get("console_kind") != "coding" or CODING_REC.get("format") != 3:
+    if not isinstance(CODING_REC, dict) or CODING_REC.get("kind") != "decision-record" or CODING_REC.get("console_kind") != "coding" or CODING_REC.get("format") != 3:
         sys.exit("--coding-record is not a GL Coding Review decision record (format 3).")
     if not all(isinstance(CODING_REC.get(k) or {}, dict) for k in ("dec", "notes", "je", "jh")):
         sys.exit("--coding-record is malformed: dec, notes, je and jh must each be an object.")
@@ -117,7 +118,7 @@ for r in (PLR, GLR):
     for k, v in (r["views"].get("accounts") or {}).items():
         ACC[k] = v.get("name") if isinstance(v, dict) else v
 acct_name = lambda c: ACC.get(c) or ""
-JE_SUBSIDIARY, JE_CURRENCY, JE_RATE = "FL87 Serif Biomedicines, Inc.", "USD", 1   # NetSuite subsidiary 97
+JE_SUBSIDIARY, JE_CURRENCY, JE_RATE = "PL87 Unity Biomedicines, Inc.", "USD", 1   # NetSuite subsidiary 97
 JE_SUBSIDIARY_ID = "97"
 
 
@@ -394,7 +395,7 @@ def drafted_entries(fids_ok=None):
         if not lines or abs(dr - cr) >= 0.005 or not all(l["account"] for l in lines):
             SKIPPED.append("Journal Entry %d (%s): does not balance or has a line with no account" % (i, txt(x.get("memo"))[:60]))
             continue
-        out.append({"entry_id": "SERIF-DRAFT-%d" % i, "finding_id": "draft-%d" % i, "kind": "Draft", "date": txt(x.get("date")),
+        out.append({"entry_id": "UNITY-DRAFT-%d" % i, "finding_id": "draft-%d" % i, "kind": "Draft", "date": txt(x.get("date")),
                     "memo": txt(x.get("memo")), "reverses": txt(x.get("reverses")), "support": txt(x.get("reason")), "lines": lines, "debits": dr, "credits": cr,
                     "fit": x.get("fit") is True})
     return out
@@ -453,7 +454,7 @@ def vendor_po(iid, lines):
                      else (one.pop() if len(one) == 1 else ""))
 
 
-# ---------- Flagship pass-through bills: the breakdown, item by item ----------
+# ---------- Plurality pass-through bills: the breakdown, item by item ----------
 MONTHS = {m.lower(): i for i, m in enumerate(calendar.month_abbr) if m}
 MONTHS.update({m.lower(): i for i, m in enumerate(calendar.month_name) if m})
 MONTHS["sept"] = 9
@@ -486,7 +487,7 @@ T_AND_E = (("parking", "Parking"), ("airfare|flight|hotel|lodging|uber|lyft|taxi
 
 
 def _match_groups(groups, booked):
-    """Each activity (Flagship account) to the booked lines it adds up to: first the lines whose
+    """Each activity (Plurality account) to the booked lines it adds up to: first the lines whose
     account name shares a word with the activity's, then by amount alone; an activity may span
     several lines of one account (departments)."""
     free = list(booked)
@@ -510,7 +511,7 @@ def _match_groups(groups, booked):
     return free
 
 
-CAPEX_THR, PREPAID_THR = 5000.0, 25000.0   # Serif's capitalization and prepaid thresholds (Mike's write-up, 12 Oct 2026)
+CAPEX_THR, PREPAID_THR = 5000.0, 25000.0   # the client's capitalization and prepaid thresholds (the controller's write-up, 12 Oct 2026)
 
 
 def breakdown_settles(rv, account, thr, vendor=None):
@@ -550,14 +551,14 @@ def pt_reviews(thr_capex, thr_prepaid):
     """The month's pass-through bills, their cost breakdowns as supplied, and each bill read
     against its breakdown: (bills, breakdowns, {document: review})."""
     bills = SS.passthrough_bills(by_period, PERIOD)
-    bds = SS.read_flagship_breakdowns(A.flagship_breakdown)
+    bds = SS.read_passthrough_breakdowns(A.parent_breakdown)
     return bills, bds, {b["document"]: dict(review_breakdown(b, bds[b["document"]], thr_capex, thr_prepaid, PERIOD), vendor=b["vendor"])
                         for b in bills if b["document"] in bds}
 
 
 def review_breakdown(bill, bd, thr_capex, thr_prepaid, period):
     """A pass-through bill read against its cost breakdown. -> {ties, groups, items, reclass, notes, why}:
-    the breakdown's total against the bill's, each activity (Flagship account) against the booked
+    the breakdown's total against the bill's, each activity (Plurality account) against the booked
     lines it adds up to, and each item against the capital and prepaid thresholds, its service
     period and the account its kind of cost belongs on. reclass: the lines of the entry that
     moves the items found on the wrong account."""
@@ -591,7 +592,7 @@ def review_breakdown(bill, bd, thr_capex, thr_prepaid, period):
                 for x in same:
                     reclass[(acct, x["department"], to)] += l["amount"] * x["amount"] / tot
                 break                                                   # one account per item
-        items.append(dict(l, serif=acct, flags=flags, future=future, end=end))
+        items.append(dict(l, client_acct=acct, flags=flags, future=future, end=end))
     eq = [i for i in items if "equipment" in (groups[i["acct_no"]]["acct_name"] + " " + " ".join(x.get("account_leaf") or "" for x in groups[i["acct_no"]]["booked"] or [])).lower()]
     if eq and not any(f[0] == "capital" for i in eq for f in i["flags"]):
         notes.append("Non-capital equipment: %s; each is under the %s capital threshold, so expensed is right."
@@ -607,7 +608,7 @@ def review_breakdown(bill, bd, thr_capex, thr_prepaid, period):
     why = ("" if ties else
            "its items add up to %s against its own Total row of %s" % (money(bd["total"], True), money(bd["stated_total"], True)) if stated_off else
            "its total, %s, is not the bill's %s" % (money(bd["total"], True), money(bill["amount"], True)) if not totals_tie else
-           "the totals agree, but %s matches no booked line, so those items are shown without Serif's account"
+           "the totals agree, but %s matches no booked line, so those items are shown without the client's account"
            % "; ".join("%s %s (%s)" % (g["acct_no"], g["acct_name"], money(g["amount"], True)) for g in unmapped))
     lines = []
     for (frm, dept, to), amt in sorted(reclass.items()):
@@ -662,7 +663,7 @@ def ref_memo(ref, memo):
 CSS = DS.FONT_CSS + DS.TOKENS + r"""
 *{box-sizing:border-box}
 body{margin:0;font-family:var(--font-sans);font-size:var(--text-0);line-height:1.35;color:var(--color-fg-primary);
-  background-color:var(--color-bg-primary);-webkit-font-smoothing:antialiased;text-wrap:pretty}
+  background-color:var(--color-bg-primary);-webkit-font-smoothing:antialiased;text-wrap:pretty;font-variant-numeric:tabular-nums}
 button,input,textarea{font:inherit;color:inherit}
 [hidden]{display:none!important}
 a.xl{font-size:var(--text--2);color:var(--color-fg-secondary);text-decoration:underline;text-underline-offset:2px;margin-left:.4em}
@@ -670,7 +671,11 @@ a.xl{font-size:var(--text--2);color:var(--color-fg-secondary);text-decoration:un
   padding-inline:var(--spacing-md-lg);background-color:var(--color-bg-inverse);color:var(--color-fg-inverse);font-size:var(--text--1)}
 .top .brand{display:flex;align-items:center;gap:var(--spacing-xs);padding-right:var(--spacing-sm);margin-right:var(--spacing-3xs);
   border-right:1px solid rgba(255,255,255,.14);flex:none}
-.top .logo{width:52px;height:auto;color:#fff;display:block}
+.top .logo{display:flex;align-items:center;gap:.55em;color:#fff;line-height:1}
+.top .logo .mono-mark{width:28px;height:28px;flex:none;display:block}
+.top .logo .wm{display:flex;flex-direction:column;gap:1px}
+.top .logo .wm b{font-size:15px;font-weight:700;letter-spacing:.01em;color:#fff}
+.top .logo .wm i{font-style:normal;font-size:9.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--color-cyan-light)}
 .top .brand b{font-weight:500;color:#fff;white-space:nowrap}
 .top .brand span{color:var(--color-warm-gray);white-space:nowrap}
 .top nav{display:flex;align-items:center;gap:var(--spacing-xs);flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
@@ -688,7 +693,7 @@ a.xl{font-size:var(--text--2);color:var(--color-fg-secondary);text-decoration:un
 .tb.cur{background-color:var(--color-light-gray);color:var(--color-dark-gray)}
 .tb.cur:hover{background-color:#fff;color:var(--color-dark-gray)}
 .sub{position:absolute;left:0;right:0;top:100%;height:58px;display:flex;align-items:center;gap:var(--spacing-3xs);
-  padding-inline:var(--spacing-md-lg);background-color:#3a3833;border-top:1px solid rgba(255,255,255,.08)}
+  padding-inline:var(--spacing-md-lg);background-color:var(--color-teal-mid);border-top:1px solid rgba(255,255,255,.08)}
 .sub.shut{display:none}
 .top:has(.tg.open){margin-bottom:58px}
 .n{font-size:var(--text--2);background-color:var(--color-red-text);color:#fff;border-radius:var(--radius-pill);padding:.05em .5em;font-variant-numeric:tabular-nums}
@@ -723,13 +728,13 @@ main{max-width:96rem;margin:0 auto;padding:var(--spacing-md) var(--spacing-md-lg
 .hero .k{font-size:var(--text--2);text-transform:uppercase;letter-spacing:.04em;color:var(--color-warm-gray)}
 .hero .v{font-size:var(--text-1);color:#fff;font-variant-numeric:tabular-nums;margin:.15em 0}
 .hero .s{font-size:var(--text--2);color:var(--color-warm-gray)}
-.hero .unf{color:#ff8a66}
+.hero .unf{color:#ffb4a8}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:var(--spacing-xs);margin-bottom:var(--spacing-sm)}
-.tile{background-color:var(--color-stark);border-radius:var(--radius-sm);padding:var(--spacing-sm)}
+.tile{background-color:var(--color-stark);border-radius:var(--radius-sm);padding:var(--spacing-sm);box-shadow:var(--shadow-card)}
 .tile .k{font-size:var(--text--2);text-transform:uppercase;letter-spacing:.04em;color:var(--color-fg-secondary)}
 .tile .v{font-size:var(--text-2);margin:.2em 0 .1em;font-variant-numeric:tabular-nums}
 .tile .s{font-size:var(--text--2);color:var(--color-fg-secondary)}
-.card{background-color:var(--color-stark);border-radius:var(--radius-sm);margin-bottom:var(--spacing-sm);overflow:hidden}
+.card{background-color:var(--color-stark);border-radius:var(--radius-sm);margin-bottom:var(--spacing-sm);overflow:hidden;box-shadow:var(--shadow-card)}
 .card > h3,.card .ch{font-size:var(--text-0);font-weight:600;margin:0;padding:var(--spacing-sm) var(--spacing-sm-md);border-bottom:1px solid var(--color-hairline);
   display:flex;align-items:center;gap:var(--spacing-xs)}
 .card .ch .r{margin-left:auto}
@@ -784,7 +789,7 @@ tr.crit td:first-child,tr.mat td:first-child{padding-left:1.1em}
 .unf{color:var(--color-red-text)}
 .cm{color:var(--color-fg-primary);line-height:1.45;margin-bottom:.35em}
 textarea.c{width:100%;min-height:2.1em;resize:vertical;border:1px solid var(--color-hairline);border-radius:var(--radius-xs);padding:.35em .5em;font-size:var(--text--1);background:none}
-:root{--color-action:#3a4a5e;--color-action-hover:#2c3948;--color-action-tint:#eef1f5}
+:root{--color-action:#0b6e75;--color-action-hover:#095a61;--color-action-tint:#e6f3f4}
 textarea.c:focus,input.f:focus{outline:2px solid var(--color-action);outline-offset:1px}
 input.f{border:1px solid var(--color-hairline);border-radius:var(--radius-xs);padding:.4em .55em;font-size:var(--text--1);background:none}
 .pill{display:inline-flex;align-items:center;gap:.35em;border:1px solid var(--color-dark-gray);border-radius:var(--radius-pill);padding:.4em 1em;
@@ -886,9 +891,9 @@ td .draft.open .dt{display:block}
 @media (min-width:48rem){.item .kv{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .tosign{position:fixed;right:var(--spacing-md);bottom:calc(var(--spacing-md) + env(safe-area-inset-bottom, 0px));z-index:35;display:inline-flex;align-items:center;gap:.5em;
   background-color:var(--color-action);color:#fff;border:0;border-radius:var(--radius-pill);padding:.65em 1.2em;font-size:var(--text--1);font-weight:600;cursor:pointer;
-  box-shadow:0 6px 18px rgba(30,40,55,.28)}
+  box-shadow:0 6px 18px rgba(11,61,71,.28)}
 .tosign:hover{background-color:var(--color-action-hover)}
-.tosign.done{background-color:var(--color-stark);color:var(--color-action);box-shadow:0 0 0 2px var(--color-action),0 6px 18px rgba(30,40,55,.18)}
+.tosign.done{background-color:var(--color-stark);color:var(--color-action);box-shadow:0 0 0 2px var(--color-action),0 6px 18px rgba(11,61,71,.18)}
 @media print{.tosign{display:none}}
 .ptflag{border-left:3px solid var(--color-warm-gray);background-color:var(--color-bg-primary);border-radius:var(--radius-xs);padding:.45em .8em;margin:0 0 .6em;font-size:var(--text--1);line-height:1.45}
 .draft .who{display:inline-flex;align-items:center;gap:.35em}
@@ -913,7 +918,7 @@ td .draft.open .dt{display:block}
 .hero .thc .tl{color:var(--color-warm-gray)}
 .hero .thc .tv{background-color:rgba(255,255,255,.12);color:#fff}
 .hero .thc .tv:hover{background-color:#fff;color:var(--color-dark-gray)}
-.hero .thc.chg{border-color:#ff8a66} .hero .thc .def,.hero .thc .def .lk{color:#ff8a66}
+.hero .thc.chg{border-color:#ffb4a8} .hero .thc .def,.hero .thc .def .lk{color:#ffb4a8}
 
 .fin{border-left:3px solid var(--color-dark-gray);padding:.2em 0 .2em .8em;margin:.3em 0 .5em}
 .fin .ft{white-space:pre-line;line-height:1.5;color:var(--color-fg-primary)}
@@ -966,7 +971,7 @@ details.lines td small{display:block;color:var(--color-fg-secondary)}
 .wf .plot{position:relative;height:14rem}
 .wf .z{position:absolute;left:-.3em;right:-.3em;border-top:1px solid var(--color-mid-gray)}
 .wf .b{position:absolute;left:22%;right:22%;border-radius:2px}
-.wf .b.f{background-color:var(--color-mid-gray)} .wf .b.u{background-color:var(--color-red-text)} .wf .b.t{background-color:var(--color-dark-gray)}
+.wf .b.f{background-color:var(--color-cyan)} .wf .b.u{background-color:var(--color-red-text)} .wf .b.t{background-color:var(--color-teal-deep)}
 .wf .val{position:absolute;left:0;right:0;text-align:center;font-size:var(--text--2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .wf .lab{font-size:var(--text--2);color:var(--color-fg-secondary);text-align:center;margin-top:.5em;line-height:1.25}
 .wflegend{display:flex;gap:var(--spacing-sm);font-size:var(--text--2);color:var(--color-fg-secondary);padding:var(--spacing-xs) var(--spacing-sm-md) var(--spacing-sm)}
@@ -979,7 +984,7 @@ details.lines td small{display:block;color:var(--color-fg-secondary)}
 .signoff{overflow:hidden;border:2px solid var(--color-action)}
 .signoff .sob{display:flex;flex-wrap:wrap;align-items:center;gap:var(--spacing-xs) var(--spacing-sm);background-color:var(--color-action);color:#fff;padding:var(--spacing-sm) var(--spacing-sm-md)}
 .signoff .sob h3{margin:0;font-size:var(--text-1);font-weight:500;color:#fff}
-.signoff .sob p{margin:.2em 0 0;font-size:var(--text--1);color:#d9dfe7}
+.signoff .sob p{margin:.2em 0 0;font-size:var(--text--1);color:#d3eef0}
 .signoff .sobtn{margin-left:auto;display:flex;gap:var(--spacing-2xs);flex-wrap:wrap}
 .signoff .sobtn .pill{border-color:#fff;color:#fff}
 .signoff .sobtn .pill.solid{background-color:#fff;color:var(--color-action)}
@@ -1003,7 +1008,7 @@ details.lines td small{display:block;color:var(--color-fg-secondary)}
 #sharedbar{background-color:var(--color-bg-inverse);color:var(--color-warm-gray);font-size:var(--text--1);padding:.45em var(--spacing-md-lg);border-top:1px solid rgba(255,255,255,.1)}
 #toast{position:fixed;left:50%;bottom:var(--spacing-md);transform:translateX(-50%);z-index:40;background-color:var(--color-bg-inverse);color:#fff;
   font-size:var(--text--1);padding:.7em 1.1em;border-radius:var(--radius-xs);max-width:min(36rem,90vw)}
-#ask{position:fixed;inset:0;z-index:50;background-color:rgba(30,28,24,.45);display:flex;align-items:center;justify-content:center;padding:var(--spacing-md)}
+#ask{position:fixed;inset:0;z-index:50;background-color:rgba(11,46,54,.5);display:flex;align-items:center;justify-content:center;padding:var(--spacing-md)}
 #ask .askbox{background-color:var(--color-stark);border-radius:var(--radius-sm);padding:var(--spacing-sm-md);max-width:34rem;width:100%}
 #ask h3{margin:0 0 .6em;font-weight:600}
 #ask .askbody{font-size:var(--text--1);line-height:1.5;margin-bottom:var(--spacing-sm)}
@@ -1211,14 +1216,14 @@ def shell(title, product, sections, pages, data, js):
             + '<datalist id="depts">' + "".join('<option value="%s">' % e(d) for d in DEPTS) + "</datalist>"
             + '<datalist id="projs">' + "".join('<option value="%s">' % e(d) for d in PROJECTS) + "</datalist>"
             + '<datalist id="progs">' + "".join('<option value="%s">' % e(d) for d in PROGRAMS) + "</datalist>"
-            + "<footer>Serif Biomedicines, Inc. (FL87) &middot; " + e(product) + " &middot; " + e(PERIOD) + "</footer></main><script>window.DATA="
+            + "<footer>PL87 Unity Biomedicines, Inc. &middot; " + e(product) + " &middot; " + e(PERIOD) + "</footer></main><script>window.DATA="
             + json.dumps(dict(data, acct={k: v for k, v in ACC.items() if v}, period=PERIOD, version=VERSION), ensure_ascii=False).replace("</", "<\\/")
             + ";</script><script>" + COMMON_JS + js + "\nShared.start();</script></body></html>")
 
 
 COMMON_JS = r"""
 const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
-const KEY = 'serif-console::' + DATA.kind + '::' + DATA.run;
+const KEY = 'console::' + DATA.kind + '::' + DATA.run;
 /* The review's state. Each of STORES is a map of item to value: decisions,
    commentary and notes, entry edits, the GAAP checklist, sign-off and the audit
    log. The thresholds are this browser's settings: thr, and on the GL Coding Review
@@ -1263,7 +1268,7 @@ const Shared = (function(){
   /* The sign-off has its own root, so the Artifact's access rules can let only
      Editors sign while Contributors decide. */
   const runRoot = (rid, store) => (store === 'sign' ? 'signoff/' + DATA.kind + '-' + PER : HOME) + '/runs/' + rid;
-  const MARK = 'serif-shared::' + runRoot(RID);
+  const MARK = 'shared::' + runRoot(RID);
   const hash = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; return h.toString(16); };
   /* A document id takes letters, digits and _ - . : @ + only; anything else is
      written as ~ and its UTF-8 bytes in hex. The key is kept in the document. */
@@ -1398,7 +1403,7 @@ const Shared = (function(){
   function showCarry(){ $$('[data-carry]').forEach(b => { b.hidden = !(st.on && !st.ro && earlier()); }); }
   async function earlierRecord(){
     const rid = earlier(); if (!rid) return null;
-    const rec = {kind: 'serif-decision-record', console_kind: DATA.kind, run_id: rid, period: DATA.period, saved_at: st.runs[rid].at || ''};
+    const rec = {kind: 'decision-record', console_kind: DATA.kind, run_id: rid, period: DATA.period, saved_at: st.runs[rid].at || ''};
     for (const n of STORES){ const q = await st.db.collection(runRoot(rid, n) + '/' + n).get(); rec[n] = {};
       q.docs.forEach(d => { const b = d.data(); if (b && b.k !== undefined) rec[n][b.k] = b.v; }); }
     return rec;
@@ -1434,7 +1439,7 @@ const blocked = () => { if (Shared.ro()){ toast('Your access lets you view this 
    Items match by id, which is built from what the item is, so it is the same in
    every run. What the page already holds is kept. */
 function recordOf(){
-  const rec = {kind: 'serif-decision-record', format: 3, console: DATA.version, console_kind: DATA.kind,
+  const rec = {kind: 'decision-record', format: 3, console: DATA.version, console_kind: DATA.kind,
                run_id: DATA.run, period: DATA.period, saved_at: new Date().toISOString(), saved_by: Shared.on() ? Shared.name(Shared.uid()) : ''};
   STORES.forEach(n => { rec[n] = S[n]; });
   rec.fixes = fixesOf();
@@ -1454,7 +1459,7 @@ function fixesOf(){
   return out;
 }
 function saveRecord(){
-  download('serif-' + DATA.kind + '-decision-record-' + DATA.slug + '-' + new Date().toISOString().slice(0, 16).replace(/[^0-9]/g, '') + '.json',
+  download(DATA.kind + '-decision-record-' + DATA.slug + '-' + new Date().toISOString().slice(0, 16).replace(/[^0-9]/g, '') + '.json',
            JSON.stringify(recordOf(), null, 1), 'application/json');
 }
 function planRecord(rec){
@@ -1484,7 +1489,7 @@ function applyRecord(rec, title, okLabel){
 function loadRecord(file){
   const rd = new FileReader();
   rd.onload = () => { let rec; try { rec = JSON.parse(rd.result); } catch (e) { toast('That file is not a decision record'); return; }
-    if (!rec || rec.kind !== 'serif-decision-record'){ toast('That file is not a decision record'); return; }
+    if (!rec || rec.kind !== 'decision-record'){ toast('That file is not a decision record'); return; }
     if (rec.console_kind && rec.console_kind !== DATA.kind){ toast('That record is for the other console'); return; }
     if (!rec.console_kind || !rec.dec){ toast('That record is from a console before 2.0.0 and cannot be loaded here'); return; }
     if (rec.period && rec.period !== DATA.period){ toast('That record is for ' + rec.period + ', not ' + DATA.period); return; }
@@ -1913,7 +1918,7 @@ const memoCut = m => m.length > 999 ? m.slice(0, 996).trimEnd() + '...' : m;
 const memoWith = (memo, note) => { if (!note) return memoCut(memo); const k = / \| [A-Z][a-z]{2}'\d\d$/.exec(memo), end = k ? k[0] : '';
   const head = (k ? memo.slice(0, k.index) : memo) + ' | ', room = 999 - head.length - end.length;
   return room > 3 ? head + (note.length > room ? note.slice(0, room - 3).trimEnd() + '...' : note) + end : memoCut(memo + ' | ' + note); };
-/* NetSuite reads an import's dates in the importing user's format, M/D/YYYY at Serif */
+/* NetSuite reads an import's dates in the importing user's format, M/D/YYYY at the client */
 const nsDate = d => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || ''); return m ? +m[2] + '/' + +m[3] + '/' + m[1] : (d || ''); };
 function exportCSV(){
   /* Subsidiary, Account, Department and Program carry NetSuite's internal IDs when its lists were
@@ -1931,7 +1936,7 @@ function exportCSV(){
   const said = [held ? 'Left out: ' + held : '', edited].filter(Boolean).join('. ');
   if (rows.length === 1){ alertBox(said ? said + '.' : 'Approve an entry first: only approved entries go into the import.'); return; }
   if (said) alertBox(said + '.');
-  const name = 'serif-' + DATA.kind + '-netsuite-' + DATA.slug + '.csv';
+  const name = DATA.kind + '-netsuite-' + DATA.slug + '.csv';
   download(name, csv(rows)).then(ok => { if (!ok) return;
     download(name.replace(/\.csv$/, '-support.html'), importSupport(name), 'text/html');
     logAdd({id: 'netsuite-import', label: 'NetSuite import exported', v: plural(Object.keys(DATA.je).filter(jeReady).length, 'entry'), note: ''}); save(); });
@@ -1967,13 +1972,13 @@ function importSupport(csvName){
   const signs = $$('[data-sname]').map(i => { const r = i.dataset.sname, g = S.sign[r], lb = i.closest('.sign').querySelector('b').textContent;
     return '<tr><td>' + esc(lb) + '</td><td>' + (g ? esc(g.name) : '<i>Not signed</i>') + '</td><td>' + esc(g ? g.date : '') + '</td></tr>'; }).join('');
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>NetSuite import support, ' + esc(DATA.period) + '</title><style>'
-    + '@page{margin:14mm}body{font:12.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:#1e1e1c;margin:28px auto;max-width:1100px;padding:0 24px}'
-    + '.co{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b6a63}h1{font-size:22px;font-weight:600;margin:2px 0 6px}.meta{color:#6b6a63;font-size:11.5px;margin-bottom:14px}'
-    + 'h2{font-size:14px;font-weight:600;margin:24px 0 6px;padding-bottom:5px;border-bottom:2px solid #3a4a5e}.m{font-family:ui-monospace,Menlo,monospace}.mut{color:#6b6a63}'
-    + 'dl{display:grid;grid-template-columns:9rem 1fr;gap:3px 12px;margin:6px 0 10px}dt{color:#6b6a63;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}dd{margin:0}'
-    + 'table{border-collapse:collapse;width:100%;font-size:11.5px}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:#6b6a63;text-align:left;border-bottom:1.5px solid #2e2d29;padding:4px 6px}'
-    + 'td{border-bottom:1px solid #e3e3e0;padding:4px 6px;vertical-align:top}.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.sum{background:#eef1f5;border-radius:6px;padding:10px 14px}'
-    + 'section{break-inside:avoid}</style></head><body><div class="co">Serif Biomedicines, Inc.</div>'
+    + '@page{margin:14mm}body{font:12.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:#0f2e36;margin:28px auto;max-width:1100px;padding:0 24px}'
+    + '.co{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#4a5f68}h1{font-size:22px;font-weight:600;margin:2px 0 6px}.meta{color:#4a5f68;font-size:11.5px;margin-bottom:14px}'
+    + 'h2{font-size:14px;font-weight:600;margin:24px 0 6px;padding-bottom:5px;border-bottom:2px solid #0b6e75}.m{font-family:ui-monospace,Menlo,monospace}.mut{color:#4a5f68}'
+    + 'dl{display:grid;grid-template-columns:9rem 1fr;gap:3px 12px;margin:6px 0 10px}dt{color:#4a5f68;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}dd{margin:0}'
+    + 'table{border-collapse:collapse;width:100%;font-size:11.5px}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:#4a5f68;text-align:left;border-bottom:1.5px solid #0f2e36;padding:4px 6px}'
+    + 'td{border-bottom:1px solid #dde5e9;padding:4px 6px;vertical-align:top}.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.sum{background:#e6f3f4;border-radius:6px;padding:10px 14px}'
+    + 'section{break-inside:avoid}</style></head><body><div class="co">Unity Biomedicines, Inc.</div>'
     + '<h1>NetSuite import support: ' + esc(DATA.kind === 'coding' ? 'GL Coding Review' : 'P&L Flux') + ', ' + esc(DATA.period) + '</h1>'
     + '<div class="meta">Supports <span class="m">' + esc(csvName) + '</span> &middot; exported ' + esc(when(new Date().toISOString())) + (Shared.on() ? ' by ' + esc(Shared.name(Shared.uid())) : '')
     + ' &middot; run ' + esc(DATA.run) + '</div>'
@@ -2298,7 +2303,7 @@ def flux():
              tile("Headcount, All Types", str(sum((pay.get("headcount") or {}).get("by_type", {}).values())),
                   " &middot; ".join(e(str(n) + " " + k) for k, n in ((pay.get("headcount") or {}).get("by_type") or {}).items())),
              tile("Cash &amp; Equiv. (" + MON + " BS)", short(cash_now),
-                  " &middot; ".join(e(r["name"].split(" - ", 1)[-1].replace("Serif - ", "")) + ": " + short(r["values"][PERIOD]) for r in banks)) if bs["rows"] else "",
+                  " &middot; ".join(e(r["name"].split(" - ", 1)[-1].replace("Unity - ", "")) + ": " + short(r["values"][PERIOD]) for r in banks)) if bs["rows"] else "",
              tile("Accounts to Review", '<span data-cm></span>', '<span data-cmn></span>')]
     # The executive summary for the controller: Claude's draft, used and edited by the reviewer.
     sd = txt(RAW_DRAFTS.get("summary"))
@@ -2306,8 +2311,8 @@ def flux():
                     + '<textarea class="c" rows="8" data-note="exec:summary" placeholder="Executive summary for the controller"></textarea></div></div>')
     pages.append(page("ov", hero("P&L Flux Analysis, " + PERIOD, "", tiles) + tie_card([PERIOD, PRIOR]) + exec_summary + '<div class="grid">' + "".join(cards) + "</div>"
                       + '<div class="card"><div class="ch">Net Loss Bridge, ' + e(PRIOR) + ' to ' + e(PERIOD) + '</div>' + wf
-                      + '<div class="wflegend"><span><i style="background:var(--color-dark-gray)"></i>Net loss</span><span><i style="background:var(--color-red-text)"></i>Raises the loss</span>'
-                        '<span><i style="background:var(--color-mid-gray)"></i>Lowers the loss</span></div></div>' + CHECKLIST))
+                      + '<div class="wflegend"><span><i style="background:var(--color-teal-deep)"></i>Net loss</span><span><i style="background:var(--color-red-text)"></i>Raises the loss</span>'
+                        '<span><i style="background:var(--color-cyan)"></i>Lowers the loss</span></div></div>' + CHECKLIST))
 
     # ----- Actual vs. Actual
     corr, ns_corr, opened, n_booked, n_edited, coding_notes, n_open = coding_corrections() if CODING_REC else ({}, {}, {}, 0, 0, [], 0)
@@ -2352,7 +2357,7 @@ def flux():
                     pid = sid("PROP", key)
                     usd = lambda x: ("($" if x < 0 else "$") + format(abs(x), ",.0f") + (")" if x < 0 else "")
                     why = "P&L flux reclass, %s %s, %s: %s %s MoM" % (r["account_code"], leaf_of(r), PERIOD, usd(abs(v)), "favorable" if v > 0 else "unfavorable")
-                    je[pid] = {"id": "SERIF-" + SLUG + "-" + pid, "date": PERIOD_END, "memo": why, "proposal": True,
+                    je[pid] = {"id": "UNITY-" + SLUG + "-" + pid, "date": PERIOD_END, "memo": why, "proposal": True,
                                "lines": je_lines([{"account": r["account_code"]}, {"account": ""}])}
                     pj = '<button class="lk" data-propose="%s" aria-expanded="false" aria-controls="jr-%s">Propose entry</button>' % (pid, pid)
                     jr = ('<tr class="jr" id="jr-%s" data-jerow="%s" hidden><td colspan="%d">%s<textarea class="c" rows="1" data-note="%s" placeholder="Note"></textarea></td></tr>'
@@ -2653,7 +2658,7 @@ def flux():
             return " ".join(t for t in (stop(cap(obs)), stop(cap(sup))) if t)
         return f.get("recommendation") or x.get("support") or x["memo"]
     # An adjustment's id is its kind, memo, bills (or, for a receipt accrual, its Coupa POs) and
-    # P&L accounts, so two alike (two Flagship bills capitalized alike, two receipt accruals) each
+    # P&L accounts, so two alike (two Plurality bills capitalized alike, two receipt accruals) each
     # keep their own id, and decision, in a later run, whatever its order and whether or not a
     # like one comes or goes.
     for x in ent:
@@ -2794,20 +2799,20 @@ def flux():
     tr_ = tie_row([PERIOD, PRIOR])
     ties.insert(0, '<tr><td>%s</td><td class="n2" colspan="2">%s</td><td>%s</td></tr>' % (e(tr_[0]), e(tr_[1].split(": ", 1)[-1]), "Pass" if tr_[1].startswith("Pass") else '<span class="unf">%s</span>' % e(tr_[1].split(":")[0])))
     tie_note = "" if ISR else '<p class="note pad">Income Statement tie-outs did not run: they need the NetSuite Income Statement by month report.</p>'
-    # Related party: Flagship-named vendors, and journals whose memo names Flagship.
+    # Related party: Plurality-named vendors, and journals whose memo names Plurality.
     m3 = [SS.shift(PERIOD, -2), PRIOR, PERIOD]
     rp = defaultdict(lambda: defaultdict(float))
     for m in m3:
         for l in by_period.get(m, []):
             who = (l.get("vendor_or_name") or "").strip()
-            if PNL(l["account_code"]) and ("flagship" in who.lower() or "flagship" in (l.get("memo") or "").lower()):
+            if PNL(l["account_code"]) and ("plurality" in who.lower() or "plurality" in (l.get("memo") or "").lower()):
                 rp[(who or "Journal: " + (l.get("memo") or "").strip()[:60], l["account_code"])][m] += l["amount"]
     rp_rows = sorted(rp.items(), key=lambda kv: -abs(kv[1].get(PERIOD, 0)))
     rp_html = "".join('<tr><td>%s</td><td><span class="code">%s</span>%s</td>%s<td class="n2">%s</td></tr>'
                       % (e(who), e(a), e(acct_name(a)), "".join('<td class="n2">%s</td>' % money(v_.get(m)) for m in m3), fav(v_.get(PRIOR, 0) - v_.get(PERIOD, 0), money(v_.get(PERIOD, 0) - v_.get(PRIOR, 0))))
                       for (who, a), v_ in rp_rows)
     rp_tot = [sum(v_.get(m, 0) for _, v_ in rp_rows) for m in m3]
-    rp_card = ('<div class="card"><div class="ch">Related Party: Flagship<span class="r note">Flagship-named vendors and journals; the intercompany policy is a draft</span></div>'
+    rp_card = ('<div class="card"><div class="ch">Related Party: Plurality<span class="r note">Plurality-named vendors and journals; the intercompany policy is a draft</span></div>'
                '<div class="tw"><table><thead><tr><th>Vendor or journal</th><th>Account</th>' + "".join('<th class="n2">%s</th>' % e(m) for m in m3) + '<th class="n2">Change</th></tr></thead><tbody>'
                + (rp_html or '<tr><td colspan="6" class="note">None.</td></tr>')
                + ('<tr class="tot"><td>Total</td><td></td>' + "".join('<td class="n2">%s</td>' % money(x) for x in rp_tot) + '<td class="n2">%s</td></tr>' % money(rp_tot[2] - rp_tot[1]) if rp_rows else "")
@@ -2908,20 +2913,20 @@ function fluxPack(){
     + (rows.join('') || '<tr><td colspan="' + head.length + '" class="none">' + none + '</td></tr>') + '</tbody></table>';
   const status = open.length ? 'Draft: ' + plural(open.length, 'item') + ' open' : 'Final';
   const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>P&amp;L Flux, ' + esc(DATA.period) + '</title><style>'
-    + '@page{margin:14mm}body{font:12.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:#1e1e1c;margin:32px auto;max-width:1180px;padding:0 24px}'
-    + '.co{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b6a63}h1{font-size:24px;font-weight:600;margin:2px 0 6px}h2{font-size:15px;font-weight:600;margin:28px 0 8px;padding-bottom:5px;border-bottom:2px solid #3a4a5e}'
-    + '.meta{color:#6b6a63;font-size:11.5px}.st{display:inline-block;margin-left:10px;font-size:11px;font-weight:600;padding:2px 10px;border-radius:999px;vertical-align:4px;border:1px solid}'
-    + '.st.f{color:#3a4a5e;border-color:#3a4a5e;background:#eef1f5}.st.d{color:#c72e00;border-color:#c72e00}'
-    + '.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0 8px}.k{border:1px solid #d6d6d4;border-radius:6px;padding:9px 12px}.k .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#6b6a63}'
-    + '.k .v{font-size:18px;font-weight:600;margin:2px 0}.k .s{font-size:11px;color:#6b6a63}.tie{color:#3a4a5e;font-size:12px;margin:6px 0 0}'
-    + '.sum{border-left:3px solid #2e2d29;padding:2px 0 2px 14px}.sum p{margin:0 0 9px}.by{font-size:10.5px;color:#6b6a63;margin-top:2px}'
-    + 'table{border-collapse:collapse;width:100%;font-size:11.5px}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:#6b6a63;text-align:left;border-bottom:1.5px solid #2e2d29;padding:5px 7px}'
-    + 'td{border-bottom:1px solid #e3e3e0;padding:5px 7px;vertical-align:top}td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}td.m{font-family:ui-monospace,Menlo,monospace;font-size:11px;white-space:nowrap}'
-    + 'td.cm{width:42%}td.cm p{margin:0 0 4px}tr.g td{background:#f1f1ef;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}tr.t td{font-weight:600;border-top:1.5px solid #2e2d29}'
-    + 'tr.rv td:first-child{box-shadow:inset 3px 0 0 #c72e00;padding-left:10px}.op{color:#c72e00;font-style:italic}.none{color:#6b6a63;font-style:italic}'
-    + 'ul.open{margin:4px 0;padding-left:18px;color:#c72e00}.disc{margin-top:30px;font-size:10.5px;color:#6b6a63;border-top:1px solid #d6d6d4;padding-top:8px}'
+    + '@page{margin:14mm}body{font:12.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:#0f2e36;margin:32px auto;max-width:1180px;padding:0 24px}'
+    + '.co{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#4a5f68}h1{font-size:24px;font-weight:600;margin:2px 0 6px}h2{font-size:15px;font-weight:600;margin:28px 0 8px;padding-bottom:5px;border-bottom:2px solid #0b6e75}'
+    + '.meta{color:#4a5f68;font-size:11.5px}.st{display:inline-block;margin-left:10px;font-size:11px;font-weight:600;padding:2px 10px;border-radius:999px;vertical-align:4px;border:1px solid}'
+    + '.st.f{color:#0b6e75;border-color:#0b6e75;background:#e6f3f4}.st.d{color:#b42318;border-color:#b42318}'
+    + '.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0 8px}.k{border:1px solid #d8e1e6;border-radius:6px;padding:9px 12px}.k .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#4a5f68}'
+    + '.k .v{font-size:18px;font-weight:600;margin:2px 0}.k .s{font-size:11px;color:#4a5f68}.tie{color:#0b6e75;font-size:12px;margin:6px 0 0}'
+    + '.sum{border-left:3px solid #0f2e36;padding:2px 0 2px 14px}.sum p{margin:0 0 9px}.by{font-size:10.5px;color:#4a5f68;margin-top:2px}'
+    + 'table{border-collapse:collapse;width:100%;font-size:11.5px}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:#4a5f68;text-align:left;border-bottom:1.5px solid #0f2e36;padding:5px 7px}'
+    + 'td{border-bottom:1px solid #dde5e9;padding:5px 7px;vertical-align:top}td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}td.m{font-family:ui-monospace,Menlo,monospace;font-size:11px;white-space:nowrap}'
+    + 'td.cm{width:42%}td.cm p{margin:0 0 4px}tr.g td{background:#eef3f5;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}tr.t td{font-weight:600;border-top:1.5px solid #0f2e36}'
+    + 'tr.rv td:first-child{box-shadow:inset 3px 0 0 #b42318;padding-left:10px}.op{color:#b42318;font-style:italic}.none{color:#4a5f68;font-style:italic}'
+    + 'ul.open{margin:4px 0;padding-left:18px;color:#b42318}.disc{margin-top:30px;font-size:10.5px;color:#4a5f68;border-top:1px solid #d8e1e6;padding-top:8px}'
     + 'thead{display:table-header-group}tr{break-inside:avoid}h2{break-after:avoid}</style></head><body>'
-    + '<div class="co">Serif Biomedicines, Inc.</div><h1>P&amp;L Flux, ' + esc(DATA.period) + '<span class="st ' + (open.length ? 'd' : 'f') + '">' + esc(status) + '</span></h1>'
+    + '<div class="co">Unity Biomedicines, Inc.</div><h1>P&amp;L Flux, ' + esc(DATA.period) + '<span class="st ' + (open.length ? 'd' : 'f') + '">' + esc(status) + '</span></h1>'
     + '<div class="meta">Exported ' + esc(when(new Date().toISOString())) + (Shared.on() ? ' by ' + esc(who(Shared.uid())) : '') + ' &middot; run ' + esc(DATA.run) + ' &middot; console ' + esc(DATA.version)
     + ' &middot; review threshold ' + money(thr) + '</div><div class="kp">' + tiles + '</div>' + (tie ? '<p class="tie">' + esc(tie) + '</p>' : '')
     + (open.length ? '<h2>Open items</h2><ul class="open">' + open.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' : '')
@@ -2932,7 +2937,7 @@ function fluxPack(){
     + '<h2>Journal Entries for the NetSuite import</h2>' + table(['External ID', 'Memo', 'Account', 'Department', 'Debit', 'Credit'], je, 'None ready.')
     + '<h2>Sign-off</h2>' + table(['Role', 'Name', 'Date'], signs, 'No sign-off roles.')
     + '<p class="disc">Figures, variances and proposed entries are computed from the NetSuite and Coupa exports for this run. Commentary and every decision are the reviewer’s; drafts, where used, were accepted or edited by the reviewer before they were saved.</p></body></html>';
-  download('serif-pl-flux-pack-' + DATA.slug + '.html', html, 'text/html');
+  download('pl-flux-pack-' + DATA.slug + '.html', html, 'text/html');
   logAdd({id: 'flux-pack', label: 'Flux pack exported', v: status, note: ''}); save();
 }
 /* The saved commentary as a sheet: every line with commentary, on every page. */
@@ -2944,7 +2949,7 @@ function fluxCSV(){
     const p = tr.closest('.page'), b = p && $('.tb.pg[data-p="' + p.id.slice(2) + '"]'), f = S.fin[t.dataset.note];
     rows.push([b ? navText(b).trim() : '', x.textContent.replace(/\s+/g, ' ').trim(), S.notes[t.dataset.note], f.by_uid ? Shared.name(f.by_uid) : '', f.at]); });
   if (savedNote('exec:summary')){ const f = S.fin['exec:summary']; rows.splice(1, 0, ['Executive Overview', 'Executive summary', S.notes['exec:summary'], f.by_uid ? Shared.name(f.by_uid) : '', f.at]); }
-  download('serif-pl-flux-commentary-' + DATA.slug + '.csv', rows.map(r => r.map(q).join(',')).join('\r\n'));
+  download('pl-flux-commentary-' + DATA.slug + '.csv', rows.map(r => r.map(q).join(',')).join('\r\n'));
 }
 document.addEventListener('click', ev => { if (ev.target.closest('[data-fluxpack]')) fluxPack(); else if (ev.target.closest('[data-fluxcsv]')) fluxCSV(); });
 shapeCards(); shapeNotes(); show('ov');
@@ -2952,7 +2957,7 @@ shapeCards(); shapeNotes(); show('ov');
     pages.append(runlog(PLR, "flux", read=[("Also read", "GL Coding Review run %s and its decision record %s, saved %s" % (
         GLR["manifest"]["run_id"], hashlib.sha256(open(A.coding_record, "rb").read()).hexdigest()[:16], str(CODING_REC.get("saved_at") or "")[:16].replace("T", " ")))]
         + [("Coding corrections", x) for x in coding_notes] if CODING_REC else ()))
-    return shell("Serif P&L Flux - " + PERIOD, "P&L Flux", sections, pages, data, js)
+    return shell("Unity P&L Flux - " + PERIOD, "P&L Flux", sections, pages, data, js)
 
 
 # =====================================================================
@@ -2962,11 +2967,11 @@ def coding():
     V = GLR["views"]
     G = {f["finding_id"]: f for f in GLR["findings"]}
     thr = 2500.0
-    # Each review screen's own line, changed on its page's chip: CapEx at Serif's PP&E capitalization
+    # Each review screen's own line, changed on its page's chip: CapEx at the client's PP&E capitalization
     # threshold, Prepaid at its prepaid threshold (12 Oct 2026), the rest at thr. A Department
     # flag has none ("all"): every line off Non-Specific is recoded, whatever its size.
     THR = {"thr": thr, "thr_capex": CAPEX_THR, "thr_prepaid": PREPAID_THR}
-    # Flagship pass-through bills: each reviewed item by item where its cost breakdown was
+    # Plurality pass-through bills: each reviewed item by item where its cost breakdown was
     # supplied; without one, the bill and every card on it say a breakdown would show more.
     PT_BILLS, PT_BD, PT_REV = pt_reviews(THR["thr_capex"], THR["thr_prepaid"])
 
@@ -3020,7 +3025,7 @@ def coding():
         return "".join('<button class="pill" data-d="%s" data-v="%s" data-label="%s">%s</button>' % (iid, v, e(label), lab) for v, lab in actions)
 
     used_ven, amts = set(), {}   # amts: each card's amount, for its reference ID
-    # Claude's notes, one per item (SERIF-162): each names its vendor, the item's category (its
+    # Claude's notes, one per item (CCC-162): each names its vendor, the item's category (its
     # reference ID's prefix: capex, fa, prepaid, ppd, dept, coding, pass, new or clear) and, for an
     # item about a bill, that bill's document number. A note goes on the first item it fits and on
     # no other. The older vendor-keyed notes apply only when a file has no `notes`.
@@ -3097,7 +3102,7 @@ def coding():
     DRAFT_ACTS = (("approve", "Add to NetSuite CSV"), ("netsuite", "Edited Manually in NetSuite"), ("reject", "Reject"))
 
     # CapEx and Prepaid flags: expense that may belong on the balance sheet. These
-    # are the flux engine's prepaid and capital screens, which serif_views.py runs
+    # are the flux engine's prepaid and capital screens, which client_views.py runs
     # over the month's lines and puts on the vendor rows.
     screen = {"capital": [], "prepaid": []}
     for r in vrows:
@@ -3176,7 +3181,7 @@ def coding():
             if top_ is not None:
                 pt_settled.append((r["vendor"], r["doc"]["document"], r["amount"], "%s %s" % (r["from_account"], acct_name(r["from_account"])), top_))
                 continue
-            # with its bill, so two alike (two Flagship bills on one account) each keep their id in
+            # with its bill, so two alike (two Plurality bills on one account) each keep their id in
             # a later run, whatever its order and whether or not a like one comes or goes
             iid = sid(prefix, *key(r), (r["doc"] or {}).get("document"))
             doc = r["doc"] or line_doc(r["vendor"], r["from_account"])
@@ -3186,7 +3191,7 @@ def coding():
                 placed = "%s, as the line says" % p["in_service"]
             elif "%s" in placed:
                 placed %= (doc or {}).get("date") or "not shown"
-            je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": doc["date"] if doc else "", "memo": "Recode %s %s from %s to %s%s" % (r["vendor"], r.get("what") or "", r["from_account"], r["to_account"], (", " + memo) if memo else ""),
+            je[iid] = {"id": "UNITY-" + SLUG + "-" + iid, "date": doc["date"] if doc else "", "memo": "Recode %s %s from %s to %s%s" % (r["vendor"], r.get("what") or "", r["from_account"], r["to_account"], (", " + memo) if memo else ""),
                        "lines": je_lines([{"account": r["to_account"], "department": r["department"], "debit": r["amount"]}]
                                          + [{"account": r["from_account"], "department": d_, ("credit" if a_ > 0 else "debit"): abs(a_), "reverses_line": True}
                                             for d_, a_ in sorted((r.get("depts") or {r["department"]: r["amount"]}).items())], doc)}
@@ -3216,7 +3221,7 @@ def coding():
             v = (l.get("vendor_or_name") or "").strip() or "(no vendor)"
             ea, ed = usual_expense(v, l["department"] or "")
             amt = round(l["amount"], 2)
-            je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": l["date"], "memo": "Recode %s %s from %s to expense" % (v, desc(l), l["account_code"]),
+            je[iid] = {"id": "UNITY-" + SLUG + "-" + iid, "date": l["date"], "memo": "Recode %s %s from %s to expense" % (v, desc(l), l["account_code"]),
                        "lines": je_lines([{"account": ea, "department": ed, "debit": amt}, {"account": l["account_code"], "department": l["department"], "credit": amt, "reverses_line": True}], l), "when": "recode"}
             doc = {"type": l["txn_type"], "document": l["document_number"], "text": desc(l), "date": l["date"]}
             out.append(card(iid, v, amt, amt >= thr, coding_(l["account_code"], l["department"]), '<span class="arrow">&rarr;</span> ' + coding_(ea, ed), doc, "",
@@ -3384,7 +3389,7 @@ def coding():
             by_dept[l.get("department") or ""] += l["amount"]
             same_item_codings.add((vname, now, l.get("department") or ""))
         src = {"project": ls[0].get("project"), "program": ls[0].get("program")}
-        je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": ls[0].get("date") or "", "memo": "Recode %s %s from %s to %s, as billed before" % (vname, ls[0]["description"][:40], now, before),
+        je[iid] = {"id": "UNITY-" + SLUG + "-" + iid, "date": ls[0].get("date") or "", "memo": "Recode %s %s from %s to %s, as billed before" % (vname, ls[0]["description"][:40], now, before),
                    "lines": je_lines([x for d, v in sorted(by_dept.items()) if round(v, 2)
                                       for x in ({"account": before, "department": d, ("debit" if v > 0 else "credit"): round(abs(v), 2)},
                                                 {"account": now, "department": d, ("credit" if v > 0 else "debit"): round(abs(v), 2), "reverses_line": True})], src)}
@@ -3488,7 +3493,7 @@ def coding():
                        {"confirm": "Confirm.", "recode": "Recode."}.get(v_, ""))
         pp = {(i.get("project") or "", i.get("program") or "") for i in (r.get("detail") or {}).get("items") or []
               if i["account"] == a and (i.get("department") or "Non-Specific") == dept}
-        je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": (doc or {}).get("date") or "", "memo": "Recode %s from %s %s" % (r["vendor"], a, dept),
+        je[iid] = {"id": "UNITY-" + SLUG + "-" + iid, "date": (doc or {}).get("date") or "", "memo": "Recode %s from %s %s" % (r["vendor"], a, dept),
                    "lines": je_lines([{"account": a, "department": dept, "debit": camt}, {"account": a, "department": dept, "credit": camt, "reverses_line": True}],
                                      dict(zip(("project", "program"), pp.pop())) if len(pp) == 1 else None), "when": "recode"}
         if move:
@@ -3544,7 +3549,7 @@ def coding():
     clear = [r for r in vrows if not r.get("flags") and round(r.get("amount") or 0)]
     P2 = SS.shift(PERIOD, -2)
 
-    # A bill a Journal Entry of the month already moves to the balance sheet (Serif's close
+    # A bill a Journal Entry of the month already moves to the balance sheet (the client's close
     # entries name the bill: "Capitalize freezer VWR International LLC bill 8822578887"): its
     # document -> the entry, the balance sheet accounts it debits, and any account its memo names.
     jl_ = [l for l in by_period.get(PERIOD, []) if l.get("txn_type") == "Journal"]
@@ -3739,20 +3744,20 @@ def coding():
                    + (" " + en(" ".join(rv["notes"])) if rv["notes"] else ""))
             rows = "".join('<tr%s><td class="mono">%s</td><td>%s</td><td>%s<small>%s</small></td><td>%s</td><td><span class="code">%s</span><small>%s</small></td><td>%s</td><td class="n2">%s</td><td>%s</td></tr>'
                            % (' class="crit"' if i["flags"] else "", e(i["date"]), e(i["vendor"]), e(i["header_memo"]), e(i["memo"]), e(i["department"]) or "&ndash;", e(i["acct_no"]),
-                              e(next(g["acct_name"] for g in rv["groups"] if g["acct_no"] == i["acct_no"])), coding_(i["serif"]) if i["serif"] else "&ndash;",
+                              e(next(g["acct_name"] for g in rv["groups"] if g["acct_no"] == i["acct_no"])), coding_(i["client_acct"]) if i["client_acct"] else "&ndash;",
                               money(i["amount"], True), "; ".join(e(f[1]) for f in i["flags"]) or "")
                            for i in rv["items"])
-            table = ('<details class="lines"><summary>Breakdown (%d)</summary><div class="tw"><table><thead><tr><th>Date</th><th>Vendor</th><th>Item</th><th>Flagship department</th><th>Flagship account</th>'
-                     '<th>Serif account</th><th class="n2">Amount</th><th>Flag</th></tr></thead><tbody>%s</tbody></table></div></details>' % (len(rv["items"]), rows))
+            table = ('<details class="lines"><summary>Breakdown (%d)</summary><div class="tw"><table><thead><tr><th>Date</th><th>Vendor</th><th>Item</th><th>Plurality department</th><th>Plurality account</th>'
+                     '<th>Unity account</th><th class="n2">Amount</th><th>Flag</th></tr></thead><tbody>%s</tbody></table></div></details>' % (len(rv["items"]), rows))
             if rv["reclass"]:
-                je[iid] = {"id": "SERIF-" + SLUG + "-" + iid, "date": b["date"], "memo": "Reclass %s %s items to their accounts, from its cost breakdown" % (b["vendor"], b["document"]),
+                je[iid] = {"id": "UNITY-" + SLUG + "-" + iid, "date": b["date"], "memo": "Reclass %s %s items to their accounts, from its cost breakdown" % (b["vendor"], b["document"]),
                            "lines": je_lines(rv["reclass"])}
                 rec = "<br>".join(coding_(l["account"], l["department"]) + ' <span class="mono">' + money(l["debit"], True) + "</span>" for l in je[iid]["lines"] if l["debit"])
                 acts_, more_ = FLAG_ACTS, je_editor(iid, je[iid]["lines"])
             else:
                 rec, acts_, more_ = "None: the coding stands", (("confirm", "Reviewed, Coding Stands"),), ""
         else:
-            why = ("Flagship bills these costs as one lump sum, one line per activity. The items behind each line, and whether any is a capital asset, "
+            why = ("Plurality bills these costs as one lump sum, one line per activity. The items behind each line, and whether any is a capital asset, "
                    "a prepaid or on the wrong account, are in the cost breakdown attached to the invoice in Coupa. Attach the breakdown to review it item by item, "
                    "or open it in Coupa and note what you found.")
             table, rec, more_ = "", "Breakdown needed to tell", ""
@@ -3857,7 +3862,7 @@ def coding():
                               ("Decided", live("done", "pass"), "Pass-through bills: %s from %s" % (money(sum(b["amount"] for b in PT_BILLS), True),
                                                                                                     " and ".join(sorted({e(b["vendor"]) for b in PT_BILLS})))),
                               ("Breakdowns Supplied", "%d of %d" % (len(PT_REV), len(PT_BILLS)), "Itemized cost breakdowns from Coupa, of the %d bills" % len(PT_BILLS))])
-                          + '<div class="legend">Each bill is one lump sum of costs Flagship paid for Serif. With its cost breakdown from Coupa, each item is checked '
+                          + '<div class="legend">Each bill is one lump sum of costs Plurality paid for Unity. With its cost breakdown from Coupa, each item is checked '
                             'against the capital and prepaid thresholds, its service period and its account; without one, review it in Coupa.</div>' + "".join(pt_cards)))
     before = [p_ for p_ in (vend["periods"].get("prior2"), vend["periods"].get("prior"), vend["periods"].get("prior_year")) if p_]
     pages.append(page("clear", hero("Vendors Reviewed &amp; Cleared, ".replace("&amp;", "&") + PERIOD, "", [
@@ -3872,7 +3877,7 @@ def coding():
     srcs = "".join('<tr><td>%s</td><td class="mono" style="text-align:right">%s</td></tr>' % (e(a), e(b)) for a, b in
                    [(", ".join(i.get("roles") or ["input"]).replace("_", " ").title(), i["path"]) for i in GLR["manifest"]["inputs"]]
                    + [("Policy", p) for p in sorted({f.get("policy_basis") for f in GLR["findings"] if f.get("policy_basis")})]
-                   + [("Review period", PERIOD), ("NetSuite subsidiary", "Serif Biomedicines, Inc. (FL87, subsidiary 97)")])
+                   + [("Review period", PERIOD), ("NetSuite subsidiary", "PL87 Unity Biomedicines, Inc. (subsidiary 97)")])
     tie = GLR["manifest"].get("tie_out") or {}
     tie_rows = "".join('<tr><td>%s</td><td class="mono" style="text-align:right">%s</td></tr>' % (a, b) for a, b in [
         (e(MON + " GL expense total (6xxxxxx)"), money(gl_6x, True)), ("Total flagged amount", money(famt + exc_amt, True)), ("Flagged as % of GL total", "%.2f%%" % (100 * (famt + exc_amt) / gl_6x)),
@@ -3976,25 +3981,25 @@ function workPaper(){
   const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>GL Coding Review work paper, ' + esc(DATA.period) + '</title><style>'
     + 'body{font:13px/1.4 system-ui,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0 0 4px}h2{font-size:14px;margin:22px 0 6px}p{margin:2px 0;color:#444}'
     + 'table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:3px 6px;text-align:left;vertical-align:top}th{background:#f2f2f2}.n{text-align:right;white-space:nowrap}.m{font-family:ui-monospace,monospace;white-space:nowrap}</style></head><body>'
-    + '<h1>Serif Biomedicines, Inc. &middot; GL Coding Review work paper &middot; ' + esc(DATA.period) + '</h1>'
+    + '<h1>Unity Biomedicines, Inc. &middot; GL Coding Review work paper &middot; ' + esc(DATA.period) + '</h1>'
     + '<p>Run ' + esc(DATA.run) + ', console ' + esc(DATA.version) + '. Saved ' + esc(new Date().toISOString().slice(0, 16).replace('T', ' ')) + ' UTC' + (Shared.on() ? ' by ' + esc(Shared.name(Shared.uid())) : '') + '.</p>'
     + '<p>' + items.length + ' items, ' + (items.length - open.length) + ' decided, ' + open.length + ' open. Agreed fixes: ' + fx.length + '; ' + rc.length + ' booked as reclasses (' + rc.filter(f => f.in_import).length
     + ' in the import), ' + (fx.length - rc.length) + ' edited in NetSuite, not in the import.</p>'
     + '<h2>Decisions</h2>' + table(['Ref ID', 'Page', 'Item', 'Amount', 'Decision', 'Path', 'Document', 'External ID', 'Change', 'Note', 'Decided by', 'When (UTC)'], dec, 'No decisions recorded.')
     + '<h2>Reclasses in the NetSuite import</h2>' + table(['Ref ID', 'External ID', 'Memo', 'Account', 'Department', 'Project', 'Program', 'Name', 'Coupa PO', 'Debit', 'Credit'], lines, 'None ready.')
     + '<h2>Sign-off</h2>' + table(['Role', 'Name', 'Date'], signs, 'Not signed.') + '</body></html>';
-  download('serif-' + DATA.kind + '-work-paper-' + DATA.slug + '.html', html, 'text/html');
+  download(DATA.kind + '-work-paper-' + DATA.slug + '.html', html, 'text/html');
 }
 document.addEventListener('click', ev => { if (ev.target.closest('[data-wpsave]')) workPaper(); });
 shapeCards(); shapeNotes(); show('ov');
 """
     pages.append(runlog(GLR, "coding"))
-    return shell("Serif GL Coding Review - " + PERIOD, "GL Coding Review", sections, pages, dict(data, docs=nsdoc), js)
+    return shell("Unity GL Coding Review - " + PERIOD, "GL Coding Review", sections, pages, dict(data, docs=nsdoc), js)
 
 
 if __name__ == "__main__":
     for kind in WANT:
-        name, fn = {"flux": ("serif-pl-flux-", flux), "coding": ("serif-gl-coding-review-", coding)}[kind]
+        name, fn = {"flux": ("pl-flux-", flux), "coding": ("gl-coding-review-", coding)}[kind]
         os.makedirs(OUTS[kind], exist_ok=True)
         p = os.path.join(OUTS[kind], name + SLUG + "-v" + VERSION + ".html")
         open(p, "w", encoding="utf-8").write(fn())

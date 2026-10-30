@@ -3,15 +3,15 @@
 // record and the work paper), then shared mode on a mocked Artifact db:
 // two reviewers, attribution, a conflict, a read-only viewer, downloads, and a rerun
 // bringing in the earlier run's decisions. Needs Playwright with Chromium.
-//   node tests/test_console.js [folder holding the two aug2026 v2.3.0 consoles]   (or: make test)
+//   node tests/test_console.js [folder holding the two aug2026 v2.4.0 consoles]   (or: make test)
 // With no folder, it tests consoles/.
 let chromium; try { ({ chromium } = require('playwright')); }
 catch (e) { ({ chromium } = require(process.env.PLAYWRIGHT || '/Users/anniebritton/.npm/_npx/520e866687cefe78/node_modules/playwright')); }
 const fs = require('fs'), path = require('path'), os = require('os');
 const B = path.resolve(__dirname, '..') + '/';
 const DIR = process.argv[2];
-const FILES = DIR ? {gl: path.join(DIR, 'serif-gl-coding-review-aug2026-v2.3.0.html'), pl: path.join(DIR, 'serif-pl-flux-aug2026-v2.3.0.html')}
-  : {gl: B + 'consoles/serif-gl-coding-review.html', pl: B + 'consoles/serif-pl-flux.html'};
+const FILES = DIR ? {gl: path.join(DIR, 'gl-coding-review-aug2026-v2.4.0.html'), pl: path.join(DIR, 'pl-flux-aug2026-v2.4.0.html')}
+  : {gl: B + 'consoles/gl-coding-review.html', pl: B + 'consoles/pl-flux.html'};
 let fails = 0;
 const ok = (c, m) => { console.log((c ? '  PASS ' : '  FAIL ') + m); if (!c) fails++; };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -197,11 +197,11 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     if (k === 'gl'){
       const [ref, ext] = await p.evaluate(id => [refOf(id), DATA.je[id].id], id), rows = csvText.split('\n').filter(r => r.startsWith(ext + ','));
       ok(/^CAPEX-\d{2}$/.test(ref) && rows.length > 1 && rows.every(r => r.includes(',' + ref + ' | ') || r.includes(',"' + ref + ' | ')), 'gl: the CSV Memo starts with the finding\'s reference ID (' + ref + ')');
-      // SERIF-144: Project and Program on each line and on both sides of each entry; balance sheet lines Non-Specific
+      // CCC-144: Project and Program on each line and on both sides of each entry; balance sheet lines Non-Specific
       ok(/^﻿?External ID,.*,Account,Department,Project,Program,Name,Coupa PO Number,Debit,Credit,Line Memo,Account Number,Department Name,Program Name,Reversing Entry\r?$/.test(csvText.split('\n')[0])
          && rows.every(r => r.includes(',00 Non-Specific,1,') && /,00 Non-Specific,[YN]\r?$/.test(r)),
          'gl: the CSV carries each line\'s Project, and its Program as NetSuite\'s internal ID with the name for the reviewer');
-      // SERIF-161: each entry line names its vendor (NetSuite's Name), one name each. The Aug 2026 export has no Coupa PO
+      // CCC-161: each entry line names its vendor (NetSuite's Name), one name each. The Aug 2026 export has no Coupa PO
       // column, so every PO here is blank; Sep 2026's fill the PO where the bill has one.
       ok(await p.evaluate(() => { const ids = Object.keys(DATA.je).filter(i => /^(C|P|D|DR)-/.test(i)), ls = ids.flatMap(i => DATA.je[i].lines);
         return ls.length > 0 && ls.filter(l => l.vendor).length >= 0.9 * ls.length && ls.every(l => !/, .*, |\(no vendor\)/.test(l.vendor || ''))
@@ -323,14 +323,14 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       // a rebuild of the same run numbers every card the same; a drafted entry takes its category's next ID and moves none
       const DG = B + 'out/dist/gl-coding-review/', run = B + 'out/aug2026/gl-coding-review/run.json';
       if (fs.existsSync(DG + 'build_pages.py') && fs.existsSync(run) && fs.existsSync(B + 'inputs/aug2026')){
-        const cp = require('child_process'), tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'serif-refs-'));
+        const cp = require('child_process'), tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wl-refs-'));
         const GL = fs.readdirSync(B + 'inputs/aug2026').filter(f => /^netsuite_gl_detail_.*\.xls$/.test(f)).map(f => B + 'inputs/aug2026/' + f);
         const drafts = path.join(tmp, 'drafts.json');
         fs.writeFileSync(drafts, JSON.stringify({entries: [{memo: "Test reclass | Aug'26", reason: 'Test', lines: [
           {account: '6410000', department: 'Platform', vendor: 'Test', debit: 1000}, {account: '6607000', department: 'Platform', vendor: 'Test', credit: 1000}]}]}));
         const refsOf = (name, extra) => { const out = path.join(tmp, name);
           const r = cp.spawnSync('python3', ['build_pages.py', '--only', 'coding', '--coding-run', run, '--gl', ...GL, '--out', out, ...extra], {cwd: DG, encoding: 'utf8'});
-          if (r.status) return null; const h = fs.readFileSync(path.join(out, fs.readdirSync(out).find(f => /^serif-gl-coding-review-.*\.html$/.test(f))), 'utf8');
+          if (r.status) return null; const h = fs.readFileSync(path.join(out, fs.readdirSync(out).find(f => /^gl-coding-review-.*\.html$/.test(f))), 'utf8');
           return JSON.parse(h.match(/window\.DATA=(.*?);<\/script>/s)[1]).ref; };
         const mine = await p.evaluate(() => DATA.ref), again = refsOf('again', []), withDraft = refsOf('draft', ['--drafts', drafts]);
         ok(again && JSON.stringify(again) === JSON.stringify(mine), 'gl: a rebuild of the same data gives the same reference IDs');
@@ -353,10 +353,10 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
           fs.writeFileSync(fd, JSON.stringify({entries: [fit('Fit test, read from the line', free, free.amount, [free.document]),
             fit('Fit test, on another card', taken, taken.credit, taken.documents), fit('Fit test, no such line', free, 10, ['NO-SUCH-DOC'])]}));
           const r = cp.spawnSync('python3', ['build_pages.py', '--only', 'coding', '--coding-run', run, '--gl', ...GL, '--out', outF, '--drafts', fd], {cwd: DG, encoding: 'utf8'});
-          const h = r.status ? '' : fs.readFileSync(path.join(outF, fs.readdirSync(outF).find(f => /^serif-gl-coding-review-.*\.html$/.test(f))), 'utf8');
+          const h = r.status ? '' : fs.readFileSync(path.join(outF, fs.readdirSync(outF).find(f => /^gl-coding-review-.*\.html$/.test(f))), 'utf8');
           const D = h ? JSON.parse(h.match(/window\.DATA=(.*?);<\/script>/s)[1]) : {ref: {}, je: {}};
           const fc = await b.newContext(), fp = await fc.newPage();
-          if (h){ await fp.goto('file://' + path.join(outF, fs.readdirSync(outF).find(f => /^serif-gl-coding-review-.*\.html$/.test(f)))); await fp.waitForTimeout(500); }
+          if (h){ await fp.goto('file://' + path.join(outF, fs.readdirSync(outF).find(f => /^gl-coding-review-.*\.html$/.test(f)))); await fp.waitForTimeout(500); }
           const card = await fp.evaluate(() => $$('[data-item^="DR-"]').map(x => ({id: x.dataset.item, page: x.closest('.page').id, pane: (x.closest('[data-pane]') || {dataset: {}}).dataset.pane,
             tag: [...x.querySelectorAll(':scope > .ih > .tag.ink')].map(t => t.textContent), vendor: x.querySelector('.ih b').textContent, status: x.querySelector('.stp').textContent,
             acts: [...x.querySelectorAll('[data-d]')].map(b => b.dataset.v), decided: !!S.dec[x.dataset.item]}))).catch(() => []);
@@ -369,7 +369,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
              && /Fit test, no such line\): account fit, but document NO-SUCH-DOC has no line on/.test(r.stdout) && /Drafts Left Out/.test(h),
              'gl: an account fit entry taking off a line another card moves, or naming no line of the month, is left out and listed');
         } else console.log('  SKIP gl: account fit (no unflagged vendor line or proposed entry in this month)');
-        // SERIF-162: a note goes on the one item it names (vendor, check, document) and on no other; a note no item fits is listed
+        // CCC-162: a note goes on the one item it names (vendor, check, document) and on no other; a note no item fits is listed
         const cx0 = await p.evaluate(() => { const x = $('#p-capex [data-item^="C-"]'); return x && {id: x.dataset.item, vendor: x.querySelector('.ih b').textContent,
           doc: (DATA.docs[x.dataset.item] || '').split(' ').pop()}; });
         if (cx0 && cx0.doc){
@@ -379,7 +379,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
             {vendor: 'No Such Vendor', check: 'dept', document: '000', recommend: 'question', note: 'Nothing fits this.'}]}));
           const outN = path.join(tmp, 'notes');
           const r = cp.spawnSync('python3', ['build_pages.py', '--only', 'coding', '--coding-run', run, '--gl', ...GL, '--out', outN, '--drafts', nd], {cwd: DG, encoding: 'utf8'});
-          const h = r.status ? '' : fs.readFileSync(path.join(outN, fs.readdirSync(outN).find(f => /^serif-gl-coding-review-.*\.html$/.test(f))), 'utf8');
+          const h = r.status ? '' : fs.readFileSync(path.join(outN, fs.readdirSync(outN).find(f => /^gl-coding-review-.*\.html$/.test(f))), 'utf8');
           const D = h ? JSON.parse(h.match(/window\.DATA=(.*?);<\/script>/s)[1]) : {drafts: {}};
           const placed = Object.keys(D.drafts).filter(k => /^ven:/.test(k));
           ok(placed.length === 1 && placed[0] === 'ven:' + cx0.id && D.drafts[placed[0]].v === 'reject' && /stays expense/.test(D.drafts[placed[0]].note),
@@ -390,7 +390,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       } else console.log('  SKIP gl: reference IDs across builds (needs out/dist, out/aug2026 and inputs/aug2026: run tools/build.sh first)');
     }
     if (k === 'gl'){
-      // SERIF-142: a threshold per screen. CapEx and Prepaid have their own, saved like the general one; a Department flag has none.
+      // CCC-142: a threshold per screen. CapEx and Prepaid have their own, saved like the general one; a Department flag has none.
       // Each is changed on its page, by its chip; Settings has none.
       const PG = {thr: 'dept', thr_capex: 'capex', thr_prepaid: 'prepaid'};
       const setThr = async (k, v) => { await p.evaluate(id => show(id), PG[k]); await p.click('#p-' + PG[k] + ' [data-thedit="' + k + '"]');
@@ -416,7 +416,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       await setThr('thr_prepaid', '5000');
       ok(await same(PF, 5000) && (await marked(PF)).length > (await over(PF, 25000)).length, 'gl: lowering the Prepaid threshold to $5,000 marks more prepaid flags (' + (await marked(PF)).length + ')');
       await setThr('thr_capex', '3000'); await setThr('thr_prepaid', '10000');
-      ok(await same(CAP, 3000) && (await marked(CAP)).length === 2 && await same(PRE, 10000), 'gl: changing the CapEx and Prepaid thresholds marks their screens again');
+      ok(await same(CAP, 3000) && (await marked(CAP)).length > (await over(CAP, 5000)).length && await same(PRE, 10000), 'gl: changing the CapEx and Prepaid thresholds marks their screens again (' + (await marked(CAP)).length + ' CapEx at $3,000)');
       ok(await p.evaluate(() => $('#p-capex .thrchips [data-thrv="thr_capex"]').textContent === '$3,000' && /Default \$5,000/.test($('#p-capex [data-thrdef="thr_capex"]').textContent)
          && $('#p-capex [data-thc="thr_capex"]').classList.contains('chg') && $('#p-prepaid [data-thrv="thr_prepaid"]').textContent === '$10,000'
          && /Always reviewed/.test($("#p-dept .thrchips").textContent) && !$('#p-export .thrchips')),
@@ -438,7 +438,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
         S.set = JSON.parse(kept); return r.set && r.set.thr_capex === 3000 && took; }),
          'gl: the thresholds are saved in the decision record, and a loaded record brings them in');
       await p.evaluate(() => { delete S.set.thr; delete S.set.thr_capex; delete S.set.thr_prepaid; save(); refresh(); });
-      // a review saved before SERIF-142 holds one threshold: it loads, keeps it, and CapEx and Prepaid take their defaults
+      // a review saved before CCC-142 holds one threshold: it loads, keeps it, and CapEx and Prepaid take their defaults
       const c0 = await b.newContext(); const o = await c0.newPage(), key = await p.evaluate(() => KEY), idOld = await p.evaluate(() => $('#p-dept [data-flag]').dataset.item);
       o.on('pageerror', e => errs.push('gl old state: ' + e.message));
       await o.addInitScript(([k, v]) => { if (!sessionStorage.getItem('seeded')){ localStorage.setItem(k, v); sessionStorage.setItem('seeded', '1'); } },
@@ -448,8 +448,8 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
          'gl: a review saved with one threshold restores, its decisions and threshold kept, CapEx and Prepaid at their defaults');
       ok(await o.evaluate(() => $$('#p-dept [data-thr="thr"]').every(x => x.classList.contains('hi') === Number(x.dataset.amt) >= 40000) && $('#p-dept [data-thrv="thr"]').textContent === '$40,000'), 'gl: its threshold marks the account recodes');
       await c0.close();
-      // SERIF-147: each CapEx recommendation says whether it goes to Capital in Process or its fixed asset account and why; the note asks
-      // the in-service date. SERIF-172: the reason states what was found, not what to do, so it carries no 'Ask ...' sentence.
+      // CCC-147: each CapEx recommendation says whether it goes to Capital in Process or its fixed asset account and why; the note asks
+      // the in-service date. CCC-172: the reason states what was found, not what to do, so it carries no 'Ask ...' sentence.
       await p.evaluate(() => show('capex'));
       const cx = await p.evaluate(() => $$('#p-capex [data-flag]').map(x => { const pl = x.querySelector('[data-placed]'), nt = x.querySelector('textarea[data-note]');
         return {id: x.dataset.item, text: x.querySelector('.why').textContent, to: DATA.je[x.dataset.item].lines.find(l => Number(l.debit)).account, memo: DATA.je[x.dataset.item].memo,
@@ -499,7 +499,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       // saved edits keep main's shape: lines in je, header fields in jh; a record from main (no jh, lines without a Line Memo) still loads
       ok(await p.evaluate(pid => Array.isArray(S.je[pid]) && !Array.isArray(S.jh[pid]) && recordOf().je[pid] === S.je[pid], pid), 'pl: S.je keeps the lines array; header edits are in their own store');
       ok(await p.evaluate(() => { const id = Object.keys(DATA.je).find(k => !DATA.je[k].proposal), lines = DATA.je[id].lines.map(l => ({account: l.account, department: l.department, debit: l.debit, credit: l.credit}));
-        const rec = {kind: 'serif-decision-record', console_kind: 'flux', dec: {}, notes: {}, je: {[id]: lines}, ck: {}, sign: {}, log: {}}; planRecord(rec); const was = S.je[id]; S.je[id] = lines;
+        const rec = {kind: 'decision-record', console_kind: 'flux', dec: {}, notes: {}, je: {[id]: lines}, ck: {}, sign: {}, log: {}}; planRecord(rec); const was = S.je[id]; S.je[id] = lines;
         const ok_ = jeOf(id).lines.every(l => l.memo === DATA.je[id].memo); if (was) S.je[id] = was; else delete S.je[id]; return ok_; }), 'pl: a record in main\'s format loads; Line Memo defaults to the entry memo');
       ok(await p.evaluate(pid => jeReady(pid), pid), 'pl: a balanced, noted proposal is ready');
       const [d2] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.evaluate(() => exportCSV())]);
@@ -526,19 +526,19 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
       ok(await p.evaluate(() => { const w = $$('#p-adj [data-item^="ADJ-"] .assess .why').map(x => x.textContent);
         return w.length > 0 && w.every(t => t.trim() && !/^(Confirm|Read|Ask|If )|If the work stopped/.test(t)) && w.some(t => /billed (nothing|\$[\d,.]+) in \w+ \d{4}, against a trailing three-month average/.test(t)); }),
          'pl: each adjustment\'s reason states what the check found, with no instruction');
-      ok(await p.locator('#p-sox .ch', {hasText: 'Related Party: Flagship'}).count() === 1, 'pl: Flagship related-party schedule');
+      ok(await p.locator('#p-sox .ch', {hasText: 'Related Party: Plurality'}).count() === 1, 'pl: Plurality related-party schedule');
     }
     // the run log
     await p.evaluate(() => show('runlog'));
     ok(await p.locator('#p-runlog h3', {hasText: 'What each check found'}).count() === 1, k + ': run log shows each check');
-    ok(await p.locator('#p-runlog td', {hasText: '2.3.0'}).count() >= 1, k + ': build record names 2.3.0');
+    ok(await p.locator('#p-runlog td', {hasText: '2.4.0'}).count() >= 1, k + ': build record names 2.4.0');
     // the decision record: save, then load into a clean browser
     await p.evaluate(() => show('settings'));
     const [rd] = await Promise.all([p.waitForEvent('download', {timeout: 4000}).catch(() => null), p.click('[data-recsave]')]);
-    const recPath = path.join(os.tmpdir(), 'serif-rec-' + k + '.json');
+    const recPath = path.join(os.tmpdir(), 'wl-rec-' + k + '.json');
     if (rd) fs.copyFileSync(await rd.path(), recPath);
     const rec = rd ? JSON.parse(fs.readFileSync(recPath, 'utf8')) : {};
-    ok(rec.kind === 'serif-decision-record' && rec.dec && rec.dec[id], k + ': record saved with the decision');
+    ok(rec.kind === 'decision-record' && rec.dec && rec.dec[id], k + ': record saved with the decision');
     if (ns){
       const f = (rec.fixes || {})[ns.id] || {};
       ok(rec.dec[ns.id].v === 'netsuite' && f.path === 'Edited in NetSuite' && f.document === ns.doc && f.ref === ns.ref && !f.in_import && !f.external_id,
@@ -631,7 +631,7 @@ const MOCK = ({uid, name, canWrite, canEdit, withDb}) => {
     ok((await A.evaluate(() => window.__saved.length)) === 1, 'decision record offered through downloads');
     // a rerun of the close brings in the earlier run's decisions
     const html = fs.readFileSync(FILES[k], 'utf8').replace(/"run": "([^"]+)"/, '"run": "rerun0000000002"');
-    const rerun = path.join(os.tmpdir(), 'serif-rerun-' + k + '.html'); fs.writeFileSync(rerun, html);
+    const rerun = path.join(os.tmpdir(), 'wl-rerun-' + k + '.html'); fs.writeFileSync(rerun, html);
     const R = await open('u_A', 'Alice Reviewer', true, rerun); await sleep(1400);
     ok(await R.evaluate(() => !document.querySelector('[data-carry]').hidden), 'rerun offers the earlier run\'s decisions');
     ok(await R.evaluate(id => !S.dec[id], ids[0]), 'rerun starts fresh');

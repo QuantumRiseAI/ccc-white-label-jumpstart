@@ -1,4 +1,4 @@
--- The general ledger for one month: every posted line of subsidiary 97 (FL87 Serif
+-- The general ledger for one month: every posted line of subsidiary 97 (PL87 Unity
 -- Biomedicines, Inc.), with the columns the scripts read. Program is the class field and
 -- ProjectID the custcol_cseg_sik_project segment. The name is the transaction's, as the
 -- saved search shows it, and the parent accounts give the path the flux groups by.

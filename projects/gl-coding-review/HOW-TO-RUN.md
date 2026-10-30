@@ -19,7 +19,7 @@ From this folder, for a close of Sep 2026, first tie the month's ledger to NetSu
 Statement, account by account:
 
 ```sh
-python3 serif_sources.py tie --period "Sep 2026" \
+python3 client_sources.py tie --period "Sep 2026" \
   --gl netsuite_gl_detail_* \
   --income-statement netsuite_income_statement_by_*
 ```
@@ -29,7 +29,7 @@ difference, and exits 2. A failed tie stops the review there: export the GL and 
 Statement again. Then:
 
 ```sh
-python3 serif_uc1_engine.py --period "Sep 2026" \
+python3 client_uc1_engine.py --period "Sep 2026" \
   --gl      netsuite_gl_detail_* \
   --coupa   coupa_po_lines_*.csv \
   --pending . \
@@ -41,9 +41,9 @@ month; the month before and the same month last year set each vendor's usual cod
 month in two exports is refused.
 
 ```sh
-python3 serif_views.py out/sep2026/run.json \
+python3 client_views.py out/sep2026/run.json \
   --gl     netsuite_gl_detail_* \
-  --plan   serif_rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
+  --plan   rolling_forecast_2026-08.xlsx --plan-vintage 2026-06 \
   --coupa  coupa_po_lines_*.csv \
   --roster ukg_full_roster_*.csv \
   --netsuite-ids netsuite_link_ids_*.csv \
@@ -56,7 +56,7 @@ rolling forecast workbook whose prior cut is the plan; `--plan-vintage` names th
 ```sh
 python3 build_pages.py --only coding --coding-run out/sep2026/run.json \
   --gl netsuite_gl_detail_* --income-statement netsuite_income_statement_by_* \
-  --netsuite-ref netsuite_ref_*.csv --flagship-breakdown flagship_breakdown_*.xlsx \
+  --netsuite-ref netsuite_ref_*.csv --parent-breakdown *breakdown_INV*.xlsx \
   --out out/sep2026
 ```
 
@@ -76,10 +76,10 @@ no item fits, a Journal Entry that does not balance, or an account fit entry tha
 `drafts.json` keyed by vendor (`vendors`) still loads when it has no `notes`. The format is in
 `PROJECT_INSTRUCTIONS.md`.
 
-Leave out `--netsuite-ids`, `--flagship-breakdown` or `--netsuite-ref` when its file is absent:
+Leave out `--netsuite-ids`, `--parent-breakdown` or `--netsuite-ref` when its file is absent:
 a pattern that matches no file can stop the command.
 
-`serif_views.py` adds the schedules to the run artifact. It reads each input, lays it out
+`client_views.py` adds the schedules to the run artifact. It reads each input, lays it out
 and decides nothing; rerunning it replaces what it added. Every input it reads is
 fingerprinted in the Run log's Build record beside the engine's.
 
@@ -88,14 +88,14 @@ addresses and salaries. With `--keep-names` the console keeps names, for the acc
 without it, the schedules step withholds them. Without the roster, the requester flag does not
 run.
 
-**`serif_uc2_flux.py` sits beside `serif_views.py`.** The CapEx and Prepaid flags are the
+**`client_uc2_flux.py` sits beside `client_views.py`.** The CapEx and Prepaid flags are the
 flux engine's own rules, imported from it.
 
 In a Claude Project every uploaded file sits at the top level, so all of these are bare
 filenames. In the repo, `make build PERIOD=sep2026` runs the same commands from the packaged
 Project folder on the exports in `inputs/sep2026/`.
 
-The last command writes `out/sep2026/serif-gl-coding-review-sep2026-v<version>.html` (the console version, 2.3.0 now), one
+The last command writes `out/sep2026/gl-coding-review-sep2026-v<version>.html` (the console version, 2.3.0 now), one
 self-contained file that opens in any browser. That is the deliverable.
 
 The filename carries the period and the console version, so builds of different versions do
@@ -113,7 +113,7 @@ If Python is missing, ask Claude to install it. On Windows that is usually
 
 ## Each Month
 
-Serif sends these exports, uploaded as they are (link IDs, Flagship cost breakdowns and NetSuite's lists are optional):
+Unity sends these exports, uploaded as they are (link IDs, Plurality cost breakdowns and NetSuite's lists are optional):
 
 1. The NetSuite Custom General Ledger saved search, exported as `.xls` (an `.xlsx` saved
    from it also reads), named `netsuite_gl_detail_<range>.xls`. Columns are found by name, so a
@@ -128,7 +128,7 @@ Serif sends these exports, uploaded as they are (link IDs, Flagship cost breakdo
 3. The newest UKG roster, as `.csv`.
 4. The NetSuite Income Statement by month report, through the month, as `.xls`.
 
-The plan workbook stays in the Project until Serif sets a new plan. Open the close's chat,
+The plan workbook stays in the Project until Unity sets a new plan. Open the close's chat,
 below, and ask: `Run the GL coding review for Sep 2026.`
 
 ## The Close in One Chat
@@ -262,9 +262,9 @@ as a file keeps the review in that browser.
 
 ## Links to NetSuite and Coupa
 
-Serif's NetSuite is account 5602907, set as `NETSUITE_ACCOUNT` at the top of
-`serif_sources.py`. It is one Flagship-wide instance, so one document number can belong to
-bills of several Flagship companies; the links use internal IDs, never the number.
+Unity's NetSuite is account 5602907, set as `NETSUITE_ACCOUNT` at the top of
+`client_sources.py`. It is one Plurality-wide instance, so one document number can belong to
+bills of several Plurality companies; the links use internal IDs, never the number.
 
 * **Document numbers** open the transaction in NetSuite. Without its internal ID a number
   is plain text: NetSuite's search results cannot be opened from a link.
@@ -278,9 +278,9 @@ bills of several Flagship companies; the links use internal IDs, never the numbe
 ### Pulling the link IDs with the NetSuite connector
 
 The IDs come from one SuiteQL query, `netsuite_link_ids.sql`, run through the NetSuite
-connector in Serif's Claude instance:
+connector in Unity's Claude instance:
 
-1. Open a chat in Serif's instance, with the NetSuite connector on, and paste
+1. Open a chat in Unity's instance, with the NetSuite connector on, and paste
    `netsuite_link_ids.sql` with the close month in place of `Sep 2026`. Ask Claude to run it,
    page through every row, and save the rows with code, exactly as returned, as
    `netsuite_link_ids_<month>.csv`.
@@ -292,7 +292,7 @@ connector in Serif's Claude instance:
 3. Put the file with the month's exports and pass it to the schedules step:
 
 ```sh
-python3 serif_views.py out/sep2026/run.json ... --netsuite-ids netsuite_link_ids_sep2026.csv
+python3 client_views.py out/sep2026/run.json ... --netsuite-ids netsuite_link_ids_sep2026.csv
 ```
 
 The file is read for links only, and no figure or finding comes from it. The schedules step
@@ -305,25 +305,22 @@ reader finds those columns by header.
 
 ## Design
 
-The console follows the Serif Brand Guide on Brandpad (brandpad.io/serif), through the
-tokens in `design-system/tokens.css` in the repo, carried in `serif_design.py`. The page is
-Light Gray, cards are white, and the top bar is Dark Gray with the wordmark in White. Text is
-Dark Gray, secondary text is Mid Gray, and rules are Warm Gray.
+The console follows the client's design system, through the tokens in
+`design-system/tokens.css` in the repo, carried in `client_design.py`. The look is a clean,
+clinical biotech style: a light neutral page, white cards, and a clinical teal accent for
+the rail, headings and links.
 
-Red marks what needs action: an item over the threshold, the current page, the one
-primary button. It never fills behind text. Where red is text it is a darker red,
-`#c72e00`, which passes WCAG AA on white. The one other color the palette does not name is
-`#d6d6d4`, for rules and hover fills on a white card.
+One action color marks what needs action: an item over the threshold, the current page, the
+one primary button. It never fills behind text, and where it is text it passes WCAG AA on
+white.
 
 Everything is in sentence case. Cards have soft corners and no borders or shadows, and
 buttons are pills.
 
-Headlines and all text are set in Denim. Eliza appears only as a short highlight in a
-headline. Denim and Eliza are licensed and are
-not redistributed, so `serif_fonts.py` inlines open-licensed stand-ins: Figtree for Denim
-at `size-adjust: 96%` and PT Serif for Eliza at `104%`. After those come the alternatives
-the brand names, Helvetica or Arial and Georgia. If `serif_fonts.py` is missing, the
-console renders in those.
+The fonts are open-licensed, and `client_fonts.py` inlines them so the HTML needs no network.
+If `client_fonts.py` is missing, the console renders in the system font stack.
+
+See `design-system/README.md` for the palette and type.
 
 ## Working the Console
 
@@ -352,12 +349,12 @@ each with what is left on it. Run log and Settings are the icons at the right.
     matches the vendor's earlier months and only the plan differs, and its Memo is
     `Recode <vendor> | Mon'YY`. When a coding's lines carry more than one Project or Program, its
     Journal Entry moves each in its own pair of lines, so both sides keep them.
-  * **Pass-Through Bills** lists the month's Flagship Labs LLC and Flagship Pioneering Labs TPC Inc
-    bills, each one lump sum of costs Flagship paid for Serif. Give a bill's cost breakdown from
-    Coupa (`flagship_breakdown_<invoice>.xlsx`, with `--flagship-breakdown`) and its card ties the
-    breakdown to the bill, maps each item to Serif's account, flags capital, prepaid and misplaced
+  * **Pass-Through Bills** lists the month's Plurality Labs LLC and Plurality Group Labs TPC Inc
+    bills, each one lump sum of costs Plurality paid for Unity. Give a bill's cost breakdown from
+    Coupa (`*breakdown_INV<n>.xlsx`, with `--parent-breakdown`) and its card ties the
+    breakdown to the bill, maps each item to Unity's account, flags capital, prepaid and misplaced
     items, and proposes the reclass. Without one, the card links to Coupa and is decided Reviewed in
-    Coupa; nothing waits on it. `python3 serif_sources.py passthrough` lists the bills.
+    Coupa; nothing waits on it. `python3 client_sources.py passthrough` lists the bills.
 * **Confirm**: Vendors Reviewed & Cleared, and New Vendors This Period, each with a folder tab
   per department.
 * **Documentation**: Audit Log, SOX Documentation (with the **Sign-Off & Export** card at its foot), and Export.
@@ -389,7 +386,7 @@ goes to the page its change belongs to and takes that category's ID: a debit to 
 account (15xxxxx) is CAPEX-NN on CapEx Flags, a debit to a prepaid account (13xxxxx) is
 PREPAID-NN on Prepaid Flags, and any other is CODING-NN on Organization & Account, under vs. Vendor
 History. It is numbered where its page lists it, so a draft added later in the close can move
-the IDs after it. Its External ID stays `SERIF-DRAFT-N`, and the work paper's decision
+the IDs after it. Its External ID stays `UNITY-DRAFT-N`, and the work paper's decision
 Path says ", drafted by Claude".
 
 An **account fit** entry is the exception. Claude reads every vendor line in the run, the vendors
@@ -427,7 +424,7 @@ text and in its Journal Entry Memo:
 * **The fixed asset account**, for an asset in service: `1510000` Lab Equipment - New for lab
   equipment, `1530000` Computers & Software for computers and software. The policy places it
   in service at the invoice date.
-* Office furniture and equipment has no fixed asset account in Serif's chart. Until Serif
+* Office furniture and equipment has no fixed asset account in Unity's chart. Until Unity
   names one, the entry holds it in Capital in Process and the card says the chart has no fixed
   asset account for it.
 
@@ -514,15 +511,15 @@ entry's status.
 ### The Threshold
 
 Nothing is graded high, medium and low. An item is either at or over the amount at which
-Serif corrects an exception, or under it. Each review screen has its own, changed on the chip
+Unity corrects an exception, or under it. Each review screen has its own, changed on the chip
 beside the page's title (click the amount; Reset brings back the default). A change is the
 review's: recorded in the Audit Log, seen by everyone the review is shared with, and saved in the
 decision record:
 
 | Screen | Default | Why |
 |---|---|---|
-| CapEx Flags | **$5,000** | Serif's PP&E capitalization threshold (Mike's write-up, 12 Oct 2026) |
-| Prepaid Flags | **$25,000** | Serif's prepaid threshold (same write-up), on related charges together |
+| CapEx Flags | **$5,000** | Unity's PP&E capitalization threshold (Mike's write-up, 12 Oct 2026) |
+| Prepaid Flags | **$25,000** | Unity's prepaid threshold (same write-up), on related charges together |
 | Organization & Account, account recodes and drafted entries | **$2,500** | The review threshold |
 | Organization & Account, Department flags | none | Every line off Non-Specific is recoded, whatever its size |
 

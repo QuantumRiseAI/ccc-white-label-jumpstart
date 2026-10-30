@@ -1,8 +1,8 @@
-"""Serif deployment-option run-cost model.
+"""Unity Biomedicines deployment-option run-cost model.
 
 One usage profile is applied to every option so the columns stay comparable.
 All unit prices are list-price assumptions (Oct 2026) to confirm against
-Serif/Flagship contracts. Edit ASSUMPTIONS and rerun: python3 cost_model.py
+Unity/Plurality contracts. Edit ASSUMPTIONS and rerun: python3 cost_model.py
 """
 
 ASSUMPTIONS = {
